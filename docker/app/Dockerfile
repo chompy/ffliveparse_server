@@ -9,7 +9,7 @@ RUN cd /app && \
     go get github.com/tdewolff/minify && \
     go get github.com/tdewolff/minify/css && \
     go get github.com/tdewolff/minify/js && \
-    go get github.com/mattn/go-sqlite3 && \
+    go get github.com/go-sql-driver/mysql && \
     go get github.com/segmentio/ksuid && \
     go build -o app.bin && \
     apk del git build-base
