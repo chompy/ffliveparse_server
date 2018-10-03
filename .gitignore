@@ -1,6 +1,7 @@
-act_plugin/obj
 *.exe
+*.pyc
 *.code-workspace
 server/data/
 !server/data/.placeholder
 !server/web/util/build_cactbot_triggers/cactbot/*
+__pycache__

@@ -35,6 +35,7 @@ func main() {
 
 	// create user manager
 	userManager, err := user.NewManager()
+	defer userManager.Close()
 	if err != nil {
 		log.Panicln("Error occured while initalizing the user manager,", err)
 	}

@@ -20,12 +20,15 @@ package act
 import (
 	"database/sql"
 	"log"
+	"os"
 	"time"
 
 	"github.com/martinlindhe/base36"
 
 	"../app"
 	"../user"
+
+	_ "github.com/go-sql-driver/mysql" // mysql driver
 )
 
 // lastUpdateInactiveTime - Time in ms between last data updata before data is considered inactive
@@ -72,7 +75,10 @@ func (d *Data) UpdateEncounter(encounter Encounter) {
 		d.Encounter = encounter
 		// save encounter if it is no longer active
 		if !d.Encounter.Active {
-			d.SaveEncounter()
+			err := d.SaveEncounter()
+			if err != nil {
+				log.Println("Error while saving encounter", d.Encounter.ID, err)
+			}
 		}
 		return
 	}
@@ -122,7 +128,13 @@ func (d *Data) ClearLogLines() {
 
 // getDatabase - get encounter database for given user
 func getDatabase(user user.Data) (*sql.DB, error) {
-	database, err := sql.Open("sqlite3", app.DataPath+"/act_"+user.GetWebIDString()+".db")
+	// get database dsn
+	dbDsn := os.Getenv(app.DatabaseDsnEnvironmentVarName)
+	if dbDsn == "" {
+		dbDsn = app.DefaultDatabaseDsn
+	}
+	// open database connection
+	database, err := sql.Open("mysql", dbDsn)
 	if err != nil {
 		return nil, err
 	}
@@ -135,12 +147,14 @@ func initDatabase(database *sql.DB) error {
 	stmt, err := database.Prepare(`
 		CREATE TABLE IF NOT EXISTS encounter
 		(
-			id INTEGER PRIMARY KEY,
+			id INTEGER,
+			user_id INTEGER,
 			start_time DATETIME,
 			end_time DATETIME,
 			zone VARCHAR(256),
 			damage INTEGER,
-			success_level INTEGER
+			success_level INTEGER,
+			CONSTRAINT encounter_unique UNIQUE (id, user_id)
 		)
 	`)
 	if err != nil {
@@ -154,7 +168,8 @@ func initDatabase(database *sql.DB) error {
 	stmt, err = database.Prepare(`
 		CREATE TABLE IF NOT EXISTS combatant
 		(
-			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			id INTEGER PRIMARY KEY AUTO_INCREMENT,
+			user_id INTEGER,
 			encounter_id INTEGER,
 			name VARCHAR(256),
 			job VARCHAR(3),
@@ -165,7 +180,7 @@ func initDatabase(database *sql.DB) error {
 			hits INTEGER,
 			heals INTEGER,
 			kills INTEGER,
-			CONSTRAINT encounter_unique UNIQUE (encounter_id, name)
+			CONSTRAINT encounter_unique UNIQUE (user_id, encounter_id, name)
 		)
 	`)
 	if err != nil {
@@ -192,15 +207,16 @@ func (d *Data) SaveEncounter() error {
 	defer database.Close()
 	// insert in to encounter table
 	stmt, err := database.Prepare(`
-		INSERT OR REPLACE INTO encounter
-		(id, start_time, end_time, zone, damage, success_level) VALUES
-		(?, ?, ?, ?, ?, ?)
+		REPLACE INTO encounter
+		(id, user_id, start_time, end_time, zone, damage, success_level) VALUES
+		(?, ?, ?, ?, ?, ?, ?)
 	`)
 	if err != nil {
 		return err
 	}
 	_, err = stmt.Exec(
 		d.Encounter.ID,
+		d.User.ID,
 		d.Encounter.StartTime,
 		d.Encounter.EndTime,
 		d.Encounter.Zone,
@@ -214,15 +230,16 @@ func (d *Data) SaveEncounter() error {
 	// insert in to combatant table
 	for _, combatant := range d.Combatants {
 		stmt, err := database.Prepare(`
-			INSERT OR REPLACE INTO combatant
-			(encounter_id, name, job, damage, damage_taken, damage_healed, deaths, hits, heals, kills) VALUES
-			(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			REPLACE INTO combatant
+			(encounter_id, user_id, name, job, damage, damage_taken, damage_healed, deaths, hits, heals, kills) VALUES
+			(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		`)
 		if err != nil {
 			return err
 		}
 		_, err = stmt.Exec(
 			combatant.EncounterID,
+			d.User.ID,
 			combatant.Name,
 			combatant.Job,
 			combatant.Damage,
@@ -248,7 +265,7 @@ func (d *Data) ClearEncounter() {
 }
 
 // GetPreviousEncounter - retrieve previous encounter data from database
-func GetPreviousEncounter(user user.Data, encounterID int32) (Data, error) {
+func GetPreviousEncounter(user user.Data, encounterID uint32) (Data, error) {
 	// get database
 	database, err := getDatabase(user)
 	if err != nil {
@@ -257,7 +274,8 @@ func GetPreviousEncounter(user user.Data, encounterID int32) (Data, error) {
 	defer database.Close()
 	// fetch encounter
 	rows, err := database.Query(
-		"SELECT * FROM encounter WHERE id = ? LIMIT 1",
+		"SELECT id, start_time, end_time, zone, damage, success_level FROM encounter WHERE user_id = ? AND id = ? LIMIT 1",
+		user.ID,
 		encounterID,
 	)
 	if err != nil {
@@ -281,7 +299,8 @@ func GetPreviousEncounter(user user.Data, encounterID int32) (Data, error) {
 	rows.Close()
 	// fetch combatants
 	rows, err = database.Query(
-		"SELECT encounter_id, name, job, damage, damage_taken, damage_healed, deaths, hits, heals, kills FROM combatant WHERE encounter_id = ?",
+		"SELECT encounter_id, name, job, damage, damage_taken, damage_healed, deaths, hits, heals, kills FROM combatant WHERE user_id = ? AND encounter_id = ?",
+		user.ID,
 		encounterID,
 	)
 	if err != nil {

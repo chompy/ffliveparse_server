@@ -134,13 +134,13 @@ func HTTPStartServer(port uint16, userManager *user.Manager, actManager *act.Man
 		// get act data from web ID
 		actData := actManager.GetDataWithWebID(webID)
 		// get encounter id int
-		encounterIDInt := int32(0)
+		encounterIDInt := uint32(0)
 		if encounterID != "" {
-			encounterIDInt = int32(base36.Decode(encounterID))
+			encounterIDInt = uint32(base36.Decode(encounterID))
 		}
 		// relay previous encounter data if encounter id was provided
 		if encounterID != "" && (actData == nil || encounterIDInt != actData.Encounter.ID) {
-			log.Println("Load previous encounter data (EncounterID:", encounterID, ", UserID:", userData.ID, ")")
+			log.Println("Load previous encounter data (EncounterID:", encounterIDInt, ", UserID:", userData.ID, ")")
 			previousEncounter, err := act.GetPreviousEncounter(userData, encounterIDInt)
 			if err != nil {
 				log.Println("Error when retreiving previous encounter", encounterID, "for user", userData.ID, ",", err)

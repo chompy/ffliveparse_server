@@ -20,11 +20,12 @@ package user
 import (
 	"database/sql"
 	"fmt"
+	"os"
 	"time"
 
 	"../app"
 
-	_ "github.com/mattn/go-sqlite3" // enable sqlite3 db driver
+	_ "github.com/go-sql-driver/mysql" // mysql driver
 )
 
 // Manager - manages users data
@@ -37,7 +38,7 @@ func createUserTables(database *sql.DB) error {
 	stmt, err := database.Prepare(`
 		CREATE TABLE IF NOT EXISTS user
 		(
-			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			id INTEGER PRIMARY KEY AUTO_INCREMENT,
 			created DATETIME DEFAULT CURRENT_TIMESTAMP,
 			accessed DATETIME DEFAULT CURRENT_TIMESTAMP,
 			upload_key VARCHAR(32),
@@ -53,8 +54,13 @@ func createUserTables(database *sql.DB) error {
 
 // NewManager - get new user manager
 func NewManager() (Manager, error) {
+	// get database dsn
+	dbDsn := os.Getenv(app.DatabaseDsnEnvironmentVarName)
+	if dbDsn == "" {
+		dbDsn = app.DefaultDatabaseDsn
+	}
 	// open database connect, create tables if they do not exist
-	database, err := sql.Open("sqlite3", app.DataPath+"/users.db")
+	database, err := sql.Open("mysql", dbDsn)
 	if err != nil {
 		return Manager{}, err
 	}
@@ -65,6 +71,11 @@ func NewManager() (Manager, error) {
 	return Manager{
 		database: database,
 	}, nil
+}
+
+// Close - clean up method, close database connection
+func (m *Manager) Close() {
+	m.database.Close()
 }
 
 // New - create a new user

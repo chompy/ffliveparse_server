@@ -39,7 +39,7 @@ const DataTypeFlag byte = 99
 
 // Combatant - Data about a combatant
 type Combatant struct {
-	EncounterID  int32
+	EncounterID  uint32
 	Name         string
 	Job          string
 	Damage       int32
@@ -53,7 +53,7 @@ type Combatant struct {
 
 // Encounter - Data about an encounter
 type Encounter struct {
-	ID           int32
+	ID           uint32
 	StartTime    time.Time
 	EndTime      time.Time
 	Zone         string
@@ -64,7 +64,7 @@ type Encounter struct {
 
 // LogLine - Log line from Act
 type LogLine struct {
-	EncounterID int32
+	EncounterID uint32
 	Time        time.Time
 	LogLine     string
 }

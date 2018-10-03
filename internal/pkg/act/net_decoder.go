@@ -32,6 +32,12 @@ func readUint16(data []byte, pos *int) uint16 {
 	return binary.BigEndian.Uint16(dataString)
 }
 
+func readUint32(data []byte, pos *int) uint32 {
+	dataString := data[*pos : *pos+4]
+	*pos += 4
+	return binary.BigEndian.Uint32(dataString)
+}
+
 func readInt32(data []byte, pos *int) int32 {
 	dataString := data[*pos : *pos+4]
 	*pos += 4
@@ -82,7 +88,7 @@ func DecodeEncounterBytes(data []byte) (Encounter, error) {
 	}
 	pos := 1
 	return Encounter{
-		ID:           readInt32(data, &pos),
+		ID:           readUint32(data, &pos),
 		StartTime:    readTime(data, &pos),
 		EndTime:      readTime(data, &pos),
 		Zone:         readString(data, &pos),
@@ -99,7 +105,7 @@ func DecodeCombatantBytes(data []byte) (Combatant, error) {
 	}
 	pos := 1
 	return Combatant{
-		EncounterID:  readInt32(data, &pos),
+		EncounterID:  readUint32(data, &pos),
 		Name:         readString(data, &pos),
 		Job:          readString(data, &pos),
 		Damage:       readInt32(data, &pos),
@@ -118,7 +124,7 @@ func DecodeLogLineBytes(data []byte) (LogLine, error) {
 		return LogLine{}, errors.New("invalid data type for LogLine")
 	}
 	pos := 1
-	encounterID := readInt32(data, &pos)
+	encounterID := readUint32(data, &pos)
 	time := readTime(data, &pos)
 	logLine := readString(data, &pos)
 	return LogLine{

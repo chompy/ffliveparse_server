@@ -49,7 +49,7 @@ class WidgetEncounter extends WidgetBase
                 "Permalink",
                 "/static/img/opt_link.png",
                 function() {
-                    window.location.href += "/" + t.encounterId;
+                    window.location.href += "/" + t.encounterId.toString(36).toUpperCase();
                 }
             )
         )

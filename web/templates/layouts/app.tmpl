@@ -19,6 +19,7 @@
 <script type="text/javascript">
     var WEB_ID = "{{ .WebIDString }}";
     var ENCOUNTER_ID = "{{ .EncounterIDString }}";
+    var ENCOUNTER_ID_INT = parseInt(ENCOUNTER_ID, 36);
 </script>
 <script type="text/javascript" src="/app.min.js?v={{ .VersionString }}"></script>
 {{ end }}
