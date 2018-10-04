@@ -2,7 +2,7 @@
     {
         "id"        : "chain-stratagem",
         "regex"     : "1A:(.*) gains the effect of Chain Stratagem from (.*) for ([0-9].*).00 Seconds",
-        "tts"       : "chain strat",
+        "tts"       : "chain",
         "name"      : "Chain Stratagem",
         "icon"      : "/static/img/skill/chain_stratagem.png",
         "duration"  : "{{M3}}",
