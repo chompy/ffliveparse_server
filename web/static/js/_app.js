@@ -342,6 +342,9 @@ class Application
             this.userConfig["_app"] = {};
         }
 
+        // add preset class to body
+        document.getElementsByTagName("html")[0].classList.add("preset-" + queryParams["p"]);
+
         // hard code presets for now
         switch(queryParams["p"])
         {
@@ -349,11 +352,12 @@ class Application
             case "stream_overylay":
             case "obs":
             {
+                document.getElementsByTagName("html")[0].classList.add("preset-stream-overylay");
                 this.userConfig["_app"]["installedWidgets"] = ["encounter", "parse"];
-                document.getElementById("header").style.display = "none";
-                document.getElementById("footer").style.display = "none";
-                document.getElementsByTagName("html")[0].style.backgroundColor = "transparent";
-                document.getElementsByTagName("body")[0].style.backgroundColor = "transparent";
+                if (!("parse" in this.userConfig)) {
+                    this.userConfig["parse"] = {};
+                }
+                this.userConfig["parse"]["showColumns"] = ["job", "damage"];                
                 break;
            }
 

@@ -1,0 +1,12 @@
+/*
+STREAM OVERLAY PRESET
+*/
+.preset-stream-overylay, .preset-stream-overylay body {
+    background: transparent;
+    margin: 0;
+}
+
+.preset-stream-overylay #header, .preset-stream-overylay #footer, .preset-stream-overylay .widget .widgetOption {
+    display: none;
+}
+
