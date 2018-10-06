@@ -6,7 +6,7 @@ STREAM OVERLAY PRESET
     margin: 0;
 }
 
-.preset-stream-overylay #header, .preset-stream-overylay #footer, .preset-stream-overylay .widget .widgetOption {
+.preset-stream-overylay #header, .preset-stream-overylay #footer, .preset-stream-overylay .widget .widgetOption, .preset-stream-overylay .parseColumnHeads {
     display: none;
 }
 

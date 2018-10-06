@@ -20,7 +20,7 @@ package app
 import "fmt"
 
 // VersionNumber - version number
-const VersionNumber int32 = 4
+const VersionNumber int32 = 5
 
 // ActPluginVersionNumber - act plugin version, must match number recieved from Act plugin to parse data
 const ActPluginVersionNumber int32 = 2
@@ -46,4 +46,9 @@ const LogTickRate = 1000
 // GetVersionString - get version as string in format X.XX
 func GetVersionString() string {
 	return fmt.Sprintf("%.2f", float32(VersionNumber)/100.0)
+}
+
+// GetActVersionString - get act version as string in format X.XX
+func GetActVersionString() string {
+	return fmt.Sprintf("%.2f", float32(ActPluginVersionNumber)/100.0)
 }

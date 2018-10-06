@@ -55,6 +55,7 @@ type templateData struct {
 	EncounterIDString string
 	AppName           string
 	VersionString     string
+	ActVersionString  string
 	ErrorMessage      string
 }
 
@@ -362,9 +363,10 @@ func globalWsWriter(websocketConnections *[]websocketConnection, events *emitter
 
 func getBaseTemplateData() templateData {
 	return templateData{
-		VersionString: app.GetVersionString(),
-		AppName:       app.Name,
-		HasUser:       false,
+		VersionString:    app.GetVersionString(),
+		ActVersionString: app.GetActVersionString(),
+		AppName:          app.Name,
+		HasUser:          false,
 	}
 }
 
