@@ -18,13 +18,18 @@ along with FFLiveParse.  If not, see <https://www.gnu.org/licenses/>.
 package user
 
 import (
+	"encoding/hex"
+	"io"
+	"strings"
 	"time"
+
+	"crypto/md5"
 
 	"github.com/martinlindhe/base36"
 	"github.com/segmentio/ksuid"
 )
 
-const webIDOffset = 1681616
+const webIDSalt = "aedb2d139b653ee8aeeed9010ed053e94cb01$#!756"
 
 // Data - data about an user
 type Data struct {
@@ -49,10 +54,29 @@ func NewData() Data {
 
 // GetWebIDString - get web id string used to access data
 func (d *Data) GetWebIDString() string {
-	return base36.Encode(uint64(d.ID + webIDOffset))
+	h := md5.New()
+	io.WriteString(h, string(d.ID))
+	io.WriteString(h, webIDSalt)
+	return strings.ToUpper(
+		base36.Encode(uint64(d.ID)) +
+			string(hex.EncodeToString(h.Sum(nil))[0:3]),
+	)
 }
 
 // GetIDFromWebIDString - convert web id string to user id int
 func GetIDFromWebIDString(webIDString string) int64 {
-	return int64(base36.Decode(webIDString)) - webIDOffset
+	if len(webIDString) < 3 {
+		return 0
+	}
+	hashStr := webIDString[len(webIDString)-3 : len(webIDString)]
+	webIDString = webIDString[0 : len(webIDString)-3]
+	userID := int64(base36.Decode(webIDString))
+	// verify hash str
+	h := md5.New()
+	io.WriteString(h, string(userID))
+	io.WriteString(h, webIDSalt)
+	if strings.ToUpper(string(hex.EncodeToString(h.Sum(nil))[0:3])) != hashStr {
+		return 0
+	}
+	return int64(base36.Decode(webIDString))
 }
