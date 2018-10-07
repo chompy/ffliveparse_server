@@ -1,0 +1,39 @@
+version: "3"
+services:
+
+    ffliveparse-mysql: 
+        hostname: "ffliveparse-mysql"
+        image: "yobasystems/alpine-mariadb"
+        volumes:
+            - "ffliveparse-data:/var/lib/mysql"
+        env_file:
+            - "docker.env"
+
+    ffliveparse-app:
+        build:
+            context: "../"
+            dockerfile: "docker/app/Dockerfile"
+        ports:
+            - "31593:31593/udp"
+        env_file:
+            - "docker.env"
+        links:
+            - "ffliveparse-mysql"
+
+    ffliveparse-nginx:
+        build: "nginx/"
+        ports:
+            - "80:80"
+            - "443:443"
+        env_file:
+            - "docker.env"
+        links:
+            - "ffliveparse-app"
+        volumes:
+            - "ffliveparse-ssl:/etc/letsencrypt"
+
+volumes:
+    "ffliveparse-data": 
+        external:
+            name: "ffliveparse-data"
+    "ffliveparse-ssl": 
