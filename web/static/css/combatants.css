@@ -1,0 +1,48 @@
+#combatants {
+    width: 20%;
+    height: 100%;
+    position: fixed;
+    overflow: hidden;
+    border-right: 1px solid #696969;
+    background: #2d2d2d;
+}
+.combatant {
+    padding: 10px 8px;
+    margin-bottom: 4px;
+}
+.combatant.combatant-healer {
+    background-color: #2fa35f;
+    color: #000;
+}
+.combatant.combatant-tank {
+    background-color: #4f59c4;
+    color: #fff;
+}
+.combatant.combatant-dps {
+    background-color: #723c3a;
+    color: #fff;
+}
+
+.combatant .info {
+    width: 20%;
+    float: left;
+}
+.combatant-info .job-icon {
+    width: 38px;
+    max-height: 38px;
+    vertical-align: middle;
+}
+.combatant-info .info-text {
+    vertical-align: middle;
+    display: inline-block;
+    margin-left: 5px;
+    margin-top: 1px;
+}
+.combatant-info .info-text span {
+    font-size: 16px;
+    line-height: 15px;
+    display: block;
+}
+.combatant-info .info-text .parse {
+    font-weight: bold;
+}

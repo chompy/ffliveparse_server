@@ -1,48 +1,52 @@
 {{ define "headerLeft" }}
-<span class="textBold siteTitle"><a href="/">{{.AppName}}</a></span>
+<div id="logo"><a href="/">{{.AppName}}</a></div>
 {{ end }}
 
 {{ define "content" }}
 
-<div class="homeSection">
-    <p>
-        {{.AppName}} is a tool for sharing your Final Fantasy XIV log and parse data from
-        <a href="https://advancedcombattracker.com/">Advanced Combat Tracker (ACT)</a> on the
-        web in real time.
-    </p>
-</div>
+<div id="homeContent">
 
-<div class="homeSection">
-    <p class="textCenter">
-        <a href="https://github.com/chompy/ffliveparse_act_plugin/archive/v{{ .ActVersionString }}.zip">Download ACT Plugin (v{{ .ActVersionString }})</a>
-    </p>
-    <p class="textCenter">
-        <a href="https://github.com/chompy/ffliveparse_act_plugin/blob/master/README.md">Install Guide</a> &bullet;
-        <a href="https://github.com/chompy/ffliveparse_server/blob/master/README.md#web-site-how-to">Web Site Usage Instructions</a>
-    </p>
-</div>
-
-
-<div class="homeSection">
-    {{ if (gt .User.ID 0) }}
-    <p class="textCenter">
-        Your ACT "upload key" is...
-    </p>
-    <code class="well textCenter">{{ .User.UploadKey }}</code>
-    <p class="textCenter">
-        Your parse page is...
-    </p>
-    <div class="well textCenter">
-        <a id="parsePageUrl" data-web-id="{{ .WebIDString }}" href="/{{ .WebIDString }}"></a>
+    <div class="homeSection">
+        <p>
+            {{.AppName}} is a tool for sharing your Final Fantasy XIV log and parse data from
+            <a href="https://advancedcombattracker.com/">Advanced Combat Tracker (ACT)</a> on the
+            web in real time.
+        </p>
     </div>
 
-    {{ else }}
-    <p class="textCenter textBody">
-        <a href="/new">Click here to generate your upload key.</a>
-    </p>
+    <div class="homeSection">
+        <p class="textCenter">
+            <a href="https://github.com/chompy/ffliveparse_act_plugin/archive/v{{ .ActVersionString }}.zip">Download ACT Plugin (v{{ .ActVersionString }})</a>
+        </p>
+        <p class="textCenter">
+            <a href="https://github.com/chompy/ffliveparse_act_plugin/blob/master/README.md">Install Guide</a> &bullet;
+            <a href="https://github.com/chompy/ffliveparse_server/blob/master/README.md#web-site-how-to">Web Site Usage Instructions</a>
+        </p>
+    </div>
+
+
+    <div class="homeSection">
+        {{ if (gt .User.ID 0) }}
+        <p class="textCenter">
+            Your ACT "upload key" is...
+        </p>
+        <code class="well textCenter">{{ .User.UploadKey }}</code>
+        <p class="textCenter">
+            Your parse page is...
+        </p>
+        <div class="well textCenter">
+            <a id="parsePageUrl" data-web-id="{{ .WebIDString }}" href="/{{ .WebIDString }}"></a>
+        </div>
+
+        {{ else }}
+        <p class="textCenter textBody">
+            <a href="/new">Click here to generate your upload key.</a>
+        </p>
+        {{ end }}
+    </div>
     {{ end }}
+    
 </div>
-{{ end }}
 
 {{ define "scripts" }}
 {{ if (gt .User.ID 0) }}

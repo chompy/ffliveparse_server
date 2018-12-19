@@ -15,6 +15,9 @@ You should have received a copy of the GNU General Public License
 along with FFLiveParse.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+var ENCOUNTER_TIME_ID = "encounter-time";
+var ENCOUNTER_NAME_ID = "encounter-name";
+
 /**
  * Encounter data widget
  */
@@ -29,6 +32,8 @@ class WidgetEncounter extends WidgetBase
         this.encounterId = "";
         this.combatants = [];
         this.tickTimeout = null;
+        this.encounterTimeElement = document.getElementById(ENCOUNTER_TIME_ID);
+        this.encounterNameElement = document.getElementById(ENCOUNTER_NAME_ID);
     }
 
     getName()
@@ -41,40 +46,9 @@ class WidgetEncounter extends WidgetBase
         return "Encounter";
     }
 
-    getOptions(){
-        var options = super.getOptions();
-        var t = this;
-        options.push(
-            new WidgetOption(
-                "Permalink",
-                "/static/img/opt_link.png",
-                function() {
-                    window.location.href += "/" + t.encounterId.toString(36).toUpperCase();
-                }
-            )
-        )
-        return options;
-    }
-
-    add()
+    init()
     {
-        super.add()
-        var bodyElement = this.getBodyElement();
-        if (!bodyElement) {
-            return;
-        }
-        // add encounter timer
-        var encounterTimerElement = document.createElement("div");
-        encounterTimerElement.classList.add("encounterTime");
-        bodyElement.appendChild(encounterTimerElement);
-        // add encounter zone
-        var encounterZoneElement = document.createElement("div");
-        encounterZoneElement.classList.add("encounterZone");
-        bodyElement.appendChild(encounterZoneElement);
-        // add raid dps
-        var encounterRaidDpsElement = document.createElement("div");
-        encounterRaidDpsElement.classList.add("encounterRaidDps");
-        bodyElement.appendChild(encounterRaidDpsElement);
+        super.init();
         // reset
         this.reset();
         // hook events
@@ -83,36 +57,14 @@ class WidgetEncounter extends WidgetBase
         this._tick();
     }
 
-    remove()
-    {
-        super.remove();
-        if (this.tickTimeout) {
-            clearTimeout(this.tickTimeout);
-        }
-        this.startTime = null;
-        this.offset = 6000;
-        this.encounterId = "";
-        this.combatants = [];
-        this.tickTimeout = null;
-    }
-
-    showOptionHelp()
-    {
-        var helpText ="";
-        helpText += "--- Encounter Widget ---\n";
-        helpText += "Displays the current encounter time, zone, and raid DPS.";
-        alert(helpText);
-    }
-
     /**
      * Reset the display.
      */
     reset()
     {
         this.combatants = [];
-        this.getBodyElement().getElementsByClassName("encounterTime")[0].innerText = "00:00";
-        this.getBodyElement().getElementsByClassName("encounterZone")[0].innerText = "(n/a)";
-        this.getBodyElement().getElementsByClassName("encounterRaidDps")[0].innerText = "0.0";
+        this.encounterTimeElement.innerText = "00:00";
+        this.encounterNameElement.innerText = "(Unknown Zone)";
     }
 
     /**
@@ -146,7 +98,7 @@ class WidgetEncounter extends WidgetBase
         var seconds = Math.floor(duration / 1000 % 60);
         if (seconds < 0) { seconds = 0; }
         var padSeconds = seconds < 10 ? "0" : "";
-        this.getBodyElement().getElementsByClassName("encounterTime")[0].innerText = padMinutes + minutes + ":" + padSeconds + seconds;
+        this.encounterTimeElement.innerText = padMinutes + minutes + ":" + padSeconds + seconds;
     }
 
     /**
@@ -161,24 +113,24 @@ class WidgetEncounter extends WidgetBase
             this.reset();
         }
         // update zone
-        this.getBodyElement().getElementsByClassName("encounterZone")[0].innerText = event.detail.Zone;
+        this.encounterNameElement.innerText = event.detail.Zone;
         // calculate encounter dps
-        var encounterDps = event.detail.Damage / ((event.detail.EndTime.getTime() - event.detail.StartTime.getTime()) / 1000);
+        /*var encounterDps = event.detail.Damage / ((event.detail.EndTime.getTime() - event.detail.StartTime.getTime()) / 1000);
         if (!this._isValidParseNumber(encounterDps)) {
             encounterDps = 0;
-        }
-        this.getBodyElement().getElementsByClassName("encounterRaidDps")[0].innerText = encounterDps.toFixed(2);
+        }*/
+        //this.encounterDpsElement.innerText = encounterDps.toFixed(2);
         // inactive
         if (!event.detail.Active) {
             this.startTime = null;
-            this.getBodyElement().classList.remove("active");
+            this.encounterTimeElement.classList.remove("active");
             var lastDuration = event.detail.EndTime.getTime() - event.detail.StartTime.getTime();
             this.setTimer(lastDuration);
             return;
         }
         this.startTime = event.detail.StartTime;
         // make active encounter
-        this.getBodyElement().classList.add("active");  
+        this.encounterTimeElement.classList.add("active");  
     }
 
 }

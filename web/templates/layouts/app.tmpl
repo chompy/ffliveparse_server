@@ -4,15 +4,56 @@
 {{ end }}
 
 {{ define "headerLeft" }}
-<span class="textBold siteTitle"><a href="/">{{.AppName}}</a></span> ::
-<span class="webId"><a href="/{{ .WebIDString }}">{{ .WebIDString }}</a></span>
-<span class="onlineStatus" title="ACT not detected.">Offline</span>
-{{ if .EncounterIDString }}:: <span class="encounterId">Encounter {{ .EncounterIDString }}{{ end }}
+<div id="logo"><a href="/">{{.AppName}}</a></div>
+<div id="webId"><a href="/{{ .WebIDString }}">{{ .WebIDString }}</a></div>
+{{ if .EncounterIDString }}<div id="encounterId">Encounter {{ .EncounterIDString }}</div>{{ end }}
+<div id="zone-info">
+    <span class="name" id="encounter-name">(Unknown Zone)</span>
+    <span class="time" id="encounter-time">00:00</span>
+</div>
 {{ end }}
 
 {{ define "content" }}
 <div id="loadingMessage">Loading...</div>
-<div id="widgetArea"></div>
+<div id="combatants"></div>
+<div id="timeline">
+    <div class="combatant combatant-timeline">
+
+        <div class="action" style="right: 500px">
+            <img src="img/skill/battle_litany.png" alt="skill 1" class="skill-icon" />
+            <span class="name">Battle Litany</span>
+        </div>
+
+        <div class="action" style="right: 750px;">
+            <img src="img/skill/brotherhood.png" alt="skill 1" class="skill-icon" />
+            <span class="name">Battle Litany</span>
+        </div>
+
+        <div class="action" style="right:1000px;">
+            <img src="img/skill/brotherhood.png" alt="skill 1" class="skill-icon" />
+            <span class="name">Battle Litany</span>
+        </div>
+
+    </div>        
+    <div class="combatant combatant-timeline">
+
+        <div class="action" style="right: 500px">
+            <img src="img/skill/battle_litany.png" alt="skill 1" class="skill-icon" />
+            <span class="name">Battle Litany</span>
+        </div>
+
+        <div class="action" style="right: 750px;">
+            <img src="img/skill/brotherhood.png" alt="skill 1" class="skill-icon" />
+            <span class="name">Battle Litany</span>
+        </div>
+
+        <div class="action" style="right:1000px;">
+            <img src="img/skill/brotherhood.png" alt="skill 1" class="skill-icon" />
+            <span class="name">Battle Litany</span>
+        </div>
+
+    </div>  
+</div>
 {{ end }}
 
 {{ define "scripts" }}

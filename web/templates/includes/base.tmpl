@@ -9,26 +9,18 @@
         <div id="errorOverlay" class="hide">
             <div id="errorOverlayMessage" class="textCenter textBold">An error has occured.</div>
         </div>
-        <div id="modalOverlay" class="hide">
-            <div id="modalClose"></div>
-            <div id="modalBody"></div>
-        </div>
-        <div id="wrapper">
-            <div id="header">
+        <div id="container">
+            <div id="head">
                 <div class="leftSide">
-                {{ template "headerLeft" . }}
+                    {{ template "headerLeft" . }}
                 </div>
-                <div class="rightSide">
-                    <span class="textRight textItalic">v{{.VersionString}}</span>
-                </div>
-                <div class="clear"></div>
             </div>
-            <div id="mainBody">
+            <div id="body">
                 {{ template "content" . }}
             </div>
         </div>
         <div id="footer">
-            &copy; 2018 Nathan Ogden
+            &copy; 2018 Nathan Ogden :: <a href="https://na.finalfantasyxiv.com/lodestone/character/1034047/">Minda Silva (Excalibur)</a>
         </div>
         {{ template "scripts" . }}
     </body>
@@ -36,3 +28,4 @@
 
 {{ define "scripts" }}{{ end }}
 {{ define "title" }}{{ end }}
+

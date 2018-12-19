@@ -1,0 +1,25 @@
+#timeline {
+    width: 80%;
+    height: 100%;
+    left: 20%;
+    overflow-x: scroll;
+    overflow-y: hidden;
+    position: fixed;
+}
+.combatant-timeline {
+    position: relative;
+    width: 9999px;
+    height: 38px;
+}
+.combatant-timeline .action {
+    position: absolute;
+}
+.combatant-timeline .action .skill-icon {
+    width: 28px;
+    max-height: 28px;
+    vertical-align: middle;
+}
+.combatant-timeline .action .name {
+    font-size: 12px;
+    display: none;
+}
