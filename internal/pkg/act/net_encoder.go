@@ -57,7 +57,7 @@ func writeString(data *[]byte, value string) {
 }
 
 func writeTime(data *[]byte, value time.Time) {
-	writeString(data, value.UTC().Format(time.RFC3339))
+	writeString(data, value.UTC().Format(time.RFC3339Nano))
 }
 
 // EncodeEncounterBytes - Create Encounter byte array

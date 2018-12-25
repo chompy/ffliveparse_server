@@ -5,21 +5,73 @@
     overflow-x: scroll;
     overflow-y: hidden;
     position: fixed;
+    cursor: grab;
 }
 .combatant-timeline {
     position: relative;
-    width: 9999px;
+    min-width: 100%;
     height: 38px;
+    transition: width .5s;
+}
+.combatant-timeline:first-child {
+    background-image: url(/static/img/timeline_mark.png);
+    background-repeat: repeat-x;
+    margin-top: 0;
 }
 .combatant-timeline .action {
     position: absolute;
 }
-.combatant-timeline .action .skill-icon {
+.combatant-timeline .action .icon {
     width: 28px;
     max-height: 28px;
     vertical-align: middle;
+    display: inline-block;
+    opacity: 0;
+    transition: opacity .5s, margin-right .5s;
+}
+.combatant-timeline .action .icon.appear {
+    opacity: 1;
+}
+.combatant-timeline .action .icon.loading {
+    background-color: #2d2d2d;
+    height: 28px;
 }
 .combatant-timeline .action .name {
     font-size: 12px;
     display: none;
+}
+
+#timeline-mouseover {
+    background: #000c;
+    position: absolute;
+    z-index: 99;
+    width: 275px;
+    padding: 10px;
+    display: none;
+    pointer-events: none;
+}
+#timeline-mouseover .action-name {
+    font-size: 18px;
+    font-weight: bold;
+}
+#timeline-mouseover .action-desc {
+    font-size: 14px;
+}
+#timeline-mouseover .action-info {
+    margin-top: 5px;
+}
+#timeline-mouseover .action-info .action-time {
+    font-size: 12px;
+    display: inline-block;
+    background-image: url(/static/img/timeline_time.png);
+    background-repeat: no-repeat;
+    padding-left:18px;
+}
+#timeline-mouseover .action-info .action-target {
+    font-size: 12px;
+    display: inline-block;
+    margin-left: 20px;
+    background-image: url(/static/img/timeline_target.png);
+    background-repeat: no-repeat;
+    padding-left:18px;
 }

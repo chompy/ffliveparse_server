@@ -22,6 +22,14 @@
     background-color: #723c3a;
     color: #fff;
 }
+.combatant.combatant-npc {
+    background: #202020;
+    color: #fff;
+    height: 32px;
+}
+.combatant.combatant-npc .info-text span {
+    line-height: 32px;
+}
 
 .combatant .info {
     width: 20%;
@@ -39,10 +47,24 @@
     margin-top: 1px;
 }
 .combatant-info .info-text span {
-    font-size: 16px;
+    font-size: 12px;
     line-height: 15px;
     display: block;
 }
+.combatant-info .info-text .name {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
 .combatant-info .info-text .parse {
     font-weight: bold;
+    font-size: 16px;
+}
+
+@media(max-width: 940px) {
+    .combatant-info { text-align:  center; }
+    .combatant-info .job-icon { max-width: 24px; }
+    .combatant-info .info-text { margin-left: 0; display: block; }
+    .combatant-info .info-text .name { display: none; }
+    .combatant-info .info-text .parse { font-size: 12px; margin-top: 5px; }
 }

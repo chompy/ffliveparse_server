@@ -15,7 +15,7 @@ You should have received a copy of the GNU General Public License
 along with FFLiveParse.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-var COMBATANT_ELEMENT_ID = "combatants";
+var COMBATANT_ELEMENT_ID = "playerCombatants";
 
 var PARSE_AVAILABLE_COLUMNS = [
     [
@@ -152,6 +152,8 @@ class WidgetCombatants extends WidgetBase
         var nameElement = element.getElementsByClassName("name")[0];
         if (nameElement.innerText != combatant.Name) {
             nameElement.innerText = combatant.Name;
+            element.setAttribute("data-name", combatant.Name);
+            element.title = combatant.Name;
         }
         // dps
         var dpsElement = element.getElementsByClassName("parse")[0];
@@ -249,6 +251,10 @@ class WidgetCombatants extends WidgetBase
         for (var i = 0; i < this.combatants.length; i++) {
             this.combatantsElement.appendChild(this.combatants[i][1]);
         }
+        // trigger custom event
+        window.dispatchEvent(
+            new CustomEvent("combatants-display", {"detail" : this.combatants})
+        );
     }
 
     _updateEncounter(event)
@@ -316,49 +322,6 @@ class WidgetCombatants extends WidgetBase
         // display
         this._displayCombatants();
         this._updateCombatantPercents();
-    }
-
-    showOptionConfig()
-    {
-        var t = this;
-        Modal.reset();
-        Modal.open(); 
-        // parse column selection
-        Modal.addSection("Parse Columns");
-        for (var i in PARSE_AVAILABLE_COLUMNS) {
-            Modal.addCheckbox(
-                PARSE_AVAILABLE_COLUMNS[i][1],
-                PARSE_AVAILABLE_COLUMNS[i][0],
-                this.userConfig["showColumns"].indexOf(PARSE_AVAILABLE_COLUMNS[i][1]) != -1,
-                function(name, checked) {
-                    var index = t.userConfig["showColumns"].indexOf(name);
-                    if (checked && index == -1) {
-                        t.userConfig["showColumns"].push(name);
-                    } else if (!checked && index != -1) {
-                        t.userConfig["showColumns"].splice(index, 1);
-                    }
-                    t._saveUserConfig();
-                    t._updateColumnVisiblity();
-                }
-            );
-        }
-        // sort
-        Modal.addSection("Sort");
-
-        var choices = {};
-        for (var i in PARSE_AVAILABLE_COLUMNS) {
-            choices[PARSE_AVAILABLE_COLUMNS[i][1]] = PARSE_AVAILABLE_COLUMNS[i][0];
-        }
-        Modal.addChoices(
-            "sort",
-            choices,
-            this.userConfig["sortBy"],
-            function(name, value) {
-                t.userConfig["sortBy"] = value;
-                t._saveUserConfig();
-                t._displayCombatants();
-            }
-        );
     }
 
 }

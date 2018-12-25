@@ -14,46 +14,25 @@
 {{ end }}
 
 {{ define "content" }}
-<div id="loadingMessage">Loading...</div>
-<div id="combatants"></div>
-<div id="timeline">
-    <div class="combatant combatant-timeline">
-
-        <div class="action" style="right: 500px">
-            <img src="img/skill/battle_litany.png" alt="skill 1" class="skill-icon" />
-            <span class="name">Battle Litany</span>
-        </div>
-
-        <div class="action" style="right: 750px;">
-            <img src="img/skill/brotherhood.png" alt="skill 1" class="skill-icon" />
-            <span class="name">Battle Litany</span>
-        </div>
-
-        <div class="action" style="right:1000px;">
-            <img src="img/skill/brotherhood.png" alt="skill 1" class="skill-icon" />
-            <span class="name">Battle Litany</span>
-        </div>
-
-    </div>        
-    <div class="combatant combatant-timeline">
-
-        <div class="action" style="right: 500px">
-            <img src="img/skill/battle_litany.png" alt="skill 1" class="skill-icon" />
-            <span class="name">Battle Litany</span>
-        </div>
-
-        <div class="action" style="right: 750px;">
-            <img src="img/skill/brotherhood.png" alt="skill 1" class="skill-icon" />
-            <span class="name">Battle Litany</span>
-        </div>
-
-        <div class="action" style="right:1000px;">
-            <img src="img/skill/brotherhood.png" alt="skill 1" class="skill-icon" />
-            <span class="name">Battle Litany</span>
-        </div>
-
-    </div>  
+<div id="timeline-mouseover">
+    <div class="action-name">Action Name</div>
+    <div class="action-desc">....Action description here....</div>
+    <div class="action-info">
+        <span class="action-time">32.25</span>
+        <span class="action-target">Action Target</span>
+    </div>
 </div>
+<div id="loadingMessage">Loading...</div>
+<div id="combatants">
+    <div class="combatant combatant-info combatant-npc">
+        <div class="info-text">
+            <span class="name">Non-Player Combatant(s)</span>
+        </div>
+    </div>
+    <div id="playerCombatants">
+    </div>
+</div>
+<div id="timeline" class="dragscroll"></div>
 {{ end }}
 
 {{ define "scripts" }}

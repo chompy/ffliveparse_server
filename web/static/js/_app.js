@@ -43,7 +43,8 @@ class Application
     {
         var availableWidgets = [
             new WidgetEncounter(),
-            new WidgetCombatants()
+            new WidgetCombatants(),
+            new WidgetTimelime(),
         ];
         for (var i = 0; i < availableWidgets.length; i++) {
             this.widgets[availableWidgets[i].getName()] = availableWidgets[i];
@@ -86,6 +87,7 @@ class Application
             t.connected = true;
             t.initUserConfig();
             t.initWidgets();
+            fetchActionData();            
         };
         socket.onmessage = function(event) {
             if (socket.readyState !== 1) {
