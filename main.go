@@ -22,6 +22,8 @@ func main() {
 
 	// define+parse flags
 	devModePtr := flag.Bool("dev", false, "Start server in development mode.")
+	httpPort := flag.Int("http-port", int(HTTPListenTCPPort), "Set HTTP listen port.")
+	actPort := flag.Int("act-port", int(ActListenUDPPort), "Set UDP port to recieved data from ACT on.")
 	flag.Parse()
 
 	// log start
@@ -44,8 +46,8 @@ func main() {
 	actManager := act.NewManager(&events, &userManager, *devModePtr)
 
 	// start http server
-	go web.HTTPStartServer(HTTPListenTCPPort, &userManager, &actManager, &events, *devModePtr)
+	go web.HTTPStartServer(uint16(*httpPort), &userManager, &actManager, &events, *devModePtr)
 
 	// start act listen server
-	act.Listen(ActListenUDPPort, &actManager)
+	act.Listen(uint16(*actPort), &actManager)
 }

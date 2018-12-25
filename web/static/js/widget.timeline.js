@@ -100,6 +100,7 @@ class WidgetTimelime extends WidgetBase
         // inactive
         if (!event.detail.Active) {
             this.startTime = null;
+            this.queueActions = [];
             return;
         }
         this.startTime = event.detail.StartTime;
@@ -134,6 +135,21 @@ class WidgetTimelime extends WidgetBase
                 combatant[0],       // combatant data
                 combatantElement,   // timeline element
             ]);
+
+            // reassign npc actions if needed
+            var npcActionElements = this.combatants[0][1].getElementsByClassName("action");
+            for (var j = 0; j < npcActionElements.length; j++) {
+                var npcActionElement = npcActionElements[j];
+                if (npcActionElement.getAttribute("data-combatant") == combatant[0].Name) {
+                    this.queueActions.push({
+                        "combatant" :        combatant[0].Name,
+                        "action"    :        npcActionElement.getAttribute("data-name"),
+                        "time"      :        new Date(parseInt(npcActionElement.getAttribute("data-time"))),
+                        "target"    :        npcActionElement.getAttribute("data-target"),
+                    });
+                    this.combatants[0][1].removeChild(npcActionElement);
+                }
+            }
         }
         this._addQueuedActions();
     }
@@ -176,9 +192,13 @@ class WidgetTimelime extends WidgetBase
      * @param {array} combatant
      * @param {string} name
      * @param {Date} time
+     * @param {string} combatantName Override combatant name for NPCs
      */
-    _addAction(combatant, name, time, target)
+    _addAction(combatant, name, time, target, combatantName)
     {
+        if (!time || isNaN(time)) {
+            return;
+        }
         var combatant = combatant;
         var target = target;
         // fetch action data
@@ -200,7 +220,6 @@ class WidgetTimelime extends WidgetBase
             iconUrl = ACTION_DATA_BASE_URL + thisActionData["icon"];
         }
         // override "attack" icon
-        console.log(thisActionData);
         if (thisActionData && thisActionData["id"] == "7") {
             var iconUrl = "/static/img/attack.png";
         }
@@ -209,9 +228,10 @@ class WidgetTimelime extends WidgetBase
         // create element
         var actionElement = document.createElement("div");
         actionElement.classList.add("action");
+        actionElement.setAttribute("data-combatant", typeof(combatantName) != "undefined" ? combatantName : combatant[0].Name);
         actionElement.setAttribute("data-name", name);
         actionElement.setAttribute("data-target", target);
-        actionElement.setAttribute("data-time", timestamp);
+        actionElement.setAttribute("data-time", time.getTime());
         var actionIconElement = document.createElement("img");
         actionIconElement.classList.add("icon", "loading");
         actionIconElement.src = iconUrl;
@@ -224,7 +244,6 @@ class WidgetTimelime extends WidgetBase
         actionNameElement.classList.add("name");
         actionNameElement.innerText = name;        
         // set offset relative to time
-        actionElement.setAttribute("data-time", timestamp);
         actionElement.style.right = pixelPosition + "px";
         // mouse over tooltip
         var t = this;
@@ -299,7 +318,8 @@ class WidgetTimelime extends WidgetBase
                     this.combatants[0],
                     this.queueActions[i]["action"],
                     this.queueActions[i]["time"],
-                    this.queueActions[i]["target"]
+                    this.queueActions[i]["target"],
+                    this.queueActions[i]["combatant"]
                 );
             }
         }
