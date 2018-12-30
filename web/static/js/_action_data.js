@@ -28,6 +28,7 @@ class ActionData
     constructor(actionData)
     {
         this.actionData = actionData;
+        this.actionDataNameCache = {};
     }
 
     /**
@@ -51,9 +52,15 @@ class ActionData
     getActionByName(name)
     {
         var name = name.toLowerCase();
+        // check name cache for index
+        if (name in this.actionDataNameCache) {
+            return this.actionData[this.actionDataNameCache[name]];
+        }
+        // itterate actions to find one with matching name
         for (var actionId in this.actionData) {
             if (this.actionData[actionId]["name_en"].toLowerCase() == name) {
                 this.actionData[actionId]["id"] = actionId;
+                this.actionDataNameCache[name] = actionId;
                 return this.actionData[actionId];
             }
         }

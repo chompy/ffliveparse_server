@@ -36,13 +36,14 @@ const lastUpdateInactiveTime = 300000
 
 // Data - data about an ACT session
 type Data struct {
-	Session     Session
-	User        user.Data
-	Encounter   Encounter
-	Combatants  []Combatant
-	LogLines    []LogLine
-	LastUpdate  time.Time
-	NewTickData bool
+	Session          Session
+	User             user.Data
+	Encounter        Encounter
+	Combatants       []Combatant
+	LogLines         []LogLine
+	LastLogLineIndex int
+	LastUpdate       time.Time
+	NewTickData      bool
 }
 
 // NewData - create new ACT session data
@@ -57,11 +58,12 @@ func NewData(session Session, user user.Data) (Data, error) {
 	}
 	database.Close()
 	return Data{
-		Session:    session,
-		User:       user,
-		Encounter:  Encounter{ID: 0},
-		Combatants: make([]Combatant, 0),
-		LastUpdate: time.Now(),
+		Session:          session,
+		User:             user,
+		Encounter:        Encounter{ID: 0},
+		Combatants:       make([]Combatant, 0),
+		LastUpdate:       time.Now(),
+		LastLogLineIndex: 0,
 	}, nil
 }
 
@@ -123,6 +125,7 @@ func (d *Data) UpdateLogLine(logLine LogLine) {
 
 // ClearLogLines - Clear log line buffer
 func (d *Data) ClearLogLines() {
+	d.LastLogLineIndex = 0
 	d.LogLines = make([]LogLine, 0)
 }
 
@@ -262,6 +265,7 @@ func (d *Data) SaveEncounter() error {
 func (d *Data) ClearEncounter() {
 	d.Encounter = Encounter{ID: 0}
 	d.Combatants = make([]Combatant, 0)
+	d.ClearLogLines()
 }
 
 // GetPreviousEncounter - retrieve previous encounter data from database

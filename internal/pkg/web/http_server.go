@@ -407,6 +407,10 @@ func sendInitData(ws *websocket.Conn, data *act.Data) {
 		for _, combatant := range data.Combatants {
 			dataBytes = append(dataBytes, act.EncodeCombatantBytes(&combatant)...)
 		}
+		// add logs
+		for _, logLine := range data.LogLines {
+			dataBytes = append(dataBytes, act.EncodeLogLineBytes(&logLine)...)
+		}
 	}
 	// add flag indicating if ACT is active
 	isActiveFlag := act.Flag{

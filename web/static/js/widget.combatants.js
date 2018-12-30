@@ -102,7 +102,10 @@ class WidgetCombatants extends WidgetBase
         element.classList.add("combatant-info");
         // job icon
         var jobIconElement = document.createElement("img");
-        jobIconElement.classList.add("job-icon");
+        jobIconElement.classList.add("job-icon", "loading");
+        jobIconElement.onload = function(e) {
+            this.classList.remove("loading");
+        };
         element.appendChild(jobIconElement);
         // combatant info
         var infoTextElement = document.createElement("div");

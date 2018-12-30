@@ -274,13 +274,13 @@ func (m *Manager) doLogTick(userID int64) {
 			log.Println("Log tick with no session data, killing thread.")
 			return
 		}
-		if len(data.LogLines) == 0 {
+		if len(data.LogLines) == 0 || data.LastLogLineIndex >= len(data.LogLines)-1 {
 			continue
 		}
 		// emit log line events
 		sendBytes := make([]byte, 0)
-		for _, logLine := range data.LogLines {
-			sendBytes = append(sendBytes, EncodeLogLineBytes(&logLine)...)
+		for i := data.LastLogLineIndex + 1; i < len(data.LogLines); i++ {
+			sendBytes = append(sendBytes, EncodeLogLineBytes(&data.LogLines[i])...)
 		}
 		if len(sendBytes) > 0 {
 			compressData, err := CompressBytes(sendBytes)
@@ -294,8 +294,8 @@ func (m *Manager) doLogTick(userID int64) {
 				compressData,
 			)
 		}
-		// clear log line buffer
-		data.ClearLogLines()
+		// update last log line index
+		data.LastLogLineIndex = len(data.LogLines) - 1
 	}
 }
 

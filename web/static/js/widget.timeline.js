@@ -20,6 +20,7 @@ var TIMELINE_MOUSEOVER_ELEMENT_ID = "timeline-mouseover";
 var TIMELINE_PIXELS_PER_MILLISECOND = 0.07; // how many pixels represents a millisecond in timeline
 var TIMELINE_PIXEL_OFFSET = 16;
 var TIMELINE_ACTION_USE_REGEX = /1[56]\:[0-9A-F]{8}\:([a-zA-Z`'\- ]*)\:[0-9A-F]{2,4}\:([a-zA-Z`'\- ]*)\:[0-9A-F]{8}\:([a-zA-Z`'\- ]*)\:/;
+var TIMELINE_DEATH_REGEX = /19\:([a-zA-Z`'\- ]*) was defeated by ([a-zA-Z`'\- ]*)\./;
 
 /**
  * Timeline widget
@@ -32,9 +33,12 @@ class WidgetTimelime extends WidgetBase
         super();
         this.encounterId = null;
         this.startTime = null;
+        this.endTime = null;
         this.combatants = [];
         this.actionData = null;
+        this.actionImages = {};
         this.queueActions = [];
+        this.targetActionTracker = {};
         this.timelineElement = document.getElementById(TIMELINE_ELEMENT_ID);
         this.timelineMouseoverElement = document.getElementById(TIMELINE_MOUSEOVER_ELEMENT_ID);
     }
@@ -64,7 +68,16 @@ class WidgetTimelime extends WidgetBase
         //this.addEventListener("act:combatant", function(e) { t._updateCombatants(e); });
         this.addEventListener("act:logLine", function(e) { t._onLogLine(e); });
         this.addEventListener("combatants-display", function(e) { t._updateCombatants(e); });
-        this.addEventListener("action-data-ready", function(e) { t.actionData = e.detail; });
+        this.addEventListener("action-data-ready", function(e) { t.actionData = e.detail; t._addQueuedActions(); });
+        // horizontal scrolling
+        function hScrollTimeline(e) {
+            var delta = Math.max(-1, Math.min(1, (e.wheelDelta || -e.detail)));
+            t.timelineElement.scrollLeft -= (delta * 40);
+        }
+        this.timelineElement.addEventListener("mousewheel", hScrollTimeline);
+        this.timelineElement.addEventListener("DOMMouseScroll", hScrollTimeline);
+        // window resize
+        this.addEventListener("resize", function(e) { t._onWindowResize(); });
     }
 
     /**
@@ -77,6 +90,7 @@ class WidgetTimelime extends WidgetBase
             "Name" : "Non-Player Combatants",
             "IsNPC" : true,
         }
+        this.targetActionTracker = {};
         this.combatants = [
             // add npc combatant
             [
@@ -98,12 +112,14 @@ class WidgetTimelime extends WidgetBase
             this.reset();
         }
         // inactive
-        if (!event.detail.Active) {
+        if (this.startTime && event.detail.StartTime != this.startTime) {
             this.startTime = null;
+            this.endTime = event.detail.EndTime;
             this.queueActions = [];
             return;
         }
         this.startTime = event.detail.StartTime;
+        this.endTime = event.detail.EndTime;
         this._addQueuedActions();
     }
 
@@ -150,6 +166,7 @@ class WidgetTimelime extends WidgetBase
                     this.combatants[0][1].removeChild(npcActionElement);
                 }
             }
+            this._onWindowResize();
         }
         this._addQueuedActions();
     }
@@ -163,6 +180,18 @@ class WidgetTimelime extends WidgetBase
         // check for skill usage in log
         var regexRes = TIMELINE_ACTION_USE_REGEX.exec(event.detail.LogLine);
         if (!regexRes) {
+            // check for death
+            regexRes = TIMELINE_DEATH_REGEX.exec(event.detail.LogLine);
+            if (!regexRes) {
+                return;
+            }
+            this.queueActions.push({
+                "combatant" :        regexRes[1],
+                "action"    :        "_death",
+                "time"      :        event.detail.Time,
+                "target"    :        regexRes[2],
+            });
+            this._addQueuedActions();
             return;
         }
         this.queueActions.push({
@@ -205,6 +234,10 @@ class WidgetTimelime extends WidgetBase
         var thisActionData = this.actionData.getActionByName(name);
         // get timestamp for action in current encounter
         var timestamp = time.getTime() - this.startTime.getTime();
+        // action takes place after encounter end, do nothing
+        if (this.endTime && timestamp > this.endTime.getTime() - this.startTime.getTime()) {
+            return;
+        }
         // drop if occured more then 10 seconds before pull
         if (timestamp < -10) {
             return;
@@ -212,32 +245,51 @@ class WidgetTimelime extends WidgetBase
         // calculate action pixel position
         var pixelPosition = parseInt((timestamp * TIMELINE_PIXELS_PER_MILLISECOND));
         // get icon
+        var actionIconElement = null;
         var iconUrl = "/static/img/attack.png"; // default
         if (typeof(combatant[0]["IsNPC"]) != undefined && combatant[0]["IsNPC"]) {
             var iconUrl = "/static/img/enemy.png"; // default npc icon
         }
         if (thisActionData && thisActionData["icon"]) {
+            if (thisActionData.id in this.actionImages) {
+                actionIconElement = this.actionImages[thisActionData.id];
+            }
             iconUrl = ACTION_DATA_BASE_URL + thisActionData["icon"];
         }
         // override "attack" icon
         if (thisActionData && thisActionData["id"] == "7") {
+            actionIconElement = null;
             var iconUrl = "/static/img/attack.png";
+        // override "death" icon
+        } else if (name == "_death") {
+            actionIconElement = null;
+            var iconUrl = "/static/img/death.png";
         }
+
         // set proper name
         var name = thisActionData ? thisActionData["name_en"] : name;
+        if (name == "_death") {
+            name = "Death";
+            target = combatantName; // target of "death" is actually combatant
+        }
         // create element
         var actionElement = document.createElement("div");
         actionElement.classList.add("action");
+        if (name == "Death") {
+            actionElement.classList.add("special");
+        }
         actionElement.setAttribute("data-combatant", typeof(combatantName) != "undefined" ? combatantName : combatant[0].Name);
         actionElement.setAttribute("data-name", name);
         actionElement.setAttribute("data-target", target);
         actionElement.setAttribute("data-time", time.getTime());
-        var actionIconElement = document.createElement("img");
-        actionIconElement.classList.add("icon", "loading");
-        actionIconElement.src = iconUrl;
-        actionIconElement.alt = name;
-        actionIconElement.onload = function() {
-            this.classList.remove("loading");
+        if (!actionIconElement) {
+            actionIconElement = document.createElement("img");
+            actionIconElement.classList.add("icon", "loading");
+            actionIconElement.src = iconUrl;
+            actionIconElement.alt = name;
+            actionIconElement.onload = function() {
+                this.classList.remove("loading");
+            };
         }
         actionElement.appendChild(actionIconElement);
         var actionNameElement = document.createElement("span");
@@ -248,14 +300,30 @@ class WidgetTimelime extends WidgetBase
         // mouse over tooltip
         var t = this;
         actionElement.onmouseenter = function(e) {
+            var time = new Date(timestamp);
             t.timelineMouseoverElement.style.display = "block";
             t.timelineMouseoverElement.getElementsByClassName("action-name")[0].innerText = name;
-            t.timelineMouseoverElement.getElementsByClassName("action-desc")[0].innerText = thisActionData ? thisActionData["help_en"] : "(no description available)";
-            t.timelineMouseoverElement.getElementsByClassName("action-time")[0].innerText = (timestamp / 1000).toFixed(2);
+            // death specific message, display last three damage sources
+            if (name == "Death") {
+                var desc = "Last three damage sources...\n";
+                for (var i = 0; i < t.targetActionTracker[target].length; i++) {
+                    desc += t.targetActionTracker[target][i];
+                    if (i < t.targetActionTracker[target].length - 1) {
+                        desc += " > ";
+                    }
+                }
+                t.timelineMouseoverElement.getElementsByClassName("action-desc")[0].innerText = desc;
+            } else {
+                t.timelineMouseoverElement.getElementsByClassName("action-desc")[0].innerText = thisActionData ? thisActionData["help_en"] : "(no description available)";
+            }
+            t.timelineMouseoverElement.getElementsByClassName("action-time")[0].innerText = time.getMinutes() + ":" + (time.getSeconds() < 10 ? "0" : "") + time.getSeconds();
             t.timelineMouseoverElement.getElementsByClassName("action-target")[0].innerText = target;
         };
         actionElement.onmousemove = function(e) {
             t.timelineMouseoverElement.style.left = e.pageX + "px";
+            if (e.pageX + t.timelineMouseoverElement.offsetWidth > window.innerWidth) {
+                t.timelineMouseoverElement.style.left = (e.pageX - t.timelineMouseoverElement.offsetWidth) + "px";
+            }
             t.timelineMouseoverElement.style.top = e.pageY + "px";
         };
         actionElement.onmouseleave = function(e) {
@@ -283,7 +351,14 @@ class WidgetTimelime extends WidgetBase
             },
             100
         );
-        
+        // track last three actions against target
+        if (typeof(this.targetActionTracker[target]) == "undefined") {
+            this.targetActionTracker[target] = [];
+        }
+        this.targetActionTracker[target].push(name);
+        if (this.targetActionTracker[target].length > 3) {
+            this.targetActionTracker[target].pop();
+        }
     }
 
     /**
@@ -291,7 +366,7 @@ class WidgetTimelime extends WidgetBase
      */
     _addQueuedActions()
     {
-        if (!this.queueActions || this.combatants.length <= 1 || !this.startTime) {
+        if (!this.queueActions || this.combatants.length <= 1 || !this.startTime || !this.actionData) {
             return;
         }
         // itterate queue items
@@ -324,6 +399,22 @@ class WidgetTimelime extends WidgetBase
             }
         }
         this.queueActions = [];        
+    }
+
+    /**
+     * Resize elements.
+     */
+    _onWindowResize()
+    {
+        // fix timeline element height
+        this.timelineElement.style.height = (
+            window.innerHeight - document.getElementById("head").offsetHeight - document.getElementById("footer").offsetHeight
+        ) + "px";
+        // resize timeline elements to match height of combatant elements
+        var combatantElements = document.getElementsByClassName("combatant-info");
+        for (var i = 0; i < combatantElements.length; i++) {
+            this.combatants[i][1].style.height = (combatantElements[i].offsetHeight - 1) + "px";
+        }        
     }
 
 };

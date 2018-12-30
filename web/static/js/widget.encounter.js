@@ -28,7 +28,7 @@ class WidgetEncounter extends WidgetBase
     {
         super()
         this.startTime = null;
-        this.offset = 6000;
+        this.offset = 12000;
         this.encounterId = "";
         this.combatants = [];
         this.tickTimeout = null;
