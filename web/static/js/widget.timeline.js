@@ -19,8 +19,6 @@ var TIMELINE_ELEMENT_ID = "timeline";
 var TIMELINE_MOUSEOVER_ELEMENT_ID = "timeline-mouseover";
 var TIMELINE_PIXELS_PER_MILLISECOND = 0.07; // how many pixels represents a millisecond in timeline
 var TIMELINE_PIXEL_OFFSET = 16;
-var TIMELINE_ACTION_USE_REGEX = /1[56]\:[0-9A-F]{8}\:([a-zA-Z`'\- ]*)\:[0-9A-F]{2,4}\:([a-zA-Z`'\- ]*)\:[0-9A-F]{8}\:([a-zA-Z`'\- ]*)\:/;
-var TIMELINE_DEATH_REGEX = /19\:([a-zA-Z`'\- ]*) was defeated by ([a-zA-Z`'\- ]*)\./;
 
 /**
  * Timeline widget
@@ -35,10 +33,13 @@ class WidgetTimelime extends WidgetBase
         this.startTime = null;
         this.endTime = null;
         this.combatants = [];
+        this.actionTimeline = [];
+
         this.actionData = null;
         this.actionImages = {};
-        this.queueActions = [];
         this.targetActionTracker = {};
+        this.timeKeyContainerElement = null;
+        this.lastTimeKey = 0;
         this.timelineElement = document.getElementById(TIMELINE_ELEMENT_ID);
         this.timelineMouseoverElement = document.getElementById(TIMELINE_MOUSEOVER_ELEMENT_ID);
     }
@@ -68,7 +69,7 @@ class WidgetTimelime extends WidgetBase
         //this.addEventListener("act:combatant", function(e) { t._updateCombatants(e); });
         this.addEventListener("act:logLine", function(e) { t._onLogLine(e); });
         this.addEventListener("combatants-display", function(e) { t._updateCombatants(e); });
-        this.addEventListener("action-data-ready", function(e) { t.actionData = e.detail; t._addQueuedActions(); });
+        this.addEventListener("action-data-ready", function(e) { t.actionData = e.detail; });
         // horizontal scrolling
         function hScrollTimeline(e) {
             var delta = Math.max(-1, Math.min(1, (e.wheelDelta || -e.detail)));
@@ -85,7 +86,12 @@ class WidgetTimelime extends WidgetBase
      */
     reset()
     {
+        this.actionTimeline = [];
         this.timelineElement.innerHTML = "";
+        this.lastTimeKey = 0;
+        this.timeKeyContainerElement = document.createElement("div");
+        this.timeKeyContainerElement.classList.add("time-key-container");
+        this.timelineElement.append(this.timeKeyContainerElement);
         var npcCombatant = {
             "Name" : "Non-Player Combatants",
             "IsNPC" : true,
@@ -115,12 +121,10 @@ class WidgetTimelime extends WidgetBase
         if (this.startTime && event.detail.StartTime != this.startTime) {
             this.startTime = null;
             this.endTime = event.detail.EndTime;
-            this.queueActions = [];
             return;
         }
         this.startTime = event.detail.StartTime;
         this.endTime = event.detail.EndTime;
-        this._addQueuedActions();
     }
 
     /**
@@ -157,18 +161,20 @@ class WidgetTimelime extends WidgetBase
             for (var j = 0; j < npcActionElements.length; j++) {
                 var npcActionElement = npcActionElements[j];
                 if (npcActionElement.getAttribute("data-combatant") == combatant[0].Name) {
-                    this.queueActions.push({
-                        "combatant" :        combatant[0].Name,
-                        "action"    :        npcActionElement.getAttribute("data-name"),
-                        "time"      :        new Date(parseInt(npcActionElement.getAttribute("data-time"))),
-                        "target"    :        npcActionElement.getAttribute("data-target"),
-                    });
+                    logData = {
+                        "actionId"          : npcActionElement.getAttribute("data-action-id"),
+                        "actionName"        : npcActionElement.getAttribute("data-action-name"),
+                        "sourceId"          : npcActionElement.getAttribute("data-combatant-id"),
+                        "sourceName"        : npcActionElement.getAttribute("data-combatant-name"),
+                        "targetId"          : npcActionElement.getAttribute("data-target-id"),
+                        "targetName"        : npcActionElement.getAttribute("data-target-name"),
+                        "damage"            : npcActionElement.getAttribute("data-damage"),
+                    };
                     this.combatants[0][1].removeChild(npcActionElement);
                 }
             }
             this._onWindowResize();
         }
-        this._addQueuedActions();
     }
 
     /**
@@ -177,30 +183,26 @@ class WidgetTimelime extends WidgetBase
      */
     _onLogLine(event)
     {
-        // check for skill usage in log
-        var regexRes = TIMELINE_ACTION_USE_REGEX.exec(event.detail.LogLine);
-        if (!regexRes) {
-            // check for death
-            regexRes = TIMELINE_DEATH_REGEX.exec(event.detail.LogLine);
-            if (!regexRes) {
-                return;
+        var logLineData = parseLogLine(event.detail.LogLine);
+        switch (logLineData.type)
+        {
+            case MESSAGE_TYPE_SINGLE_TARGET:
+            case MESSAGE_TYPE_AOE:
+            {
+                this._addAction(logLineData, event.detail.Time);
+                break;
             }
-            this.queueActions.push({
-                "combatant" :        regexRes[1],
-                "action"    :        "_death",
-                "time"      :        event.detail.Time,
-                "target"    :        regexRes[2],
-            });
-            this._addQueuedActions();
-            return;
+            case MESSAGE_TYPE_DEATH:
+            {
+                logLineData["actionId"] = -1;
+                logLineData["actionName"] = "Death";
+                logLineData["sourceId"] = -1;
+                logLineData["targetName"] = logLineData.sourceName;
+                logLineData["targetId"] = -1;
+                this._addAction(logLineData, event.detail.Time)
+                break;
+            }
         }
-        this.queueActions.push({
-            "combatant" :        regexRes[1],
-            "action"    :        regexRes[2],
-            "time"      :        event.detail.Time,
-            "target"    :        regexRes[3],
-        });
-        this._addQueuedActions();
     }
 
     /**
@@ -217,21 +219,43 @@ class WidgetTimelime extends WidgetBase
     }
 
     /**
-     * Add action to given combatants timeline.
-     * @param {array} combatant
-     * @param {string} name
+     * Add action to timeline.
+     * @param {Object} logData
      * @param {Date} time
-     * @param {string} combatantName Override combatant name for NPCs
      */
-    _addAction(combatant, name, time, target, combatantName)
+    _addAction(logData, time)
     {
         if (!time || isNaN(time)) {
             return;
         }
-        var combatant = combatant;
-        var target = target;
+        // find combatant
+        var combatant = this.combatants[0];
+        for (var i = 0; i < this.combatants.length; i++) {
+            if (this.combatants[i][0].Name == logData.sourceName) {
+                combatant = this.combatants[i];
+                break;
+            }
+        }
+        // add to action timeline
+        this.actionTimeline.push({
+            "logData"       : logData,
+            "time"          : time,
+            "combatant"     : combatant
+        });
+
+        /*var combatantName = logData.sourceName;
+        // get target data
+        var targetId = typeof(logData.targetId) != "undefined" ? logData.targetId : -1;
+        var targetName = logData.targetName;
+        // get action damage
+        var damage = typeof(logData.damage) != "undefined" ? logData.damage : 0;
         // fetch action data
-        var thisActionData = this.actionData.getActionByName(name);
+        var actionId = logData.actionId;
+        var actionData = null;
+        var actionName = logData.actionName;
+        if (actionId > 0) {
+            var actionData = this.actionData.getActionById(actionId)
+        }
         // get timestamp for action in current encounter
         var timestamp = time.getTime() - this.startTime.getTime();
         // action takes place after encounter end, do nothing
@@ -239,9 +263,9 @@ class WidgetTimelime extends WidgetBase
             return;
         }
         // drop if occured more then 10 seconds before pull
-        if (timestamp < -10) {
+        if (timestamp < -10000) {
             return;
-        }
+        }   
         // calculate action pixel position
         var pixelPosition = parseInt((timestamp * TIMELINE_PIXELS_PER_MILLISECOND));
         // get icon
@@ -250,38 +274,45 @@ class WidgetTimelime extends WidgetBase
         if (typeof(combatant[0]["IsNPC"]) != undefined && combatant[0]["IsNPC"]) {
             var iconUrl = "/static/img/enemy.png"; // default npc icon
         }
-        if (thisActionData && thisActionData["icon"]) {
-            if (thisActionData.id in this.actionImages) {
-                actionIconElement = this.actionImages[thisActionData.id];
+        if (actionData && actionData["icon"]) {
+            if (actionData.id in this.actionImages) {
+                actionIconElement = this.actionImages[actionData.id];
             }
-            iconUrl = ACTION_DATA_BASE_URL + thisActionData["icon"];
+            iconUrl = ACTION_DATA_BASE_URL + actionData["icon"];
         }
         // override "attack" icon
-        if (thisActionData && thisActionData["id"] == "7") {
+        if (actionName == "Attack") {
             actionIconElement = null;
             var iconUrl = "/static/img/attack.png";
         // override "death" icon
-        } else if (name == "_death") {
+        } else if (actionId == -1) {
             actionIconElement = null;
             var iconUrl = "/static/img/death.png";
-        }
-
-        // set proper name
-        var name = thisActionData ? thisActionData["name_en"] : name;
-        if (name == "_death") {
-            name = "Death";
-            target = combatantName; // target of "death" is actually combatant
         }
         // create element
         var actionElement = document.createElement("div");
         actionElement.classList.add("action");
-        if (name == "Death") {
-            actionElement.classList.add("special");
+        // set proper name
+        var actionName = actionData ? actionData["name_en"] : actionName;
+        switch (actionId)
+        {
+            case -1:
+            {
+                actionName = "Death";
+                targetName = combatantName; // target of "death" is actually combatant
+                actionElement.classList.add("special");
+                break;
+            }
         }
-        actionElement.setAttribute("data-combatant", typeof(combatantName) != "undefined" ? combatantName : combatant[0].Name);
-        actionElement.setAttribute("data-name", name);
-        actionElement.setAttribute("data-target", target);
+
+        actionElement.setAttribute("data-combatant-id", logData.sourceId);
+        actionElement.setAttribute("data-combatant-name", combatantName);
+        actionElement.setAttribute("data-action-id", actionId);
+        actionElement.setAttribute("data-action-name", actionName);
+        actionElement.setAttribute("data-target-id", targetId);
+        actionElement.setAttribute("data-target-name", targetName);
         actionElement.setAttribute("data-time", time.getTime());
+        actionElement.setAttribute("data-damage", damage);
         if (!actionIconElement) {
             actionIconElement = document.createElement("img");
             actionIconElement.classList.add("icon", "loading");
@@ -302,22 +333,23 @@ class WidgetTimelime extends WidgetBase
         actionElement.onmouseenter = function(e) {
             var time = new Date(timestamp);
             t.timelineMouseoverElement.style.display = "block";
-            t.timelineMouseoverElement.getElementsByClassName("action-name")[0].innerText = name;
-            // death specific message, display last three damage sources
-            if (name == "Death") {
-                var desc = "Last three damage sources...\n";
-                for (var i = 0; i < t.targetActionTracker[target].length; i++) {
-                    desc += t.targetActionTracker[target][i];
-                    if (i < t.targetActionTracker[target].length - 1) {
-                        desc += " > ";
-                    }
+            t.timelineMouseoverElement.getElementsByClassName("action-name")[0].innerText = actionName;
+            // death specific message, display last actions against combatant
+            if (actionId == -1) {
+                var desc = "Last 20 targeted actions...\n";
+                for (var i = 0; i < t.targetActionTracker[targetName].length; i++) {
+                    desc += t.targetActionTracker[targetName][i].actionName + "(" + t.targetActionTracker[targetName][i].damage + ")\n";
                 }
                 t.timelineMouseoverElement.getElementsByClassName("action-desc")[0].innerText = desc;
             } else {
-                t.timelineMouseoverElement.getElementsByClassName("action-desc")[0].innerText = thisActionData ? thisActionData["help_en"] : "(no description available)";
+                t.timelineMouseoverElement.getElementsByClassName("action-desc")[0].innerText = actionData ? actionData["help_en"] : "(no description available)";
             }
             t.timelineMouseoverElement.getElementsByClassName("action-time")[0].innerText = time.getMinutes() + ":" + (time.getSeconds() < 10 ? "0" : "") + time.getSeconds();
-            t.timelineMouseoverElement.getElementsByClassName("action-target")[0].innerText = target;
+            var targetText = targetName;
+            if (typeof(combatant[0]["IsNPC"]) != undefined && combatant[0]["IsNPC"]) {
+                targetText = combatantName + " > " + targetName;
+            }
+            t.timelineMouseoverElement.getElementsByClassName("action-target")[0].innerText = targetText;
         };
         actionElement.onmousemove = function(e) {
             t.timelineMouseoverElement.style.left = e.pageX + "px";
@@ -330,9 +362,9 @@ class WidgetTimelime extends WidgetBase
             t.timelineMouseoverElement.style.display = "none";
         };
         // add element
-        combatant[1].appendChild(actionElement);
+        //combatant[1].appendChild(actionElement);
         // resize all timelines
-        var longestTimeline = 0;
+        /*var longestTimeline = 0;
         for (var i = 0; i < this.combatants.length; i++) {
             if (this.combatants[i][1].offsetWidth > longestTimeline) {
                 longestTimeline = this.combatants[i][1].offsetWidth;
@@ -344,6 +376,21 @@ class WidgetTimelime extends WidgetBase
         for (var i = 0; i < this.combatants.length; i++) {
             this.combatants[i][1].style.width = longestTimeline + "px";
         }
+        if (this.timeKeyContainerElement) {
+            this.timeKeyContainerElement.style.width = longestTimeline + "px";
+            // add more time keys
+            if (timestamp > this.lastTimeKey) {
+                for (var i = this.lastTimeKey; i < parseInt(timestamp / 1000) + 1; i++) {
+                    var timeKeyElement = document.createElement("div");
+                    timeKeyElement.classList.add("time-key");
+                    timeKeyElement.innerText = ((i / 60) < 10 ? "0" : "") + (Math.floor((i / 60)).toFixed(0)) + ":" + ((i % 60) < 10 ? "0" : "") + (i % 60);
+                    timeKeyElement.style.right = (parseInt(((i * 1000) * TIMELINE_PIXELS_PER_MILLISECOND))) + "px";
+                    this.timeKeyContainerElement.append(timeKeyElement);
+                }
+                this.lastTimeKey = parseInt(timestamp / 1000) + 1;
+            }
+        }
+
         // add 'appear' class to icon to start css3 animation
         setTimeout(
             function() {
@@ -351,54 +398,16 @@ class WidgetTimelime extends WidgetBase
             },
             100
         );
-        // track last three actions against target
-        if (typeof(this.targetActionTracker[target]) == "undefined") {
-            this.targetActionTracker[target] = [];
-        }
-        this.targetActionTracker[target].push(name);
-        if (this.targetActionTracker[target].length > 3) {
-            this.targetActionTracker[target].pop();
-        }
-    }
-
-    /**
-     * Add actions that have been queued up.
-     */
-    _addQueuedActions()
-    {
-        if (!this.queueActions || this.combatants.length <= 1 || !this.startTime || !this.actionData) {
-            return;
-        }
-        // itterate queue items
-        for (var i = 0; i < this.queueActions.length; i++) {
-            // find combatant
-            var foundCombatant = false;
-            for (var j = 0; j < this.combatants.length; j++) {
-                var combatant = this.combatants[j];
-                if (combatant[0].Name.toLowerCase() == this.queueActions[i]["combatant"].toLowerCase()) {
-                    // add action
-                    this._addAction(
-                        combatant,
-                        this.queueActions[i]["action"],
-                        this.queueActions[i]["time"],
-                        this.queueActions[i]["target"]
-                    );
-                    foundCombatant = true;
-                    break;
-                }
+        // track actions against target
+        if (targetName) {
+            if (typeof(this.targetActionTracker[targetName]) == "undefined") {
+                this.targetActionTracker[targetName] = [];
             }
-            // use npc combatant
-            if (!foundCombatant) {
-                this._addAction(
-                    this.combatants[0],
-                    this.queueActions[i]["action"],
-                    this.queueActions[i]["time"],
-                    this.queueActions[i]["target"],
-                    this.queueActions[i]["combatant"]
-                );
+            this.targetActionTracker[targetName].push(logData);
+            if (this.targetActionTracker[targetName].length > 20) {
+                this.targetActionTracker[targetName].pop();
             }
-        }
-        this.queueActions = [];        
+        }*/
     }
 
     /**

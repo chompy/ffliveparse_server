@@ -78,3 +78,18 @@
     background-repeat: no-repeat;
     padding-left:18px;
 }
+
+#timeline .time-key-container {
+    height: 24px;
+    background: #2d2d2d;
+    border-bottom: 1px solid #fff;
+    color: #fff;
+    vertical-align: middle;
+    line-height: 24px;
+    margin-left: 1px;
+    position: relative;
+}
+
+#timeline .time-key-container .time-key {
+    position: absolute;
+}

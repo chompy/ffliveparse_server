@@ -25,6 +25,7 @@
     background: #202020;
     color: #fff;
     height: 32px;
+    margin-top: 25px;
 }
 .combatant.combatant-npc .info-text span {
     line-height: 32px;

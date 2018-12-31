@@ -179,41 +179,81 @@ function decodeFlagBytes(data)
     return pos;
 }
 
+function parseNextMessage(e)
+{
+    var e = e;
+    var buffer = e.detail.buffer;
+    var data = new Uint8Array(buffer);
+    var length = 0;
+    switch (data[0])
+    {
+        case DATA_TYPE_ENCOUNTER:
+        {
+            length = decodeEncounterBytes(data);
+            break;
+        }
+        case DATA_TYPE_COMBATANT:
+        {
+            length = decodeCombatantBytes(data);
+            break;
+        }
+        case DATA_TYPE_LOG_LINE:
+        {
+            length = decodeLogLineBytes(data);
+            break;
+        }
+        case DATA_TYPE_FLAG:
+        {
+            length = decodeFlagBytes(data);
+            break;
+        }
+    }
+
+    if (length == 0) {
+        document.getElementById("loadingMessage").classList.add("hide");
+        return;
+    }
+    e.detail.buffer = buffer.slice(length);
+    e.detail.count += 1;
+    e.detail.pos += length;
+    if (e.detail.count >= 200) {
+        document.getElementById("loadingMessage").innerText = "Loading (" + ((e.detail.pos / e.detail.length) * 100).toFixed(1) + "%)";
+        console.log(">> Read message batch. (" + e.detail.pos + "/" + e.detail.length + " bytes) (" + ((e.detail.pos / e.detail.length) * 100).toFixed(1) + "%).");
+        e.detail.count = 0;
+        setTimeout(function() { parseNextMessage(e); }, 1);
+        return;
+    }
+    window.dispatchEvent(
+        new CustomEvent(
+            "messageRead", {
+                "detail" : e.detail
+            }
+        )
+    );
+}
+
 function parseMessage(data)
 {
     totalBytesRecieved += data.length;
+    // show load screen when parsing large chunks of data
+    if (data.length > 102400) {
+        document.getElementById("loadingMessage").classList.remove("hide");
+    }
     // decompress
     data = pako.inflate(data)
-    var pos = 0;
-    while (pos < data.length) {
-        var length = 0;
-        switch (data[pos])
-        {
-            case DATA_TYPE_ENCOUNTER:
-            {
-                length = decodeEncounterBytes(data.slice(pos));
-                break;
-            }
-            case DATA_TYPE_COMBATANT:
-            {
-                length = decodeCombatantBytes(data.slice(pos));
-                break;
-            }
-            case DATA_TYPE_LOG_LINE:
-            {
-                length = decodeLogLineBytes(data.slice(pos));
-                break;
-            }
-            case DATA_TYPE_FLAG:
-            {
-                length = decodeFlagBytes(data.slice(pos));
-                break;
-            }
-        }
-        if (length == 0) {
-            return;
-        }
-        pos += length;
+    if (data.length > 0) {
+        window.dispatchEvent(
+            new CustomEvent(
+                "messageRead", 
+                {
+                    "detail" : {
+                        "buffer" : data.buffer,
+                        "count" : 1,
+                        "length" : data.length,
+                        "pos" : 0
+                    }
+                }
+            )
+        );
     }
-    return pos;
 }

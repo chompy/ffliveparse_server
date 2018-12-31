@@ -81,14 +81,18 @@ class Application
         }
         var socket = new WebSocket(socketUrl);
         var t = this;
+        // net decoder messageRead event
+        window.addEventListener("messageRead", parseNextMessage);
+        // socket open event
         socket.onopen = function(event) {
-            document.getElementById("loadingMessage").remove();
+            document.getElementById("loadingMessage").classList.add("hide");
             console.log(">> Connected to server.");
             t.connected = true;
             t.initUserConfig();
             t.initWidgets();
             fetchActionData();            
         };
+        // socket message event
         socket.onmessage = function(event) {
             if (socket.readyState !== 1) {
                 return;
