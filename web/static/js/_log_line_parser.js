@@ -50,6 +50,8 @@ let kFieldAttackerZ = 40;
 var MESSAGE_TYPE_SINGLE_TARGET = 21;
 var MESSAGE_TYPE_AOE = 22;
 var MESSAGE_TYPE_DEATH = 25;
+var MESSAGE_TYPE_GAIN_EFFECT = 26;
+var MESSAGE_TYPE_LOSE_EFFECT = 30;
 
 /**
  * Parse contents of log line and expand in to dictionary object.
@@ -75,7 +77,6 @@ function parseLogLine(message)
             data["actionName"] = fields[kFieldAbilityName];
             data["targetId"] = parseInt(fields[kFieldTargetId], 16);
             data["targetName"] = fields[kFieldTargetName];
-            data["flags"] = parseInt(fields[kFieldFlags], 16);
             data["damage"] = DamageFromFields(fields);
             break;
         }
@@ -89,6 +90,76 @@ function parseLogLine(message)
             let name = message.substr(offset, defeatedIdx - offset);            
             data["sourceName"] = name;
             break;
+        }
+    }
+    // flags
+    data["flags"] = [];
+    if (fields.length >= kFieldFlags && typeof(fields[kFieldFlags]) != "undefined") {
+        var rawFlags = fields[kFieldFlags];
+        // damage
+        switch (rawFlags.substring(rawFlags.length - 1, rawFlags.length))
+        {
+            case "1":
+            {
+                data.flags.push("dodge");
+                break;
+            }
+            case "3":
+            {
+                switch (rawFlags.substring(rawFlags.length - 2, rawFlags.length - 1))
+                {
+                    case "3":
+                    {
+                        data.flags.push("instant-death");
+                        break;
+                    }
+                    default:
+                    {
+                        data.flags.push("damage");
+                        if (rawFlags.length >= 3) {
+                            switch(rawFlags.substring(rawFlags.length - 3, rawFlags.length - 2))
+                            {
+                                case "1":
+                                {
+                                    data.flags.push("crit");
+                                    break;
+                                }
+                                case "2":
+                                {
+                                    data.flags.push("direct-hit");
+                                    break;
+                                }
+                                case "3":
+                                {
+                                    data.flags.push("crit");
+                                    data.flags.push("direct-hit");
+                                    break;
+                                }
+                            }
+                        }
+                        break;
+                    }
+                }                
+                break;
+            }
+            case "4":
+            {
+                data.flags.push("heal");
+                if (rawFlags.length >= 5 && rawFlags.substring(rawFlags.length - 5, rawFlags.length - 4) == "1") {
+                    data.flags.push("crit");
+                }
+                break;
+            }
+            case "5":
+            {
+                data.flags.push("blocked-damage");
+                break;
+            }
+            case "6":
+            {
+                data.flags.push("parried-damage");
+                break;
+            }
         }
     }
     return data;

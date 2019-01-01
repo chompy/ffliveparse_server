@@ -29,6 +29,9 @@
     opacity: 0;
     transition: opacity .5s, margin-right .5s;
 }
+.combatant-timeline .action.flag-crit .icon {
+    border: 1px dashed yellow;
+}
 .combatant-timeline .action.special .icon {
     border: 1px dashed #ff6969;
 }

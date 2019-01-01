@@ -41,7 +41,9 @@ class ActionData
         if (!(actionId in this.actionData)) {
             return null;
         }
-        return this.actionData[actionId];
+        var data = this.actionData[actionId];
+        data["id"] = actionId;
+        return data;
     }
 
     /**
