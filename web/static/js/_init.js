@@ -16,7 +16,8 @@ along with FFLiveParse.  If not, see <https://www.gnu.org/licenses/>.
 */
 
 // init main app
-var application = new Application(WEB_ID, ENCOUNTER_ID);
+var application = new Application(WEB_ID, ENCOUNTER_UID);
+document.getElementsByTagName("html")[0].classList.add("mode-" + window.location.hash.substring(1));
 window.addEventListener("load", function(e) {
     application.connect();
 });

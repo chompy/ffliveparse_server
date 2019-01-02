@@ -21,12 +21,9 @@ import (
 	"errors"
 	"log"
 	"net"
-	"net/url"
 	"time"
 
 	"github.com/olebedev/emitter"
-
-	"github.com/martinlindhe/base36"
 
 	"../app"
 	"../user"
@@ -57,7 +54,7 @@ func (m *Manager) ParseDataString(dataStr []byte, addr *net.UDPAddr) (*Data, err
 	case DataTypeSession:
 		{
 			// decode session string
-			session, err := DecodeSessionBytes(dataStr, addr)
+			session, _, err := DecodeSessionBytes(dataStr, addr)
 			if err != nil {
 				return nil, err
 			}
@@ -118,17 +115,17 @@ func (m *Manager) ParseDataString(dataStr []byte, addr *net.UDPAddr) (*Data, err
 				return nil, errors.New("recieved Encounter with no matching data object")
 			}
 			// parse encounter data
-			encounter, err := DecodeEncounterBytes(dataStr)
+			encounter, _, err := DecodeEncounterBytes(dataStr)
 			if err != nil {
 				return nil, err
 			}
 			// update data
 			dataObj.UpdateEncounter(encounter)
 			// log
-			dur := encounter.EndTime.Sub(encounter.StartTime)
+			/*dur := encounter.EndTime.Sub(encounter.StartTime)
 			log.Println(
 				"Update encounter",
-				base36.Encode(uint64(uint32(encounter.ID))),
+				encounter.UID,
 				"for user",
 				dataObj.User.ID,
 				"(ZoneName:",
@@ -142,7 +139,7 @@ func (m *Manager) ParseDataString(dataStr []byte, addr *net.UDPAddr) (*Data, err
 				", SuccessLevel:",
 				encounter.SuccessLevel,
 				")",
-			)
+			)*/
 			break
 		}
 	case DataTypeCombatant:
@@ -152,18 +149,18 @@ func (m *Manager) ParseDataString(dataStr []byte, addr *net.UDPAddr) (*Data, err
 				return nil, errors.New("recieved Combatant with no matching data object")
 			}
 			// parse combatant data
-			combatant, err := DecodeCombatantBytes(dataStr)
+			combatant, _, err := DecodeCombatantBytes(dataStr)
 			if err != nil {
 				return nil, err
 			}
 			// update user data
 			dataObj.UpdateCombatant(combatant)
 			// log
-			log.Println(
+			/*log.Println(
 				"Update combatant",
 				combatant.Name,
 				"for encounter",
-				base36.Encode(uint64(uint32(combatant.EncounterID))),
+				combatant.UID,
 				"(UserID:",
 				dataObj.User.ID,
 				", Job:",
@@ -177,7 +174,7 @@ func (m *Manager) ParseDataString(dataStr []byte, addr *net.UDPAddr) (*Data, err
 				", Deaths:",
 				combatant.Deaths,
 				")",
-			)
+			)*/
 		}
 	case DataTypeLogLine:
 		{
@@ -186,30 +183,12 @@ func (m *Manager) ParseDataString(dataStr []byte, addr *net.UDPAddr) (*Data, err
 				return nil, errors.New("recieved LogLine with no matching data object")
 			}
 			// parse log line data
-			logLine, err := DecodeLogLineBytes(dataStr)
+			logLine, _, err := DecodeLogLineBytes(dataStr)
 			if err != nil {
 				return nil, err
 			}
 			// add log line
 			dataObj.UpdateLogLine(logLine)
-			// log LogLines in dev mode
-			if m.devMode {
-				// log
-				encounterString := "(none)"
-				if logLine.EncounterID > 0 {
-					encounterString = base36.Encode(uint64(uint32(logLine.EncounterID)))
-				}
-				log.Println(
-					"Log line for user",
-					dataObj.User.ID,
-					"and encounter",
-					encounterString,
-					",",
-					len(logLine.LogLine),
-					"bytes,",
-					url.QueryEscape(logLine.LogLine),
-				)
-			}
 		}
 	default:
 		{
@@ -227,14 +206,14 @@ func (m *Manager) doTick(userID int64) {
 			log.Println("Tick with no session data, killing thread.")
 			return
 		}
-		if data.Encounter.ID == 0 {
+		if data.Encounter.UID == "" {
 			continue
 		}
 		if !data.NewTickData {
 			continue
 		}
 		data.NewTickData = false
-		log.Println("Tick for user", data.User.ID, "send data for encounter", base36.Encode(uint64(uint32(data.Encounter.ID))))
+		log.Println("Tick for user", data.User.ID, "send data for encounter", data.Encounter.UID)
 		// gz compress encounter data and emit event
 		compressData, err := CompressBytes(EncodeEncounterBytes(&data.Encounter))
 		if err != nil {
@@ -279,7 +258,7 @@ func (m *Manager) doLogTick(userID int64) {
 		}
 		// emit log line events
 		sendBytes := make([]byte, 0)
-		for i := data.LastLogLineIndex + 1; i < len(data.LogLines); i++ {
+		for i := data.LastLogLineIndex; i < len(data.LogLines); i++ {
 			sendBytes = append(sendBytes, EncodeLogLineBytes(&data.LogLines[i])...)
 		}
 		if len(sendBytes) > 0 {
@@ -331,7 +310,10 @@ func (m *Manager) GetDataWithUserID(userID int64) *Data {
 }
 
 // GetDataWithWebID - retrieve data with web id string
-func (m *Manager) GetDataWithWebID(webID string) *Data {
-	userID := user.GetIDFromWebIDString(webID)
-	return m.GetDataWithUserID(userID)
+func (m *Manager) GetDataWithWebID(webID string) (*Data, error) {
+	userID, err := user.GetIDFromWebIDString(webID)
+	if err != nil {
+		return nil, err
+	}
+	return m.GetDataWithUserID(userID), nil
 }

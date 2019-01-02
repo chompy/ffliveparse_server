@@ -7,38 +7,28 @@ This is the main server component, it listens for log data from the ACT plugin a
 
 ## Web Site How To
 
-When you generate a key for yourself you are given a personal parse page. This page will displays the data from your ACT. The default view displays information about the current encounter and the parses for all combatants.
-
-You can add additional widgets by clicking the white cog wheel in the top right corner of the page.
+When you generate a key for yourself you are given a personal parse page. This page takes data from your ACT and displays the parses and action timelines with it. You are free to share this page with others.
 
 
-### Widgets
+## Viewing Past Encounters
 
-**Encounter**
-
-The encounter widget will either display the current time in an active encounter or display the total time for the last active encounter. It also shows the zone name and total raid DPS.
-
-**Parse**
-
-Displays all allied combatants and their damage per second, healing per second, and deaths in the encounter. You can click the black cog wheel to add or remove columns as well as sorting options.
+Eventually you'll be able to view data on past encounters. While encounter data is currently being collected a way to view past data has not yet been implemented.
 
 
-**Custom Triggers**
+## Custom Plugins
 
-Allows the import of custom ACT triggers that use text-to-speech. Click the black cog wheel to import or remove triggers.
+Eventually you'll be able to add custom third party plugins that can extends FFLiveParse's functionality and provide additional data and triggers.
 
-**Cactbot Triggers**
+Some custom plugin ideas...
 
-Provides audible alerts for mechanics in many of the games raid fights. These are the same triggers that are part of the cactbot raidboss ACT overlay. See... [https://github.com/quisquous/cactbot](https://github.com/quisquous/cactbot). Click the black cog wheel to configure what types of audio alerts you recieve and add your character name to recieve custom callouts (i.e. boss is targeting YOU).
-
-**Skill Timer**
-
-Provides text-to-speech alerts when skills are used. This is meant to be used to track when allies are using their raid buffs. Click the black cog wheel to choose if you want callouts for skill activation and skill off cooldown. You can also pick which skills get called out.Not every skill has been implemented yet...
+- UWU Jail Plugin that works for PS4 users
+- Text-to-speech triggers to help line up raid buffs
 
 
 ## Todos
 
 - Past encounter list. (Be able to review all your past encounters.)
-- Skill timer widget, more skills, more options.
-- Encounter log widget, list details about the encounter (attacks, deaths, etc)
-- Ranking system, maybe?
+- Ability to have user provided custom widgets/plugins.
+- Restore functionality from v0.XX
+    - Custom triggers
+    - Cactbot triggers

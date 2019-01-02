@@ -64,7 +64,7 @@ func writeTime(data *[]byte, value time.Time) {
 func EncodeEncounterBytes(value *Encounter) []byte {
 	data := make([]byte, 1)
 	data[0] = DataTypeEncounter
-	writeInt32(&data, int32(value.ID))
+	writeString(&data, value.UID)
 	writeTime(&data, value.StartTime)
 	writeTime(&data, value.EndTime)
 	writeString(&data, value.Zone)
@@ -78,7 +78,7 @@ func EncodeEncounterBytes(value *Encounter) []byte {
 func EncodeCombatantBytes(value *Combatant) []byte {
 	data := make([]byte, 1)
 	data[0] = DataTypeCombatant
-	writeInt32(&data, int32(value.EncounterID))
+	writeString(&data, value.EncounterUID)
 	writeString(&data, value.Name)
 	writeString(&data, value.Job)
 	writeInt32(&data, value.Damage)
@@ -95,7 +95,7 @@ func EncodeCombatantBytes(value *Combatant) []byte {
 func EncodeLogLineBytes(value *LogLine) []byte {
 	data := make([]byte, 1)
 	data[0] = DataTypeLogLine
-	writeInt32(&data, int32(value.EncounterID))
+	writeString(&data, value.EncounterUID)
 	writeTime(&data, value.Time)
 	writeString(&data, value.LogLine)
 	return data
@@ -114,6 +114,7 @@ func EncodeFlagBytes(value *Flag) []byte {
 func CompressBytes(data []byte) ([]byte, error) {
 	var gzBytes bytes.Buffer
 	gz := gzip.NewWriter(&gzBytes)
+	defer gz.Close()
 	if _, err := gz.Write(data); err != nil {
 		return []byte{}, err
 	}

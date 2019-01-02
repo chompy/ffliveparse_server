@@ -18,6 +18,8 @@ along with FFLiveParse.  If not, see <https://www.gnu.org/licenses/>.
 package act
 
 import (
+	"bytes"
+	"compress/gzip"
 	"encoding/binary"
 	"errors"
 	"net"
@@ -64,72 +66,118 @@ func readTime(data []byte, pos *int) time.Time {
 }
 
 // DecodeSessionBytes - Create Session struct from incomming data packet
-func DecodeSessionBytes(data []byte, addr *net.UDPAddr) (Session, error) {
+func DecodeSessionBytes(data []byte, addr *net.UDPAddr) (Session, int, error) {
 	if data[0] != DataTypeSession {
-		return Session{}, errors.New("invalid data type for Session")
+		return Session{}, 0, errors.New("invalid data type for Session")
 	}
 	pos := 1
 	// check version number
 	versionNumber := readInt32(data, &pos)
 	if versionNumber != app.ActPluginVersionNumber {
-		return Session{}, errors.New("version number mismatch")
+		return Session{}, 0, errors.New("version number mismatch")
 	}
 	return Session{
 		UploadKey: readString(data, &pos),
 		IP:        addr.IP,
 		Port:      addr.Port,
-	}, nil
+	}, pos, nil
 }
 
 // DecodeEncounterBytes - Create Encounter struct from incomming data packet
-func DecodeEncounterBytes(data []byte) (Encounter, error) {
+func DecodeEncounterBytes(data []byte) (Encounter, int, error) {
 	if data[0] != DataTypeEncounter {
-		return Encounter{}, errors.New("invalid data type for Encounter")
+		return Encounter{}, 0, errors.New("invalid data type for Encounter")
 	}
 	pos := 1
 	return Encounter{
-		ID:           readUint32(data, &pos),
+		ActID:        readUint32(data, &pos),
 		StartTime:    readTime(data, &pos),
 		EndTime:      readTime(data, &pos),
 		Zone:         readString(data, &pos),
 		Damage:       readInt32(data, &pos),
 		Active:       readByte(data, &pos) != 0,
 		SuccessLevel: readByte(data, &pos),
-	}, nil
+	}, pos, nil
 }
 
 // DecodeCombatantBytes - Create Combatant struct from incomming data packet
-func DecodeCombatantBytes(data []byte) (Combatant, error) {
+func DecodeCombatantBytes(data []byte) (Combatant, int, error) {
 	if data[0] != DataTypeCombatant {
-		return Combatant{}, errors.New("invalid data type for Combatant")
+		return Combatant{}, 0, errors.New("invalid data type for Combatant")
 	}
 	pos := 1
 	return Combatant{
-		EncounterID:  readUint32(data, &pos),
-		Name:         readString(data, &pos),
-		Job:          readString(data, &pos),
-		Damage:       readInt32(data, &pos),
-		DamageTaken:  readInt32(data, &pos),
-		DamageHealed: readInt32(data, &pos),
-		Deaths:       readInt32(data, &pos),
-		Hits:         readInt32(data, &pos),
-		Heals:        readInt32(data, &pos),
-		Kills:        readInt32(data, &pos),
-	}, nil
+		ActEncounterID: readUint32(data, &pos),
+		Name:           readString(data, &pos),
+		Job:            readString(data, &pos),
+		Damage:         readInt32(data, &pos),
+		DamageTaken:    readInt32(data, &pos),
+		DamageHealed:   readInt32(data, &pos),
+		Deaths:         readInt32(data, &pos),
+		Hits:           readInt32(data, &pos),
+		Heals:          readInt32(data, &pos),
+		Kills:          readInt32(data, &pos),
+	}, pos, nil
 }
 
 // DecodeLogLineBytes - Create LogLine struct from incomming data packet
-func DecodeLogLineBytes(data []byte) (LogLine, error) {
+func DecodeLogLineBytes(data []byte) (LogLine, int, error) {
 	if data[0] != DataTypeLogLine {
-		return LogLine{}, errors.New("invalid data type for LogLine")
+		return LogLine{}, 0, errors.New("invalid data type for LogLine")
 	}
 	pos := 1
 	encounterID := readUint32(data, &pos)
 	time := readTime(data, &pos)
 	logLine := readString(data, &pos)
 	return LogLine{
-		EncounterID: encounterID,
-		Time:        time,
-		LogLine:     logLine,
-	}, nil
+		ActEncounterID: encounterID,
+		Time:           time,
+		LogLine:        logLine,
+	}, pos, nil
+}
+
+// DecompressBytes - Decompress byte array for recieving
+func DecompressBytes(data []byte) ([]byte, error) {
+	r := bytes.NewReader(data)
+	gz, err := gzip.NewReader(r)
+	defer gz.Close()
+	var output bytes.Buffer
+	_, err = output.ReadFrom(gz)
+	if err != nil {
+		return nil, err
+	}
+	return output.Bytes(), nil
+}
+
+// DecodeLogLineBytesFile - Create LogLine struct from data stored in log file
+func DecodeLogLineBytesFile(data []byte) ([]LogLine, int, error) {
+	// should be compressed
+	logBytes, err := DecompressBytes(data)
+	if err != nil {
+		return nil, 0, err
+	}
+	// itterate log bytes and convert to log line
+	pos := 0
+	logLines := make([]LogLine, 0)
+	for pos < len(logBytes) {
+		// check 'type' byte
+		if logBytes[pos] != DataTypeLogLine {
+			return nil, 0, errors.New("invalid data type for LogLine")
+		}
+		// read data
+		pos = pos + 1
+		encounterUID := readString(logBytes, &pos)
+		time := readTime(logBytes, &pos)
+		logLineString := readString(logBytes, &pos)
+		// append to log lines array
+		logLines = append(
+			logLines,
+			LogLine{
+				EncounterUID: encounterUID,
+				Time:         time,
+				LogLine:      logLineString,
+			},
+		)
+	}
+	return logLines, pos, nil
 }

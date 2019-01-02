@@ -154,7 +154,7 @@ class WidgetCombatants extends WidgetBase
         // name
         var nameElement = element.getElementsByClassName("name")[0];
         if (nameElement.innerText != combatant.Name) {
-            nameElement.innerText = combatant.Name;
+            nameElement.innerText = combatant.Name + " " + combatant.Name;
             element.setAttribute("data-name", combatant.Name);
             element.title = combatant.Name;
         }
@@ -165,40 +165,6 @@ class WidgetCombatants extends WidgetBase
             dps = 0;
         }
         dpsElement.innerText = dps.toFixed(2);
-    }
-
-    /**
-     * Update dps and heal percentage values.
-     */
-    _updateCombatantPercents()
-    {
-        return;
-        // TODO
-        // calculate healing total
-        var healingTotal = 0;
-        for (var i in this.combatants) {
-            healingTotal += this.combatants[i][0].DamageHealed;
-        }
-        // update percents for each combatant
-        for (var i in this.combatants) {
-            var combatant = this.combatants[i][0];
-            var element = this.combatants[i][1];
-            // damage percent
-            var damagePercentElement = element.getElementsByClassName("parseCombatantDamagePercent")[0];
-            var healingPercentElement = element.getElementsByClassName("parseCombatantHealingPercent")[0];
-            var damagePercent = Math.floor(combatant.Damage * (100 / this.encounterDamage));
-            if (!this._isValidParseNumber(damagePercent)) {
-                damagePercent = 0;
-            }
-            damagePercentElement.innerText = damagePercent + "%";
-            // healing percent
-            var healingPercentElement = element.getElementsByClassName("parseCombatantHealingPercent")[0];
-            var healingPercent = Math.floor(combatant.DamageHealed * (100 / healingTotal));
-            if (!this._isValidParseNumber(healingPercent)) {
-                healingPercent = 0;
-            }
-            healingPercentElement.innerText = healingPercent + "%";
-        }
     }
 
     /**
@@ -263,9 +229,9 @@ class WidgetCombatants extends WidgetBase
     _updateEncounter(event)
     {
         // new encounter
-        if (this.encounterId != event.detail.ID) {
+        if (this.encounterId != event.detail.UID) {
             this.reset();
-            this.encounterId = event.detail.ID;
+            this.encounterId = event.detail.UID;
         }
         this.encounterDamage = event.detail.Damage;
         // update encounter duration
@@ -283,14 +249,13 @@ class WidgetCombatants extends WidgetBase
         }
         // display combatants
         this._displayCombatants();
-        //this._updateCombatantPercents();
     }
 
     _updateCombatants(event)
     {
         var combatant = event.detail;
         // must be part of same encounter
-        if (combatant.EncounterID != this.encounterId) {
+        if (combatant.EncounterUID != this.encounterId) {
             return;
         }
         // don't add combatants with no job
@@ -324,7 +289,6 @@ class WidgetCombatants extends WidgetBase
         );
         // display
         this._displayCombatants();
-        this._updateCombatantPercents();
     }
 
 }

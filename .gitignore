@@ -1,7 +1,6 @@
 *.exe
 *.pyc
 *.code-workspace
-server/data/
-!server/data/.placeholder
-!server/web/util/build_cactbot_triggers/cactbot/*
+data/
+!data/.placeholder
 __pycache__

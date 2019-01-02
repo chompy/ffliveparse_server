@@ -4,10 +4,10 @@
     padding: 10px 8px;
     color: #fff;
 }
-#head #logo, #head #webId, #head #zone-info {
+#head #logo, #head #webId, #head #zone-info, #head #encounterId {
     display: inline-block;
 }
-#head #webId::before, #head #zone-info span::before {
+#head #webId::before, #head #zone-info span::before, #head #webId::before, #head #encounterId::before {
     content: "::";
     display: inline-block;
     margin-right: 4px;
@@ -17,4 +17,12 @@
 }
 #head #zone-info .time {
     font-weight: bold;
+}
+
+#head .left-side {
+    float: left;
+}
+
+#head .right-side {
+    float: right;
 }

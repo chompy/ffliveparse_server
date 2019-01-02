@@ -28,7 +28,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/martinlindhe/base36"
 	"github.com/olebedev/emitter"
 	"github.com/tdewolff/minify"
 	"github.com/tdewolff/minify/css"
@@ -49,14 +48,14 @@ var htmlTemplates map[string]*template.Template
 
 // templateData - Struct containing data to be made available to html template
 type templateData struct {
-	User              user.Data
-	HasUser           bool
-	WebIDString       string
-	EncounterIDString string
-	AppName           string
-	VersionString     string
-	ActVersionString  string
-	ErrorMessage      string
+	User             user.Data
+	HasUser          bool
+	WebIDString      string
+	EncounterUID     string
+	AppName          string
+	VersionString    string
+	ActVersionString string
+	ErrorMessage     string
 }
 
 // websocketConnection - Websocket connection data associated with user data
@@ -113,44 +112,47 @@ func HTTPStartServer(port uint16, userManager *user.Manager, actManager *act.Man
 	http.Handle("/ws/", websocket.Handler(func(ws *websocket.Conn) {
 		// split url path in to parts
 		urlPathParts := strings.Split(strings.TrimLeft(ws.Request().URL.Path, "/"), "/")
-		// need at once web ID to be present in url
+		// need user ID to be present in url
 		if len(urlPathParts) <= 1 {
 			return
 		}
-		// get web ID string (base36 user ID)
-		webID := urlPathParts[1]
-		// get encounter id string
-		encounterID := ""
+		// get user ID string
+		userID := urlPathParts[1]
+		// get encounter uid string
+		encounterUID := ""
 		if len(urlPathParts) >= 3 {
-			encounterID = urlPathParts[2]
+			encounterUID = urlPathParts[2]
 		}
 		// fetch user data
-		userData, err := userManager.LoadFromWebIDString(webID)
+		userData, err := userManager.LoadFromWebIDString(userID)
 		if err != nil {
-			log.Println("Error when attempting to retreive user", webID, ",", err)
+			log.Println("Error when attempting to retreive user", userID, ",", err)
 			return
 		}
 		// log
 		log.Println("New web socket session for ACT user", userData.ID, "from", ws.RemoteAddr())
 		// get act data from web ID
-		actData := actManager.GetDataWithWebID(webID)
-		// get encounter id int
-		encounterIDInt := uint32(0)
-		if encounterID != "" {
-			encounterIDInt = uint32(base36.Decode(encounterID))
+		actData, err := actManager.GetDataWithWebID(userID)
+		if err != nil {
+			log.Println("Error when attempting to retreive user", userID, ",", err)
+			return
 		}
 		// relay previous encounter data if encounter id was provided
-		if encounterID != "" && (actData == nil || encounterIDInt != actData.Encounter.ID) {
-			log.Println("Load previous encounter data (EncounterID:", encounterIDInt, ", UserID:", userData.ID, ")")
-			previousEncounter, err := act.GetPreviousEncounter(userData, encounterIDInt)
+		if encounterUID != "" && (actData == nil || encounterUID != actData.Encounter.UID) {
+			log.Println("Load previous encounter data (EncounterUID:", encounterUID, ", UserID:", userData.ID, ")")
+			previousEncounter, err := act.GetPreviousEncounter(userData, encounterUID)
 			if err != nil {
-				log.Println("Error when retreiving previous encounter", encounterID, "for user", userData.ID, ",", err)
+				log.Println("Error when retreiving previous encounter", encounterUID, "for user", userData.ID, ",", err)
 				return
 			}
 			sendInitData(ws, &previousEncounter)
 		} else {
 			// get act data from web ID
-			actData := actManager.GetDataWithWebID(webID)
+			actData, err := actManager.GetDataWithWebID(userID)
+			if err != nil {
+				log.Println("Error when retreiving encounter", encounterUID, "for user", userData.ID, ",", err)
+				return
+			}
 			// send init data
 			sendInitData(ws, actData)
 		}
@@ -204,7 +206,7 @@ func HTTPStartServer(port uint16, userManager *user.Manager, actManager *act.Man
 		td := getBaseTemplateData()
 		// get encounter id from url path
 		if len(urlPathParts) >= 2 {
-			td.EncounterIDString = urlPathParts[1]
+			td.EncounterUID = urlPathParts[1]
 		}
 		// set resposne headers
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -372,7 +374,7 @@ func getBaseTemplateData() templateData {
 
 func addUserToTemplateData(td *templateData, u user.Data) {
 	td.User = u
-	td.WebIDString = u.GetWebIDString()
+	td.WebIDString, _ = u.GetWebIDString()
 	td.HasUser = true
 }
 
@@ -398,9 +400,9 @@ func sendInitData(ws *websocket.Conn, data *act.Data) {
 	// prepare data
 	dataBytes := make([]byte, 0)
 	// send encounter
-	if data != nil && data.Encounter.ID != 0 {
-		encounterIDString := base36.Encode(uint64(data.Encounter.ID))
-		log.Println("Send encounter data for", encounterIDString, "(TotalCombatants:", len(data.Combatants), ")")
+	if data != nil && data.Encounter.UID != "" {
+		encounterUID := data.Encounter.UID
+		log.Println("Send encounter data for", encounterUID, "(TotalCombatants:", len(data.Combatants), ")")
 		// add encounter
 		dataBytes = append(dataBytes, act.EncodeEncounterBytes(&data.Encounter)...)
 		// add combatants

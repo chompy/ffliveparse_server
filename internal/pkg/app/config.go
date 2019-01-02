@@ -20,7 +20,7 @@ package app
 import "fmt"
 
 // VersionNumber - version number
-const VersionNumber int32 = 5
+const VersionNumber int32 = 100
 
 // ActPluginVersionNumber - act plugin version, must match number recieved from Act plugin to parse data
 const ActPluginVersionNumber int32 = 2
@@ -30,12 +30,6 @@ const Name string = "FFLiveParse"
 
 // DataPath - path where user data is stored
 const DataPath = "./data"
-
-// DatabaseDsnEnvironmentVarName - environment variable to use as database dsn
-const DatabaseDsnEnvironmentVarName = "FFLIVEPARSE_DATABASE_DSN"
-
-// DefaultDatabaseDsn - default dsn for database connection
-const DefaultDatabaseDsn = "ffliveparse:fftest@/ffliveparse?parseTime=true"
 
 // TickRate - how often combatant and encounter data should be sent to web user in ms
 const TickRate = 3000

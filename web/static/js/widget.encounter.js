@@ -107,7 +107,7 @@ class WidgetEncounter extends WidgetBase
      */
     _updateEncounter(event)
     {
-        this.encounterId = event.detail.ID;
+        this.encounterId = event.detail.UID;
         // new encounter active
         if (!this.startTime && event.detail.Active) {
             this.reset();

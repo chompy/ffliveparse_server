@@ -20,12 +20,12 @@ package user
 import (
 	"database/sql"
 	"fmt"
-	"os"
+	"path/filepath"
 	"time"
 
 	"../app"
 
-	_ "github.com/go-sql-driver/mysql" // mysql driver
+	_ "github.com/mattn/go-sqlite3" // sqlite driver
 )
 
 // Manager - manages users data
@@ -38,7 +38,7 @@ func createUserTables(database *sql.DB) error {
 	stmt, err := database.Prepare(`
 		CREATE TABLE IF NOT EXISTS user
 		(
-			id INTEGER PRIMARY KEY AUTO_INCREMENT,
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
 			created DATETIME DEFAULT CURRENT_TIMESTAMP,
 			accessed DATETIME DEFAULT CURRENT_TIMESTAMP,
 			upload_key VARCHAR(32),
@@ -54,16 +54,15 @@ func createUserTables(database *sql.DB) error {
 
 // NewManager - get new user manager
 func NewManager() (Manager, error) {
-	// get database dsn
-	dbDsn := os.Getenv(app.DatabaseDsnEnvironmentVarName)
-	if dbDsn == "" {
-		dbDsn = app.DefaultDatabaseDsn
-	}
-	// open database connect, create tables if they do not exist
-	database, err := sql.Open("mysql", dbDsn)
+
+	// get database path
+	dbPath := filepath.Join(app.DataPath, "db.sqlite")
+	// open database connection
+	database, err := sql.Open("sqlite3", dbPath)
 	if err != nil {
 		return Manager{}, err
 	}
+	// create tables if they do not exist
 	err = createUserTables(database)
 	if err != nil {
 		return Manager{}, err
@@ -172,7 +171,10 @@ func (m *Manager) LoadFromWebKey(webKey string) (Data, error) {
 
 // LoadFromWebIDString - load user from web ID string
 func (m *Manager) LoadFromWebIDString(webIDString string) (Data, error) {
-	userID := GetIDFromWebIDString(webIDString)
+	userID, err := GetIDFromWebIDString(webIDString)
+	if err != nil {
+		return Data{}, err
+	}
 	return m.LoadFromID(userID)
 }
 
@@ -192,7 +194,7 @@ func (m *Manager) Save(user Data) error {
 }
 
 // Delete - delete user data from database
-func (m *Manager) Delete(user Data) error {
+/*func (m *Manager) Delete(user Data) error {
 	stmt, err := m.database.Prepare(
 		`DELETE FROM user WHERE id = ?`,
 	)
@@ -201,4 +203,4 @@ func (m *Manager) Delete(user Data) error {
 	}
 	_, err = stmt.Exec(user.ID)
 	return err
-}
+}*/

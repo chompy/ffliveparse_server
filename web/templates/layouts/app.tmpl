@@ -1,12 +1,12 @@
 {{ template "base" .}}
 
-{{ define "title" }} :: {{ .WebIDString }}{{ if .EncounterIDString }} :: Encounter {{ .EncounterIDString }}{{ end }}
+{{ define "title" }} :: {{ .WebIDString }}{{ if .EncounterUID }} :: Encounter {{ .EncounterUID }}{{ end }}
 {{ end }}
 
 {{ define "headerLeft" }}
 <div id="logo"><a href="/">{{.AppName}}</a></div>
 <div id="webId"><a href="/{{ .WebIDString }}">{{ .WebIDString }}</a></div>
-{{ if .EncounterIDString }}<div id="encounterId">Encounter {{ .EncounterIDString }}</div>{{ end }}
+{{ if .EncounterUID }}<div id="encounterId">Encounter {{ .EncounterUID }}</div>{{ end }}
 <div id="zone-info">
     <span class="name" id="encounter-name">(Unknown Zone)</span>
     <span class="time" id="encounter-time">00:00</span>
@@ -38,8 +38,7 @@
 {{ define "scripts" }}
 <script type="text/javascript">
     var WEB_ID = "{{ .WebIDString }}";
-    var ENCOUNTER_ID = "{{ .EncounterIDString }}";
-    var ENCOUNTER_ID_INT = parseInt(ENCOUNTER_ID, 36);
+    var ENCOUNTER_UID = "{{ .EncounterUID }}";
 </script>
 <script type="text/javascript" src="/app.min.js?v={{ .VersionString }}"></script>
 {{ end }}

@@ -8,6 +8,7 @@
 }
 .combatant {
     padding: 10px 8px;
+    white-space: nowrap;
 }
 .combatant.combatant-healer {
     background-color: #2fa35f;

@@ -56,3 +56,11 @@ img.loading {
     padding: 10px 0;
     text-align: center;    
 }
+
+#mainBody {
+    padding: 20px;
+}
+
+@media(max-width: 940px) {
+    #head .right-side { display: none; }
+}

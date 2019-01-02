@@ -3,6 +3,7 @@
     <head>
         <title>{{ .AppName }}{{ template "title" . }}</title>
         <meta name="viewport" content="width=device-width, initial-scale=1">
+        <link rel="shortcut icon" href="/static/img/favicon.ico" />
         <link rel="stylesheet" href="/app.min.css?v={{.VersionString}}" />
     </head>
     <body>
@@ -11,9 +12,13 @@
         </div>
         <div id="container">
             <div id="head">
-                <div class="leftSide">
+                <div class="left-side">
                     {{ template "headerLeft" . }}
                 </div>
+                <div class="right-side">
+                    <span id="appVersion">v{{.VersionString}}</span>
+                </div>
+                <div class="clear"></div>
             </div>
             <div id="body">
                 {{ template "content" . }}

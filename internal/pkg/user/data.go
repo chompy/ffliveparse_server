@@ -18,15 +18,11 @@ along with FFLiveParse.  If not, see <https://www.gnu.org/licenses/>.
 package user
 
 import (
-	"encoding/hex"
-	"io"
-	"strings"
+	"errors"
 	"time"
 
-	"crypto/md5"
-
-	"github.com/martinlindhe/base36"
-	"github.com/segmentio/ksuid"
+	"github.com/rs/xid"
+	hashids "github.com/speps/go-hashids"
 )
 
 const webIDSalt = "aedb2d139b653ee8aeeed9010ed053e94cb01$#!756"
@@ -36,14 +32,14 @@ type Data struct {
 	ID        int64
 	Created   time.Time
 	Accessed  time.Time
-	UploadKey string
-	WebKey    string
+	UploadKey string // key used to push data from ACT
+	WebKey    string // key used to access creds via homepage (stored in cookie)
 }
 
 // NewData - create new user data
 func NewData() Data {
-	uploadKeyGen := ksuid.New()
-	webKeyGen := ksuid.New()
+	uploadKeyGen := xid.New()
+	webKeyGen := xid.New()
 	return Data{
 		Created:   time.Now(),
 		Accessed:  time.Now(),
@@ -53,30 +49,36 @@ func NewData() Data {
 }
 
 // GetWebIDString - get web id string used to access data
-func (d *Data) GetWebIDString() string {
-	h := md5.New()
-	io.WriteString(h, string(d.ID))
-	io.WriteString(h, webIDSalt)
-	return strings.ToUpper(
-		base36.Encode(uint64(d.ID)) +
-			string(hex.EncodeToString(h.Sum(nil))[0:3]),
-	)
+func (d *Data) GetWebIDString() (string, error) {
+	hd := hashids.NewData()
+	hd.Salt = webIDSalt
+	hd.MinLength = 5
+	h, err := hashids.NewWithData(hd)
+	if err != nil {
+		return "", err
+	}
+	idStr, err := h.EncodeInt64([]int64{d.ID})
+	if err != nil {
+		return "", err
+	}
+	return idStr, nil
 }
 
 // GetIDFromWebIDString - convert web id string to user id int
-func GetIDFromWebIDString(webIDString string) int64 {
-	if len(webIDString) < 3 {
-		return 0
+func GetIDFromWebIDString(webIDString string) (int64, error) {
+	hd := hashids.NewData()
+	hd.Salt = webIDSalt
+	hd.MinLength = 5
+	h, err := hashids.NewWithData(hd)
+	if err != nil {
+		return 0, err
 	}
-	hashStr := webIDString[len(webIDString)-3 : len(webIDString)]
-	webIDString = webIDString[0 : len(webIDString)-3]
-	userID := int64(base36.Decode(webIDString))
-	// verify hash str
-	h := md5.New()
-	io.WriteString(h, string(userID))
-	io.WriteString(h, webIDSalt)
-	if strings.ToUpper(string(hex.EncodeToString(h.Sum(nil))[0:3])) != hashStr {
-		return 0
+	idInt, err := h.DecodeInt64WithError(webIDString)
+	if err != nil {
+		return 0, err
 	}
-	return int64(base36.Decode(webIDString))
+	if len(idInt) < 1 {
+		return 0, errors.New("could not convert web ID string to web ID integer")
+	}
+	return idInt[0], nil
 }

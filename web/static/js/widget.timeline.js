@@ -90,7 +90,15 @@ class WidgetTimelime extends WidgetBase
      */
     reset()
     {
-        this.actionTimeline = [];
+        // carry over actions that have the same encounter uid
+        var carryOverActions = [];
+        for (var i in this.actionTimeline) {
+            var actionData = this.actionTimeline[i];
+            if (actionData.encounterUID == this.encounterId || !this.encounterId) {
+                carryOverActions.push(actionData);
+            }
+        }
+        this.actionTimeline = carryOverActions;
         this.timelineElement.innerHTML = "";
         this.lastTimeKey = 0;
         this.timeKeyContainerElement = document.createElement("div");
@@ -112,10 +120,10 @@ class WidgetTimelime extends WidgetBase
     _updateEncounter(event)
     {
         // new encounter active
-        if (event.detail.Active && this.encounterId != event.detail.ID) {
+        if (event.detail.Active && this.encounterId != event.detail.UID) {
+            this.encounterId = event.detail.UID;
             this.reset();
         }
-        this.encounterId = event.detail.ID;
         this.isActiveEncounter = event.detail.Active;
         this.startTime = event.detail.StartTime;
         this.endTime = event.detail.EndTime;
@@ -181,9 +189,7 @@ class WidgetTimelime extends WidgetBase
             case MESSAGE_TYPE_SINGLE_TARGET:
             case MESSAGE_TYPE_AOE:
             {
-                this._addAction(logLineData, event.detail.Time);
-                // track action usage on targets
-                this.actionT
+                this._addAction(logLineData, event.detail.Time, event.detail.EncounterUID);
                 break;
             }
             case MESSAGE_TYPE_DEATH:
@@ -193,7 +199,7 @@ class WidgetTimelime extends WidgetBase
                 logLineData["sourceId"] = -1;
                 logLineData["targetName"] = logLineData.sourceName;
                 logLineData["targetId"] = -1;
-                this._addAction(logLineData, event.detail.Time)
+                this._addAction(logLineData, event.detail.Time, event.detail.EncounterUID)
                 break;
             }
             case MESSAGE_TYPE_GAIN_EFFECT:
@@ -255,10 +261,11 @@ class WidgetTimelime extends WidgetBase
      * Add action to timeline.
      * @param {Object} logData
      * @param {Date} time
+     * @param {string} encounterUID
      */
-    _addAction(logData, time)
+    _addAction(logData, time, encounterUID)
     {
-        if (!time || isNaN(time)) {
+        if (!time || isNaN(time) || !encounterUID) {
             return;
         }
         // add to action timeline
@@ -266,8 +273,8 @@ class WidgetTimelime extends WidgetBase
             "logData"       : logData,
             "time"          : time,
             "element"       : null,
+            "encounterUID"  : encounterUID
         });
-
         // render new timeline elements
         this._renderTimeline();
     }
@@ -296,11 +303,6 @@ class WidgetTimelime extends WidgetBase
     {
         var timestamp = parseInt(Math.ceil(timestamp / 1000)) * 1000;
         var timelinePixelLength = TIMELINE_PIXEL_OFFSET + parseInt(TIMELINE_PIXELS_PER_MILLISECOND * timestamp);
-        if (timelinePixelLength < window.innerWidth) {
-            timestamp = parseInt(window.innerWidth / TIMELINE_PIXELS_PER_MILLISECOND);
-            timelinePixelLength = window.innerWidth;
-        }
-
         // resize combatant timelines
         for (var i = 0; i < this.combatants.length; i++) {
             if (this.combatants[i].element.offsetWidth < timestamp) {
@@ -442,7 +444,7 @@ class WidgetTimelime extends WidgetBase
                         }
                         lastDamages.push(this.actionTimeline[j].logData);
                         if (lastDamages.length > 5) {
-                            lastDamages.pop();
+                            lastDamages.shift();
                         }
                     }
                     for (var j in lastDamages) {

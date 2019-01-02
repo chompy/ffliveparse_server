@@ -9,7 +9,6 @@
 }
 .combatant-timeline {
     position: relative;
-    min-width: 100%;
     transition: width .5s;
     background-image: url(/static/img/timeline_mark.png);
     background-repeat: repeat;
@@ -84,6 +83,7 @@
 
 #timeline .time-key-container {
     height: 24px;
+    width: 0;
     background: #2d2d2d;
     border-bottom: 1px solid #fff;
     color: #fff;

@@ -25,6 +25,7 @@ var SIZE_INT16 = 2;
 var SIZE_INT32 = 4;
 
 var totalBytesRecieved= 0;
+var hasEncounter = false;
 
 function readInt32(data, pos)
 {
@@ -67,7 +68,7 @@ function decodeEncounterBytes(data)
     var output = {
         "Type" : DATA_TYPE_ENCOUNTER
     };
-    output["ID"]            = readUint32(data, pos); pos += SIZE_INT32;
+    output["UID"]           = readString(data, pos); pos += readUint16(data, pos) + SIZE_INT16;
     output["StartTime"]     = readString(data, pos); pos += readUint16(data, pos) + SIZE_INT16;
     output["EndTime"]       = readString(data, pos); pos += readUint16(data, pos) + SIZE_INT16;
     output["Zone"]          = readString(data, pos); pos += readUint16(data, pos) + SIZE_INT16;
@@ -78,7 +79,10 @@ function decodeEncounterBytes(data)
     output["StartTime"]     = new Date(output["StartTime"]);
     output["EndTime"]       = new Date(output["EndTime"]);
 
-    if (!ENCOUNTER_ID_INT || output["ID"] == ENCOUNTER_ID_INT) {
+    if (!ENCOUNTER_UID || output["UID"] == ENCOUNTER_UID) {
+        if (output.Zone) {
+            hasEncounter = true;
+        }
         window.dispatchEvent(
             new CustomEvent("act:encounter", {"detail" : output})
         );
@@ -95,7 +99,7 @@ function decodeCombatantBytes(data)
     var output = {
         "Type" : DATA_TYPE_COMBATANT
     };
-    output["EncounterID"]   = readUint32(data, pos); pos += SIZE_INT32;
+    output["EncounterUID"]  = readString(data, pos); pos += readUint16(data, pos) + SIZE_INT16;
     output["Name"]          = readString(data, pos); pos += readUint16(data, pos) + SIZE_INT16;
     output["Job"]           = readString(data, pos); pos += readUint16(data, pos) + SIZE_INT16;
     output["Damage"]        = readInt32(data, pos); pos += SIZE_INT32;
@@ -105,7 +109,7 @@ function decodeCombatantBytes(data)
     output["Hits"]          = readInt32(data, pos); pos += SIZE_INT32;
     output["Heals"]         = readInt32(data, pos); pos += SIZE_INT32;
     output["Kills" ]        = readInt32(data, pos); pos += SIZE_INT32;
-    if (!ENCOUNTER_ID_INT || output["EncounterID"] == ENCOUNTER_ID_INT) {
+    if (!ENCOUNTER_UID || output["EncounterUID"] == ENCOUNTER_UID) {
         window.dispatchEvent(
             new CustomEvent("act:combatant", {"detail" : output})
         );
@@ -122,7 +126,7 @@ function decodeCombatActionBytes(data)
     var output = {
         "Type" : DATA_TYPE_COMBAT_ACTION
     };
-    output["EncounterID"]   = readUint32(data, pos); pos += SIZE_INT32;
+    output["EncounterUID"]  = readString(data, pos); pos += readUint16(data, pos) + SIZE_INT16;
     output["Time"]          = readString(data, pos); pos += readUint16(data, pos) + SIZE_INT16;
     output["Sort"]          = readInt32(data, pos); pos += SIZE_INT32;
     output["Attacker"]      = readString(data, pos); pos += readUint16(data, pos) + SIZE_INT16;
@@ -132,7 +136,7 @@ function decodeCombatActionBytes(data)
     output["SkillType"]     = readString(data, pos); pos += readUint16(data, pos) + SIZE_INT16;
     output["SwingType"]     = readByte(data, pos); pos += SIZE_BYTE;
     output["Critical"]      = readByte(data, pos) != 0; pos += SIZE_BYTE;
-    if (!ENCOUNTER_ID_INT || output["EncounterID"] == ENCOUNTER_ID_INT) {
+    if (!ENCOUNTER_UID || output["EncounterUID"] == ENCOUNTER_UID) {
         window.dispatchEvent(
             new CustomEvent("act:combatAction", {"detail" : output})
         );
@@ -149,12 +153,12 @@ function decodeLogLineBytes(data)
     var output = {
         "Type" : DATA_TYPE_LOG_LINE
     };
-    output["EncounterID"]   = readUint32(data, pos); pos += SIZE_INT32;
+    output["EncounterUID"]  = readString(data, pos); pos += readUint16(data, pos) + SIZE_INT16;
     output["Time"]          = readString(data, pos); pos += readUint16(data, pos) + SIZE_INT16;
     output["LogLine"]       = readString(data, pos); pos += readUint16(data, pos) + SIZE_INT16;
 
     output["Time"]          = new Date(output["Time"]);
-    if (!ENCOUNTER_ID_INT || output["EncounterID"] == ENCOUNTER_ID_INT) {    
+    if (!ENCOUNTER_UID || output["EncounterUID"] == ENCOUNTER_UID) {
         window.dispatchEvent(
             new CustomEvent("act:logLine", {"detail" : output})
         );
@@ -181,7 +185,6 @@ function decodeFlagBytes(data)
 
 function parseNextMessage(e)
 {
-    var e = e;
     var buffer = e.detail.buffer;
     var data = new Uint8Array(buffer);
     var length = 0;
@@ -209,15 +212,19 @@ function parseNextMessage(e)
         }
     }
 
-    if (length == 0) {
-        document.getElementById("loadingMessage").classList.add("hide");
+    if (length <= 0) {
+        if (hasEncounter) {
+            document.getElementById("loadingMessage").classList.add("hide");
+        }
         return;
     }
     e.detail.buffer = buffer.slice(length);
     e.detail.count += 1;
     e.detail.pos += length;
     if (e.detail.count >= 200) {
-        document.getElementById("loadingMessage").innerText = "Loading (" + ((e.detail.pos / e.detail.length) * 100).toFixed(1) + "%)";
+        if (hasEncounter) {
+            document.getElementById("loadingMessage").innerText = "Loading (" + ((e.detail.pos / e.detail.length) * 100).toFixed(1) + "%)";
+        }
         console.log(">> Read message batch. (" + e.detail.pos + "/" + e.detail.length + " bytes) (" + ((e.detail.pos / e.detail.length) * 100).toFixed(1) + "%).");
         e.detail.count = 0;
         setTimeout(function() { parseNextMessage(e); }, 1);

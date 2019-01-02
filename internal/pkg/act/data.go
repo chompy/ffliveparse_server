@@ -19,16 +19,17 @@ package act
 
 import (
 	"database/sql"
+	"io/ioutil"
 	"log"
-	"os"
+	"path/filepath"
 	"time"
-
-	"github.com/martinlindhe/base36"
 
 	"../app"
 	"../user"
 
-	_ "github.com/go-sql-driver/mysql" // mysql driver
+	"github.com/rs/xid"
+
+	_ "github.com/mattn/go-sqlite3" // sqlite driver
 )
 
 // lastUpdateInactiveTime - Time in ms between last data updata before data is considered inactive
@@ -57,10 +58,11 @@ func NewData(session Session, user user.Data) (Data, error) {
 		return Data{}, err
 	}
 	database.Close()
+	encounterUIDGenerator := xid.New()
 	return Data{
 		Session:          session,
 		User:             user,
-		Encounter:        Encounter{ID: 0},
+		Encounter:        Encounter{UID: encounterUIDGenerator.String()},
 		Combatants:       make([]Combatant, 0),
 		LastUpdate:       time.Now(),
 		LastLogLineIndex: 0,
@@ -73,28 +75,31 @@ func (d *Data) UpdateEncounter(encounter Encounter) {
 	d.NewTickData = true
 	// check if encounter update is for current counter
 	// update it if so
-	if encounter.ID == d.Encounter.ID {
+	if encounter.ActID == d.Encounter.ActID {
+		encounter.UID = d.Encounter.UID // copy UID
 		d.Encounter = encounter
 		// save encounter if it is no longer active
 		if !d.Encounter.Active {
 			err := d.SaveEncounter()
 			if err != nil {
-				log.Println("Error while saving encounter", d.Encounter.ID, err)
+				log.Println("Error while saving encounter", d.Encounter.UID, err)
 			}
 		}
 		return
 	}
 	// save + clear current encounter if one exists
-	if d.Encounter.ID != 0 {
+	if d.Encounter.ActID != 0 {
 		err := d.SaveEncounter()
 		if err != nil {
-			log.Println("Error while saving encounter", d.Encounter.ID, err)
+			log.Println("Error while saving encounter", d.Encounter.UID, err)
 		}
 		d.ClearEncounter()
 	}
 	// create new encounter
+	encounterUIDGenerator := xid.New()
+	encounter.UID = encounterUIDGenerator.String()
 	d.Encounter = encounter
-	log.Println("Set active encounter to", base36.Encode(uint64(uint32(encounter.ID))), "for session", d.User.ID)
+	log.Println("New active encounter. (UID:", d.Encounter.UID, "ActID:", d.Encounter.ActID, "UserID:", d.User.ID, ")")
 }
 
 // UpdateCombatant - Add or update combatant data
@@ -102,9 +107,11 @@ func (d *Data) UpdateCombatant(combatant Combatant) {
 	d.LastUpdate = time.Now()
 	d.NewTickData = true
 	// ensure there is a current encounter and that data is for it
-	if combatant.EncounterID == 0 || d.Encounter.ID == 0 || combatant.EncounterID != d.Encounter.ID {
+	if combatant.ActEncounterID == 0 || d.Encounter.ActID == 0 || d.Encounter.UID == "" || combatant.ActEncounterID != d.Encounter.ActID {
 		return
 	}
+	// set encounter UID
+	combatant.EncounterUID = d.Encounter.UID
 	// look for existing, update if found
 	for index, storedCombatant := range d.Combatants {
 		if storedCombatant.Name == combatant.Name {
@@ -114,12 +121,20 @@ func (d *Data) UpdateCombatant(combatant Combatant) {
 	}
 	// add new
 	d.Combatants = append(d.Combatants, combatant)
-	log.Println("Add combatant", combatant.Name, "to encounter", combatant.EncounterID, "(TotalCombatants:", len(d.Combatants), ")")
+	log.Println("Add combatant", combatant.Name, "to encounter", combatant.EncounterUID, "(TotalCombatants:", len(d.Combatants), ")")
 }
 
 // UpdateLogLine - Add log line
 func (d *Data) UpdateLogLine(logLine LogLine) {
+	// ensure there is a current encounter and that data is for it
+	if logLine.ActEncounterID == 0 || d.Encounter.ActID == 0 || d.Encounter.UID == "" || logLine.ActEncounterID != d.Encounter.ActID {
+		return
+	}
+	// set encounter UID
+	logLine.EncounterUID = d.Encounter.UID
+	// update log last update flag
 	d.LastUpdate = time.Now()
+	// add to log line list
 	d.LogLines = append(d.LogLines, logLine)
 }
 
@@ -131,13 +146,10 @@ func (d *Data) ClearLogLines() {
 
 // getDatabase - get encounter database for given user
 func getDatabase(user user.Data) (*sql.DB, error) {
-	// get database dsn
-	dbDsn := os.Getenv(app.DatabaseDsnEnvironmentVarName)
-	if dbDsn == "" {
-		dbDsn = app.DefaultDatabaseDsn
-	}
+	// get database path
+	dbPath := filepath.Join(app.DataPath, "db.sqlite")
 	// open database connection
-	database, err := sql.Open("mysql", dbDsn)
+	database, err := sql.Open("sqlite3", dbPath)
 	if err != nil {
 		return nil, err
 	}
@@ -150,14 +162,15 @@ func initDatabase(database *sql.DB) error {
 	stmt, err := database.Prepare(`
 		CREATE TABLE IF NOT EXISTS encounter
 		(
-			id INTEGER,
+			uid VARCHAR(32),
+			act_id INTEGER,
 			user_id INTEGER,
 			start_time DATETIME,
 			end_time DATETIME,
 			zone VARCHAR(256),
 			damage INTEGER,
 			success_level INTEGER,
-			CONSTRAINT encounter_unique UNIQUE (id, user_id)
+			CONSTRAINT encounter_uid_unique UNIQUE (uid)
 		)
 	`)
 	if err != nil {
@@ -171,9 +184,9 @@ func initDatabase(database *sql.DB) error {
 	stmt, err = database.Prepare(`
 		CREATE TABLE IF NOT EXISTS combatant
 		(
-			id INTEGER PRIMARY KEY AUTO_INCREMENT,
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
 			user_id INTEGER,
-			encounter_id INTEGER,
+			encounter_uid VARCHAR(32),
 			name VARCHAR(256),
 			job VARCHAR(3),
 			damage INTEGER,
@@ -183,7 +196,7 @@ func initDatabase(database *sql.DB) error {
 			hits INTEGER,
 			heals INTEGER,
 			kills INTEGER,
-			CONSTRAINT encounter_unique UNIQUE (user_id, encounter_id, name)
+			CONSTRAINT encounter_unique UNIQUE (user_id, encounter_uid, name)
 		)
 	`)
 	if err != nil {
@@ -199,7 +212,7 @@ func initDatabase(database *sql.DB) error {
 // SaveEncounter - save all data related to current encounter
 func (d *Data) SaveEncounter() error {
 	// no encounter
-	if d.Encounter.ID == 0 {
+	if d.Encounter.UID == "" {
 		return nil
 	}
 	// get database
@@ -211,14 +224,15 @@ func (d *Data) SaveEncounter() error {
 	// insert in to encounter table
 	stmt, err := database.Prepare(`
 		REPLACE INTO encounter
-		(id, user_id, start_time, end_time, zone, damage, success_level) VALUES
-		(?, ?, ?, ?, ?, ?, ?)
+		(uid, act_id, user_id, start_time, end_time, zone, damage, success_level) VALUES
+		(?, ?, ?, ?, ?, ?, ?, ?)
 	`)
 	if err != nil {
 		return err
 	}
 	_, err = stmt.Exec(
-		d.Encounter.ID,
+		d.Encounter.UID,
+		d.Encounter.ActID,
 		d.User.ID,
 		d.Encounter.StartTime,
 		d.Encounter.EndTime,
@@ -234,14 +248,14 @@ func (d *Data) SaveEncounter() error {
 	for _, combatant := range d.Combatants {
 		stmt, err := database.Prepare(`
 			REPLACE INTO combatant
-			(encounter_id, user_id, name, job, damage, damage_taken, damage_healed, deaths, hits, heals, kills) VALUES
+			(encounter_uid, user_id, name, job, damage, damage_taken, damage_healed, deaths, hits, heals, kills) VALUES
 			(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		`)
 		if err != nil {
 			return err
 		}
 		_, err = stmt.Exec(
-			combatant.EncounterID,
+			combatant.EncounterUID,
 			d.User.ID,
 			combatant.Name,
 			combatant.Job,
@@ -258,18 +272,35 @@ func (d *Data) SaveEncounter() error {
 		}
 		stmt.Close()
 	}
+	// store log data to binary file
+	logBytes := make([]byte, 0)
+	for _, logLine := range d.LogLines {
+		logBytes = append(logBytes, EncodeLogLineBytes(&logLine)...)
+	}
+	if len(logBytes) > 0 {
+		compressedLogData, err := CompressBytes(logBytes)
+		if err != nil {
+			return err
+		}
+		logFilePath := filepath.Join(app.DataPath, d.Encounter.UID+"_LogLines.dat")
+		err = ioutil.WriteFile(logFilePath, compressedLogData, 0644)
+		if err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
 // ClearEncounter - delete all data for current encounter from memory
 func (d *Data) ClearEncounter() {
-	d.Encounter = Encounter{ID: 0}
+	encounterUIDGenerator := xid.New()
+	d.Encounter = Encounter{UID: encounterUIDGenerator.String()}
 	d.Combatants = make([]Combatant, 0)
 	d.ClearLogLines()
 }
 
 // GetPreviousEncounter - retrieve previous encounter data from database
-func GetPreviousEncounter(user user.Data, encounterID uint32) (Data, error) {
+func GetPreviousEncounter(user user.Data, encounterUID string) (Data, error) {
 	// get database
 	database, err := getDatabase(user)
 	if err != nil {
@@ -278,9 +309,9 @@ func GetPreviousEncounter(user user.Data, encounterID uint32) (Data, error) {
 	defer database.Close()
 	// fetch encounter
 	rows, err := database.Query(
-		"SELECT id, start_time, end_time, zone, damage, success_level FROM encounter WHERE user_id = ? AND id = ? LIMIT 1",
+		"SELECT uid, act_id, start_time, end_time, zone, damage, success_level FROM encounter WHERE user_id = ? AND uid = ? LIMIT 1",
 		user.ID,
-		encounterID,
+		encounterUID,
 	)
 	if err != nil {
 		return Data{}, err
@@ -288,7 +319,8 @@ func GetPreviousEncounter(user user.Data, encounterID uint32) (Data, error) {
 	encounter := Encounter{}
 	for rows.Next() {
 		err = rows.Scan(
-			&encounter.ID,
+			&encounter.UID,
+			&encounter.ActID,
 			&encounter.StartTime,
 			&encounter.EndTime,
 			&encounter.Zone,
@@ -303,9 +335,9 @@ func GetPreviousEncounter(user user.Data, encounterID uint32) (Data, error) {
 	rows.Close()
 	// fetch combatants
 	rows, err = database.Query(
-		"SELECT encounter_id, name, job, damage, damage_taken, damage_healed, deaths, hits, heals, kills FROM combatant WHERE user_id = ? AND encounter_id = ?",
+		"SELECT encounter_uid, name, job, damage, damage_taken, damage_healed, deaths, hits, heals, kills FROM combatant WHERE user_id = ? AND encounter_uid = ?",
 		user.ID,
-		encounterID,
+		encounterUID,
 	)
 	if err != nil {
 		return Data{}, err
@@ -314,7 +346,7 @@ func GetPreviousEncounter(user user.Data, encounterID uint32) (Data, error) {
 	for rows.Next() {
 		combatant := Combatant{}
 		err := rows.Scan(
-			&combatant.EncounterID,
+			&combatant.EncounterUID,
 			&combatant.Name,
 			&combatant.Job,
 			&combatant.Damage,
@@ -331,11 +363,22 @@ func GetPreviousEncounter(user user.Data, encounterID uint32) (Data, error) {
 		combatants = append(combatants, combatant)
 	}
 	rows.Close()
+	// fetch log lines file
+	logFilePath := filepath.Join(app.DataPath, encounterUID+"_LogLines.dat")
+	compressedLogBytes, err := ioutil.ReadFile(logFilePath)
+	if err != nil {
+		return Data{}, err
+	}
+	logLines, _, err := DecodeLogLineBytesFile(compressedLogBytes)
+	if err != nil {
+		return Data{}, err
+	}
 	// return data set
 	return Data{
 		User:       user,
 		Encounter:  encounter,
 		Combatants: combatants,
+		LogLines:   logLines,
 	}, nil
 }
 

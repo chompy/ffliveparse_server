@@ -21,13 +21,13 @@ along with FFLiveParse.  If not, see <https://www.gnu.org/licenses/>.
 class Application
 {
 
-    constructor(webId, encounterId)
+    constructor(webId, encounterUid)
     {
         // user web id
         this.webId = webId;
-        // encounter id, when provided ignore all data not
+        // encounter uid, when provided ignore all data not
         // related to encounter
-        this.encounterId = encounterId;
+        this.encounterUid = encounterUid;
         // list widgets
         this.widgets = {};
         // connection flag
@@ -44,8 +44,11 @@ class Application
         var availableWidgets = [
             new WidgetEncounter(),
             new WidgetCombatants(),
-            new WidgetTimelime(),
         ];
+        // don't load timeline for 'stream' mode
+        if (window.location.hash != "#stream") {
+            availableWidgets.push(new WidgetTimelime());
+        }
         for (var i = 0; i < availableWidgets.length; i++) {
             this.widgets[availableWidgets[i].getName()] = availableWidgets[i];
             availableWidgets[i].init();
@@ -76,8 +79,8 @@ class Application
     connect()
     {
         var socketUrl = (window.location.protocol == "https:" ? "wss" : "ws") + "://" + window.location.host + "/ws/" + this.webId;
-        if (this.encounterId) {
-            socketUrl += "/" + this.encounterId;
+        if (this.encounterUid) {
+            socketUrl += "/" + this.encounterUid;
         }
         var socket = new WebSocket(socketUrl);
         var t = this;
@@ -85,7 +88,7 @@ class Application
         window.addEventListener("messageRead", parseNextMessage);
         // socket open event
         socket.onopen = function(event) {
-            document.getElementById("loadingMessage").classList.add("hide");
+            document.getElementById("loadingMessage").innerText = "Waiting for Encounter data...";
             console.log(">> Connected to server.");
             t.connected = true;
             t.initUserConfig();
@@ -118,12 +121,12 @@ class Application
             console.log(">> An error has occured,", event);
         };
         // log incoming data
-        var lastEncounterId = null;
+        var lastEncounterUid = null;
         var currentCombatants = [];
         window.addEventListener("act:encounter", function(e) {
-            if (e.detail.ID != lastEncounterId) {
+            if (e.detail.ID != lastEncounterUid) {
                 console.log(">> Receieved new encounter, ", e.detail);
-                lastEncounterId = e.detail.ID;
+                lastEncounterUid = e.detail.UID;
                 currentCombatants = [];
             }
         });
