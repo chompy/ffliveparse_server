@@ -1,14 +1,5 @@
 version: "3"
-services:
-
-    ffliveparse-mysql: 
-        hostname: "ffliveparse-mysql"
-        image: "yobasystems/alpine-mariadb"
-        volumes:
-            - "ffliveparse-data:/var/lib/mysql"
-        env_file:
-            - "docker.env"
-
+services:    
     ffliveparse-app:
         build:
             context: "../"
@@ -19,6 +10,8 @@ services:
             - "docker.env"
         links:
             - "ffliveparse-mysql"
+        volumes:
+            - "ffliveparse-data:/app/data"
 
     ffliveparse-nginx:
         build: "nginx/"
