@@ -154,7 +154,7 @@ class WidgetCombatants extends WidgetBase
         // name
         var nameElement = element.getElementsByClassName("name")[0];
         if (nameElement.innerText != combatant.Name) {
-            nameElement.innerText = combatant.Name + " " + combatant.Name;
+            nameElement.innerText = combatant.Name;
             element.setAttribute("data-name", combatant.Name);
             element.title = combatant.Name;
         }
