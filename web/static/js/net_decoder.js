@@ -183,10 +183,9 @@ function decodeFlagBytes(data)
     return pos;
 }
 
-function parseNextMessage(e)
+function parseNextMessage(buffer, pos, count)
 {
-    var buffer = e.detail.buffer;
-    var data = new Uint8Array(buffer);
+    var data = new Uint8Array(buffer.slice(pos));
     var length = 0;
     switch (data[0])
     {
@@ -211,32 +210,24 @@ function parseNextMessage(e)
             break;
         }
     }
-
+    delete data;
     if (length <= 0) {
         if (hasEncounter) {
             document.getElementById("loadingMessage").classList.add("hide");
         }
         return;
     }
-    e.detail.buffer = buffer.slice(length);
-    e.detail.count += 1;
-    e.detail.pos += length;
-    if (e.detail.count >= 200) {
+    pos += length;
+    // every ~200 update loading message and setTimeout to prevent lockout of browser
+    if (count >= 200) {
         if (hasEncounter) {
-            document.getElementById("loadingMessage").innerText = "Loading (" + ((e.detail.pos / e.detail.length) * 100).toFixed(1) + "%)";
+            document.getElementById("loadingMessage").innerText = "Loading (" + ((pos / buffer.byteLength) * 100).toFixed(1) + "%)";
         }
-        console.log(">> Read message batch. (" + e.detail.pos + "/" + e.detail.length + " bytes) (" + ((e.detail.pos / e.detail.length) * 100).toFixed(1) + "%).");
-        e.detail.count = 0;
-        setTimeout(function() { parseNextMessage(e); }, 1);
+        console.log(">> Read message batch. (" + pos + "/" + buffer.byteLength + " bytes) (" + ((pos / buffer.byteLength) * 100).toFixed(1) + "%).");
+        setTimeout(function() { parseNextMessage(buffer, pos, 0); }, 1);
         return;
     }
-    window.dispatchEvent(
-        new CustomEvent(
-            "messageRead", {
-                "detail" : e.detail
-            }
-        )
-    );
+    parseNextMessage(buffer, pos, count + 1);
 }
 
 function parseMessage(data)
@@ -249,18 +240,6 @@ function parseMessage(data)
     // decompress
     data = pako.inflate(data)
     if (data.length > 0) {
-        window.dispatchEvent(
-            new CustomEvent(
-                "messageRead", 
-                {
-                    "detail" : {
-                        "buffer" : data.buffer,
-                        "count" : 1,
-                        "length" : data.length,
-                        "pos" : 0
-                    }
-                }
-            )
-        );
+        parseNextMessage(data.buffer, 0, 0);
     }
 }

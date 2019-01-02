@@ -84,8 +84,6 @@ class Application
         }
         var socket = new WebSocket(socketUrl);
         var t = this;
-        // net decoder messageRead event
-        window.addEventListener("messageRead", parseNextMessage);
         // socket open event
         socket.onopen = function(event) {
             document.getElementById("loadingMessage").innerText = "Waiting for Encounter data...";

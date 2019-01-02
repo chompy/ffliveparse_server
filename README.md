@@ -27,6 +27,9 @@ Some custom plugin ideas...
 
 ## Todos
 
+- Modal popup for all actions on timeline.
+- Display more information about actions on timeline...damage done, how much HP target had, etc
+- More information and nicer layout for deaths in the timeline.
 - Past encounter list. (Be able to review all your past encounters.)
 - Ability to have user provided custom widgets/plugins.
 - Restore functionality from v0.XX

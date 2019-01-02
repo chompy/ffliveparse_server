@@ -3,7 +3,7 @@ html.mode-stream, .mode-stream body {
     background-color: none;
 }
 
-.mode-stream #head, .mode-stream #footer, .mode-stream #timeline, .mode-stream #combatants .combatant-npc, #loadingMessage {
+.mode-stream #head, .mode-stream #footer, .mode-stream #timeline, .mode-stream #combatants .combatant-npc, .mode-stream #loadingMessage {
     display: none;
 }
 
