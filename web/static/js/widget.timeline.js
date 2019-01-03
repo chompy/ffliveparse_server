@@ -105,8 +105,10 @@ class WidgetTimelime extends WidgetBase
         this.timeKeyContainerElement.classList.add("time-key-container");
         this.timelineElement.append(this.timeKeyContainerElement);
         var npcCombatant = {
-            "Name"          : "Non-Player Combatants",
-            "IsNPC"         : true
+            "ids"           : [-1],
+            "name"          : "Non-Player Combatants",
+            "isNpc"         : true,
+            "data"          : { "ID" : -1 }
         };
         npcCombatant["element"] = this._createTimelineElement(npcCombatant);
         this.combatants = [npcCombatant];
@@ -141,11 +143,13 @@ class WidgetTimelime extends WidgetBase
             // update existing
             var isExisting = false;
             for (var j = 0; j < this.combatants.length; j++) {
-                if (this.combatants[j].Name == combatant[0].Name) {
-                    var element = this.combatants[j].element;
-                    this.combatants[j] = combatant[0];
-                    this.combatants[j]["element"] = element;
+                if (this.combatants[j].data.Name == combatant.data.Name) {
+                    this.combatants[j].data = combatant.data;
                     this.timelineElement.appendChild(this.combatants[j].element);
+                    if (this.combatants[j].ids.toString() != combatant.ids.toString()) {
+                        this.combatants[j].ids = combatant.ids.slice();
+                        this._fixTimelineActionCombatants();
+                    }
                     isExisting = true;
                     break;
                 }
@@ -154,28 +158,50 @@ class WidgetTimelime extends WidgetBase
                 continue;
             }
             // new combatant
-            combatant[0]["element"] = this._createTimelineElement(combatant[0]);            
-            this.combatants.push(combatant[0]);
+            var newTimelineCombatant = {
+                "ids"           : combatant.ids.slice(),
+                "data"          : combatant.data,
+                "name"          : combatant.name,
+                "element"       : this._createTimelineElement(combatant)
+            };
+            this.combatants.push(newTimelineCombatant);
+            this._fixTimelineActionCombatants();
+            // force window resize event
+            this._onWindowResize();
+        }
+    }
 
+    /**
+     * Itterate timeline actions and move actions to their
+     * correct combatants.
+     */
+    _fixTimelineActionCombatants()
+    {
             // itterate action timeline and move new combatant actions to their timeline from npc timline
             for (var i in this.actionTimeline) {
                 var action = this.actionTimeline[i];
                 if (
                     !action.element ||
-                    typeof(action.logData.sourceName) == "undefined" ||
-                    action.logData.sourceName != combatant[0].Name
+                    typeof(action.logData.sourceId) == "undefined"
                 ) {
                     continue;
                 }
-                // remove from npc timeline
-                this.combatants[0].element.removeChild(action.element);
-                // add to player timeline
-                combatant[0].element.appendChild(action.element);
+
+                for (var j in this.combatants) {
+                    if (
+                        this.combatants[j].ids.indexOf(action.logData.sourceId) != -1 &&
+                        action.element.parentElement == this.combatants[0].element
+                    ) {
+                        // remove from npc timeline
+                        this.combatants[0].element.removeChild(action.element);
+                        // add to player timeline
+                        this.combatants[j].element.appendChild(action.element);
+                        break;
+                    }
+                }
             }
-            // force window resize event
-            this._onWindowResize();
-        }
     }
+
 
     /**
      * Queue up action recieved from "act:logline" event.
@@ -252,7 +278,7 @@ class WidgetTimelime extends WidgetBase
     {
         var element = document.createElement("div");
         element.classList.add("combatant", "combatant-timeline");
-        element.setAttribute("data-name", combatant.Name);
+        element.setAttribute("data-name", combatant.name);
         this.timelineElement.appendChild(element);
         return element;
     }
@@ -353,7 +379,10 @@ class WidgetTimelime extends WidgetBase
             // find combatant
             var combatant = this.combatants[0];
             for (var j = 0; j < this.combatants.length; j++) {
-                if (this.combatants[j].Name == sourceName) {
+                if (
+                    this.combatants[j].ids.indexOf(sourceId) != -1 ||
+                    this.combatants[j].name == sourceName
+                ) {
                     combatant = this.combatants[j];
                     break;
                 }
@@ -385,7 +414,7 @@ class WidgetTimelime extends WidgetBase
             var pixelPosition = parseInt((timestamp * TIMELINE_PIXELS_PER_MILLISECOND));
             // get icon
             var iconUrl = "/static/img/attack.png"; // default
-            if (typeof(combatant.IsNPC) != "undefined" && combatant.IsNPC) {
+            if (typeof(combatant.isNpc) != "undefined" && combatant.isNpc) {
                 iconUrl = "/static/img/enemy.png"; // default npc icon
             }
             if (actionData && actionData["icon"]) {
@@ -475,7 +504,7 @@ class WidgetTimelime extends WidgetBase
             action.element.setAttribute("data-action-name", actionName);
             action.element.setAttribute("data-action-desc", actionDescription);
             action.element.setAttribute("data-action-target", targetName);
-            if (typeof(combatant.IsNPC) != "undefined" && combatant.IsNPC) {
+            if (typeof(combatant.isNpc) != "undefined" && combatant.isNpc) {
                 action.element.setAttribute("data-action-target", sourceName + " > " + targetName);
             }
             var time = new Date(timestamp);

@@ -100,6 +100,7 @@ function decodeCombatantBytes(data)
         "Type" : DATA_TYPE_COMBATANT
     };
     output["EncounterUID"]  = readString(data, pos); pos += readUint16(data, pos) + SIZE_INT16;
+    output["ID"]            = readInt32(data, pos); pos += SIZE_INT32;
     output["Name"]          = readString(data, pos); pos += readUint16(data, pos) + SIZE_INT16;
     output["Job"]           = readString(data, pos); pos += readUint16(data, pos) + SIZE_INT16;
     output["Damage"]        = readInt32(data, pos); pos += SIZE_INT32;

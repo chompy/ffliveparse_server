@@ -79,6 +79,7 @@ class WidgetCombatants extends WidgetBase
         var t = this;
         this.addEventListener("act:encounter", function(e) { t._updateEncounter(e); });
         this.addEventListener("act:combatant", function(e) { t._updateCombatants(e); });
+        this.addEventListener("act:logLine", function(e) { t._onLogLine(e); });
     }
 
     /**
@@ -122,12 +123,12 @@ class WidgetCombatants extends WidgetBase
     /**
      * Update combatant element.
      * @param {array} combatant 
-     * @param {Element} element 
      */
-    _updateCombatantElement(combatant, element)
+    _updateCombatantElement(combatant)
     {
+        var element = combatant.element;
         // assign class for roles
-        var jobUpper = combatant.Job.toUpperCase();
+        var jobUpper = combatant.data.Job.toUpperCase();
         var defaultRoleClass = "combatant-dps";
         var roleClasses = {
             "combatant-tank"    : ["WAR", "DRK", "PLD"],
@@ -145,22 +146,22 @@ class WidgetCombatants extends WidgetBase
         }
         // job icon
         var jobIconElement = element.getElementsByClassName("job-icon")[0];
-        var jobIconSrc = "/static/img/job/" + combatant.Job.toLowerCase() + ".png";
+        var jobIconSrc = "/static/img/job/" + combatant.data.Job.toLowerCase() + ".png";
         if (jobIconSrc != jobIconElement.src) {
             jobIconElement.src = jobIconSrc;
-            jobIconElement.title = combatant.Job.toUpperCase() + " - " + combatant.Name;
-            jobIconElement.alt = combatant.Job.toUpperCase() + " - " + combatant.Name;
+            jobIconElement.title = combatant.data.Job.toUpperCase() + " - " + combatant.name;
+            jobIconElement.alt = combatant.data.Job.toUpperCase() + " - " + combatant.name;
         }
         // name
         var nameElement = element.getElementsByClassName("name")[0];
-        if (nameElement.innerText != combatant.Name) {
-            nameElement.innerText = combatant.Name;
-            element.setAttribute("data-name", combatant.Name);
-            element.title = combatant.Name;
+        if (nameElement.innerText != combatant.name) {
+            nameElement.innerText = combatant.name;
+            element.setAttribute("data-name", combatant.name);
+            element.title = combatant.name;
         }
         // dps
         var dpsElement = element.getElementsByClassName("parse")[0];
-        var dps = (combatant.Damage / this.encounterDuration);
+        var dps = (combatant.data.Damage / this.encounterDuration);
         if (!this._isValidParseNumber(dps)) {
             dps = 0;
         }
@@ -178,17 +179,17 @@ class WidgetCombatants extends WidgetBase
             {
                 case "healing":
                 {
-                    var aHps = (a[0].DamageHealed / t.encounterDuration);
-                    var bHps = (b[0].DamageHealed / t.encounterDuration);
+                    var aHps = (a.data.DamageHealed / t.encounterDuration);
+                    var bHps = (b.data.DamageHealed / t.encounterDuration);
                     return bHps - aHps;
                 }
                 case "deaths":
                 {
-                    return b[0].Deaths - a[0].Deaths;
+                    return b.data.Deaths - a.data.Deaths;
                 }
                 case "name":
                 {
-                    return a[0].Name.localeCompare(b[0].Name);
+                    return a.name.localeCompare(b.name);
                 }
                 case "job":
                 {
@@ -197,28 +198,28 @@ class WidgetCombatants extends WidgetBase
                         ["SCH", "WHM", "AST"]   // healers
                     ];
                     for (var i in jobCats) {
-                        var indexA = jobCats[i].indexOf(a[0].Job.toUpperCase());
-                        var indexB = jobCats[i].indexOf(b[0].Job.toUpperCase());
+                        var indexA = jobCats[i].indexOf(a.data.Job.toUpperCase());
+                        var indexB = jobCats[i].indexOf(b.data.Job.toUpperCase());
                         if (indexA != -1 && indexB == -1) {
                             return -1;
                         } else if (indexA == -1 && indexB != -1) {
                             return 1;
                         }
                     }
-                    return a[0].Job.localeCompare(b[0].Job);
+                    return a.data.Job.localeCompare(b.data.Job);
                 }
                 default:
                 case "damage":
                 {
-                    var aDps = (a[0].Damage / t.encounterDuration);
-                    var bDps = (b[0].Damage / t.encounterDuration);
+                    var aDps = (a.data.Damage / t.encounterDuration);
+                    var bDps = (b.data.Damage / t.encounterDuration);
                     return bDps - aDps;
                 }
             }
 
         })
         for (var i = 0; i < this.combatants.length; i++) {
-            this.combatantsElement.appendChild(this.combatants[i][1]);
+            this.combatantsElement.appendChild(this.combatants[i].element);
         }
         // trigger custom event
         window.dispatchEvent(
@@ -242,9 +243,7 @@ class WidgetCombatants extends WidgetBase
         // update combatant elements
         for (var i in this.combatants) {
             this._updateCombatantElement(
-                this.combatants[i][0],
-                this.combatants[i][1],
-                this.encounterDuration
+                this.combatants[i]
             )
         }
         // display combatants
@@ -264,12 +263,13 @@ class WidgetCombatants extends WidgetBase
         }
         // update existing
         for (var i = 0; i < this.combatants.length; i++) {
-            if (this.combatants[i][0].Name == combatant.Name) {
-                this.combatants[i][0] = combatant;
+            if (this.combatants[i].data.Name == combatant.Name) {
+                if (this.combatants[i].ids.indexOf(combatant.ID) == -1) {
+                    this.combatants[i].ids.push(combatant.ID);
+                }
+                this.combatants[i].data = combatant;
                 this._updateCombatantElement(
-                    combatant,
-                    this.combatants[i][1],
-                    this.encounterDuration
+                    this.combatants[i]
                 );
                 this._displayCombatants();
                 return;
@@ -277,18 +277,57 @@ class WidgetCombatants extends WidgetBase
         }
         // new combatant
         var combatantElement = this._buildCombatantElement(combatant);
-        this.combatants.push([
-            combatant,
-            combatantElement
-        ]);
+        this.combatants.push({
+            "ids"           : [combatant.ID],
+            "data"          : combatant,
+            "element"       : combatantElement,
+            "name"          : "", // name to be set from log data (so sending player name gets set as well instead of "YOU")
+        });
         // update combatant element
         this._updateCombatantElement(
-            combatant,
-            combatantElement,
-            this.encounterDuration
+            this.combatants[this.combatants.length - 1]
         );
         // display
         this._displayCombatants();
+    }
+
+    /**
+     * Retrieve character names from "act:logline" event as this
+     * will ensure we grab the sending player's actual name instead of "YOU".
+     * @param {Event} event 
+     */
+    _onLogLine(event)
+    {
+        // check if any combatants need names
+        var needName = false;
+        for (var i in this.combatants) {
+            if (!this.combatants[i].name) {
+                needName = true;
+                break;
+            }
+        }
+        if (!needName) {
+            return;
+        }
+        // parse log line data to fetch combatant name
+        var logLineData = parseLogLine(event.detail.LogLine);
+        switch (logLineData.type)
+        {
+            case MESSAGE_TYPE_SINGLE_TARGET:
+            case MESSAGE_TYPE_AOE:
+            {
+                for (var i in this.combatants) {
+                    if (this.combatants[i].name) {
+                        continue;
+                    }
+                    if (this.combatants[i].ids.indexOf(logLineData.sourceId) != -1) {
+                        this.combatants[i].name = logLineData.sourceName;
+                        this._updateCombatantElement(this.combatants[i]);
+                    }
+                }
+                break;
+            }
+        }
     }
 
 }

@@ -86,7 +86,7 @@ class Application
         var t = this;
         // socket open event
         socket.onopen = function(event) {
-            document.getElementById("loadingMessage").innerText = "Waiting for Encounter data...";
+            document.getElementById("loadingMessage").innerText = "Waiting for encounter data...";
             console.log(">> Connected to server.");
             t.connected = true;
             t.initUserConfig();
@@ -137,7 +137,19 @@ class Application
         // flags
         window.addEventListener("onFlag", function(e) {
             console.log(">> Received flag, ", e.detail);
-            // TODO online status set
+            switch (e.detail.Name)
+            {
+                case "active":
+                {
+                    var element = document.getElementById("loadingMessage");
+                    element.classList.add("hide");
+                    if (!e.detail.Value) {
+                        document.getElementById("loadingMessage").classList.remove("hide");
+                        document.getElementById("loadingMessage").innerHTML = "Waiting for connection from ACT...<br/></br><sub>(Please make sure you are using the correct version of the ACT Plugin.)</sub>";
+                    }
+                    break;
+                }
+            }
         });
     }    
 

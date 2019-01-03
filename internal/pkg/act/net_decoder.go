@@ -108,6 +108,7 @@ func DecodeCombatantBytes(data []byte) (Combatant, int, error) {
 	pos := 1
 	return Combatant{
 		ActEncounterID: readUint32(data, &pos),
+		ID:             readInt32(data, &pos),
 		Name:           readString(data, &pos),
 		Job:            readString(data, &pos),
 		Damage:         readInt32(data, &pos),

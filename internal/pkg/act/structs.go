@@ -41,6 +41,7 @@ const DataTypeFlag byte = 99
 type Combatant struct {
 	EncounterUID   string
 	ActEncounterID uint32
+	ID             int32
 	Name           string
 	Job            string
 	Damage         int32

@@ -45,6 +45,7 @@ type Data struct {
 	LastLogLineIndex int
 	LastUpdate       time.Time
 	NewTickData      bool
+	HasValidSession  bool
 }
 
 // NewData - create new ACT session data
@@ -66,6 +67,7 @@ func NewData(session Session, user user.Data) (Data, error) {
 		Combatants:       make([]Combatant, 0),
 		LastUpdate:       time.Now(),
 		LastLogLineIndex: 0,
+		HasValidSession:  false,
 	}, nil
 }
 
@@ -114,14 +116,14 @@ func (d *Data) UpdateCombatant(combatant Combatant) {
 	combatant.EncounterUID = d.Encounter.UID
 	// look for existing, update if found
 	for index, storedCombatant := range d.Combatants {
-		if storedCombatant.Name == combatant.Name {
+		if storedCombatant.ID == combatant.ID {
 			d.Combatants[index] = combatant
 			return
 		}
 	}
 	// add new
 	d.Combatants = append(d.Combatants, combatant)
-	log.Println("Add combatant", combatant.Name, "to encounter", combatant.EncounterUID, "(TotalCombatants:", len(d.Combatants), ")")
+	log.Println("Add combatant", combatant.Name, "(", combatant.ID, ") to encounter", combatant.EncounterUID, "(TotalCombatants:", len(d.Combatants), ")")
 }
 
 // UpdateLogLine - Add log line
@@ -184,7 +186,7 @@ func initDatabase(database *sql.DB) error {
 	stmt, err = database.Prepare(`
 		CREATE TABLE IF NOT EXISTS combatant
 		(
-			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			id INTEGER,
 			user_id INTEGER,
 			encounter_uid VARCHAR(32),
 			name VARCHAR(256),
@@ -196,7 +198,7 @@ func initDatabase(database *sql.DB) error {
 			hits INTEGER,
 			heals INTEGER,
 			kills INTEGER,
-			CONSTRAINT encounter_unique UNIQUE (user_id, encounter_uid, name)
+			CONSTRAINT encounter_unique UNIQUE (id, user_id, encounter_uid)
 		)
 	`)
 	if err != nil {
@@ -248,13 +250,14 @@ func (d *Data) SaveEncounter() error {
 	for _, combatant := range d.Combatants {
 		stmt, err := database.Prepare(`
 			REPLACE INTO combatant
-			(encounter_uid, user_id, name, job, damage, damage_taken, damage_healed, deaths, hits, heals, kills) VALUES
-			(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			(id, encounter_uid, user_id, name, job, damage, damage_taken, damage_healed, deaths, hits, heals, kills) VALUES
+			(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		`)
 		if err != nil {
 			return err
 		}
 		_, err = stmt.Exec(
+			combatant.ID,
 			combatant.EncounterUID,
 			d.User.ID,
 			combatant.Name,
@@ -335,7 +338,7 @@ func GetPreviousEncounter(user user.Data, encounterUID string) (Data, error) {
 	rows.Close()
 	// fetch combatants
 	rows, err = database.Query(
-		"SELECT encounter_uid, name, job, damage, damage_taken, damage_healed, deaths, hits, heals, kills FROM combatant WHERE user_id = ? AND encounter_uid = ?",
+		"SELECT id, encounter_uid, name, job, damage, damage_taken, damage_healed, deaths, hits, heals, kills FROM combatant WHERE user_id = ? AND encounter_uid = ?",
 		user.ID,
 		encounterUID,
 	)
@@ -346,6 +349,7 @@ func GetPreviousEncounter(user user.Data, encounterUID string) (Data, error) {
 	for rows.Next() {
 		combatant := Combatant{}
 		err := rows.Scan(
+			&combatant.ID,
 			&combatant.EncounterUID,
 			&combatant.Name,
 			&combatant.Job,
