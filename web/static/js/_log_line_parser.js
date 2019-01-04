@@ -47,6 +47,14 @@ let kFieldAttackerX = 38;
 let kFieldAttackerY = 39;
 let kFieldAttackerZ = 40;
 
+// If kFieldFlags is any of these values, then consider field 9/10 as 7/8.
+// It appears a little bit that flags come in pairs of values, but it's unclear
+// what these mean.
+let kShiftFlagValues = ['3E', '113', '213', '313'];
+let kFlagInstantDeath = '33';
+// miss, damage, block, parry, instant death
+let kAttackFlags = ['01', '03', '05', '06', kFlagInstantDeath];
+
 var MESSAGE_TYPE_SINGLE_TARGET = 21;
 var MESSAGE_TYPE_AOE = 22;
 var MESSAGE_TYPE_DEATH = 25;
@@ -71,6 +79,15 @@ function parseLogLine(message)
         case MESSAGE_TYPE_SINGLE_TARGET:
         case MESSAGE_TYPE_AOE:
         {
+
+            // Shift damage and flags forward for mysterious spurious :3E:0:.
+            // Plenary Indulgence also appears to prepend confession stacks.
+            // UNKNOWN: Can these two happen at the same time?
+            if (kShiftFlagValues.indexOf(fields[kFieldFlags]) >= 0) {
+                fields[kFieldFlags] = fields[kFieldFlags + 2];
+                fields[kFieldFlags + 1] = fields[kFieldFlags + 3];
+            }
+
             data["sourceId"] = parseInt(fields[kFieldAttackerId], 16);
             data["sourceName"] = fields[kFieldAttackerName];
             data["actionId"] = parseInt(fields[kFieldAbilityId], 16);
@@ -78,6 +95,8 @@ function parseLogLine(message)
             data["targetId"] = parseInt(fields[kFieldTargetId], 16);
             data["targetName"] = fields[kFieldTargetName];
             data["damage"] = DamageFromFields(fields);
+            data["targetCurrentHp"] = fields[kFieldTargetCurrentHp];
+            data["targetMaxHp"] = fields[kFieldTargetMaxHp];
             break;
         }
         case MESSAGE_TYPE_DEATH:

@@ -37,10 +37,9 @@ You can run the server on your own machine if you prefer.
 
 ## Todos
 
-- Modal popup for all actions on timeline.
-- Display more information about actions on timeline...damage done, how much HP target had, etc
+- Fix time shown on skills cast before encounter start.
+- Display source of "death" as last attacker.
 - More information and nicer layout for deaths in the timeline.
-- Handle AOE abilities better by showing all targets in overlay.
 - Past encounter list. (Be able to review all your past encounters.)
 - Ability to have user provided custom widgets/plugins.
 - Restore functionality from v0.XX

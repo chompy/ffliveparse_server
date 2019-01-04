@@ -44,9 +44,41 @@
         </p>
         {{ end }}
     </div>
-    {{ end }}
+
+    <div class="homeSection">
+        <p>
+            You can contact me via email at
+            <strong><a href="mailto:&#110;&#097;&#116;&#104;&#097;&#110;&#064;&#111;&#103;&#100;&#101;&#110;&#046;&#116;&#101;&#099;&#104;">&#110;&#097;&#116;&#104;&#097;&#110;&#064;&#111;&#103;&#100;&#101;&#110;&#046;&#116;&#101;&#099;&#104;</a></strong>
+            or on Discord at <strong>Chompy#3436</strong>. Feel free to send feature request, suggestions, or bug reports my way!
+        </p>
+        <p>
+            Additionally, If you like FFLiveParse consider making a donation to help with hosting costs and to fund further development!
+        </p>
+        <div class="textCenter">
+            <form action="https://www.paypal.com/cgi-bin/webscr" target="_blank" method="post">
+                <!-- Identify your business so that you can collect the payments. -->
+                <input type="hidden" name="business"
+                    value="nathan@ogden.tech">
+                <!-- Specify a Donate button. -->
+                <input type="hidden" name="cmd" value="_donations">
+                <!-- Specify details about the contribution -->
+                <input type="hidden" name="item_name" value="FFLiveParse.com">
+                <input type="hidden" name="item_number" value="Donation">
+                <input type="hidden" name="currency_code" value="USD">
+                <!-- Display the payment button. -->
+                <input type="image" name="submit"
+                src="https://www.paypalobjects.com/en_US/i/btn/btn_donate_LG.gif"
+                alt="Donate">
+                <img alt="" width="1" height="1"
+                src="https://www.paypalobjects.com/en_US/i/scr/pixel.gif" >
+            </form>
+        </div>
+        <div class="spacer"></div>
+    </div>
     
 </div>
+
+{{ end }}
 
 {{ define "scripts" }}
 {{ if (gt .User.ID 0) }}

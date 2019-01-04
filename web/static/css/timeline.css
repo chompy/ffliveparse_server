@@ -18,6 +18,7 @@
 .combatant-timeline .action {
     position: absolute;
     height: 100%;
+    cursor: pointer;
 }
 .combatant-timeline .action .icon {
     margin-top: 10px;
@@ -46,6 +47,7 @@
     display: none;
 }
 
+/** TIMELINE MOUSEOVER **/
 #timeline-mouseover {
     background: #000c;
     position: absolute;
@@ -54,6 +56,8 @@
     padding: 10px;
     display: none;
     pointer-events: none;
+    margin-left:5px;
+    margin-top: 10px;
 }
 #timeline-mouseover .action-name {
     font-size: 18px;
@@ -67,20 +71,36 @@
 }
 #timeline-mouseover .action-info .action-time {
     font-size: 12px;
-    display: inline-block;
     background-image: url(/static/img/timeline_time.png);
     background-repeat: no-repeat;
     padding-left:18px;
+    display: block;
 }
-#timeline-mouseover .action-info .action-target {
+#timeline-mouseover .action-info .action-targets {
     font-size: 12px;
-    display: inline-block;
-    margin-left: 20px;
     background-image: url(/static/img/timeline_target.png);
     background-repeat: no-repeat;
     padding-left:18px;
+    display: block;
+    margin-top: 5px;
+}
+#timeline-mouseover .action-info .action-target-source {
+    visibility: hidden;
+}
+#timeline-mouseover .action-info .action-target:first-child .action-target-source {
+    visibility: visible;
+}
+#timeline-mouseover .action-info .action-target-source::after {
+    content: ">";
+    margin-left: 3px;
+    margin-right: 5px;
+}
+#timeline-mouseover .action-info .action-target-damage {
+    display: none;
 }
 
+
+/** TIME KEY/TIME STAMPS **/
 #timeline .time-key-container {
     height: 24px;
     width: 0;
@@ -92,7 +112,126 @@
     margin-left: 1px;
     position: relative;
 }
-
 #timeline .time-key-container .time-key {
     position: absolute;
+}
+
+/** TIMELINE OVERLAY **/
+#timeline-overlay {
+    padding-top: 0;
+}
+#timeline-overlay .inner {
+    margin: 10% auto;
+    display: inline-block;
+    text-align: left;
+    font-weight: normal;
+    font-size: 14px;
+    max-width: 80%;
+}
+#timeline-overlay .action-icon {
+    width: 28px;
+    height: 28px;
+    vertical-align: -4px;
+    margin-right: 5px;
+}
+#timeline-overlay .action-name {
+    display: inline-block;
+    font-size: 28px;
+    font-weight: bold;
+}
+#timeline-overlay .action-desc {
+    margin-top: 5px;
+    margin-bottom: 10px;
+}
+#timeline-overlay .action-info .action-time {
+    background-image: url(/static/img/timeline_time.png);
+    background-repeat: no-repeat;
+    background-position: left 1px;
+    padding-left:20px;
+    display: block;
+}
+#timeline-overlay .action-info .action-flags {
+    background-image: url(/static/img/timeline_flags.png);
+    background-repeat: no-repeat;
+    background-position: left 1px;
+    padding-left:20px;
+    margin-top: 5px;
+    display: block;
+}
+#timeline-overlay .action-info .action-targets {
+    background-image: url(/static/img/timeline_target.png);
+    background-repeat: no-repeat;
+    background-position: left 1px;
+    padding-left:20px;
+    display: block;
+    margin-top: 5px;
+}
+#timeline-overlay .action-info .action-targets .action-target {
+    margin-bottom: 1px;
+}
+#timeline-overlay .action-info .action-targets .action-target-source {
+    font-style: italic;
+    visibility: hidden;
+}
+#timeline-overlay .action-info .action-targets .action-target:first-child .action-target-source {
+    visibility: visible;
+}
+#timeline-overlay .action-info .action-targets .action-target-source::after {
+    content: ">";
+    display: inline-block;
+    margin-left: 8px;
+    margin-right: 5px;
+}
+#timeline-overlay .action-info .action-targets .action-target-name {
+    font-style: italic;
+}
+#timeline-overlay .action-info .action-targets .action-target-damage {
+    font-weight: bold;
+    margin-left: 4px;
+}
+#timeline-overlay .action-info .action-targets .action-target-damage::before {
+    content: "(";
+}
+#timeline-overlay .action-info .action-targets .action-target-damage::after {
+    content: ")";
+}
+#timeline-overlay .other-actions-head {
+    font-size: 18px;
+    margin-top: 15px;
+    margin-bottom: 10px;
+    display: block;
+}
+#timeline-overlay .other-actions {
+    margin-top: 6px;
+}
+#timeline-overlay .other-action {
+    margin-top: 4px;
+    cursor: pointer;
+}
+#timeline-overlay .other-action .action-time {
+    background-image: url(/static/img/timeline_time.png);
+    background-repeat: no-repeat;
+    background-position: left 0px;
+    padding-left:20px;    
+    display: inline-block;
+    margin-right: 10px;
+    min-width: 80px;
+}
+#timeline-overlay .other-action .action-icon {
+    width: 18px;
+    height: 18px;
+    margin-right: 3px;
+}
+#timeline-overlay .other-action .action-name {
+    font-size: 14px;
+    font-weight: normal;
+}
+#timeline-overlay .close {
+    position: absolute;
+    right: 50px;
+    top: 30px;
+    font-family: sans-serif;
+    font-size: 31px;
+    font-weight: normal;
+    cursor: pointer;
 }

@@ -14,12 +14,33 @@
 {{ end }}
 
 {{ define "content" }}
+<div id="timeline-overlay" class="hide">
+    <div class="close">x</div>
+    <div class="inner">
+        <img class="action-icon" src="/static/img/attack.png" />
+        <div class="action-name">Action Name</div>
+        <div class="action-desc">....Action description here....</div>
+        <div class="action-info">
+            <span class="action-time">00.00</span>
+            <span class="action-flags">Critical, Direct Hit, Heal</span>
+            <div class="action-targets"></div>
+        </div>
+        <div class="other-actions-head">Other Nearby Actions</div>
+        <div class="other-actions">
+            <div class="other-action">
+                <span class="action-time">00.00</span>
+                <img class="action-icon" src="/static/img/attack.png" />
+                <span class="action-name">Action Name</span>
+            </div>
+        </div>
+    </div>
+</div>
 <div id="timeline-mouseover">
     <div class="action-name">Action Name</div>
     <div class="action-desc">....Action description here....</div>
     <div class="action-info">
-        <span class="action-time">32.25</span>
-        <span class="action-target">Action Target</span>
+        <span class="action-time">00.00</span>
+        <div class="action-targets"></div>
     </div>
 </div>
 <div id="loadingMessage">Loading...</div>
