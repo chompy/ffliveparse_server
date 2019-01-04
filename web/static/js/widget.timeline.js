@@ -146,9 +146,14 @@ class WidgetTimelime extends WidgetBase
                 if (this.combatants[j].data.Name == combatant.data.Name) {
                     this.combatants[j].data = combatant.data;
                     this.timelineElement.appendChild(this.combatants[j].element);
+                    // update id list, fix timeline actions
                     if (this.combatants[j].ids.toString() != combatant.ids.toString()) {
                         this.combatants[j].ids = combatant.ids.slice();
                         this._fixTimelineActionCombatants();
+                    }
+                    // update data-name attribute
+                    if (this.combatants[j].name != combatant.name) {
+                        this.combatants[j].element.setAttribute("data-name", combatant.name);
                     }
                     isExisting = true;
                     break;
