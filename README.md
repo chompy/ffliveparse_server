@@ -37,9 +37,7 @@ You can run the server on your own machine if you prefer.
 
 ## Todos
 
-- Fix time shown on skills cast before encounter start.
-- Display source of "death" as last attacker.
-- More information and nicer layout for deaths in the timeline.
+- Track DOTs to be able to better track causes of death.
 - Past encounter list. (Be able to review all your past encounters.)
 - Ability to have user provided custom widgets/plugins.
 - Restore functionality from v0.XX

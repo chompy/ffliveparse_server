@@ -241,6 +241,23 @@ class WidgetTimelime extends WidgetBase
                 logLineData["sourceId"] = -1;
                 logLineData["targetName"] = logLineData.sourceName;
                 logLineData["targetId"] = -1;
+                // find last action again death target
+                for (var i = this.actionTimeline.length - 1; i >= 0; i--) {
+                    var action = this.actionTimeline[i];
+                    var hasLogData = false;
+                    for (var j in action.logData) {
+                        if (action.logData[j].targetName == logLineData.sourceName) {
+                            hasLogData = true;
+                            logLineData["sourceId"] = action.logData[j].targetId;
+                            logLineData["sourceName"] = action.logData[j].targetName;
+                            logLineData["targetName"] = logLineData["sourceName"];
+                            logLineData["targetId"] = logLineData["sourceId"];
+                        }
+                    }
+                    if (hasLogData) {
+                        break;
+                    }
+                }
                 this._addAction(logLineData, event.detail.Time, event.detail.EncounterUID)
                 break;
             }
@@ -542,6 +559,7 @@ class WidgetTimelime extends WidgetBase
         // action vars
         var actionName = actionData ? actionData.name_en : actionName;
         var actionDescription = actionData && actionData.help_en.trim() ? actionData.help_en.trim() : "(no description available)";
+        var actionDescriptionElement = null; // optional element to append for action description
         var actionTimestamp = timelineAction.time.getTime() - this.startTime.getTime();
         var actionTimestampDate = new Date(actionTimestamp);
         // find combatant
@@ -573,48 +591,132 @@ class WidgetTimelime extends WidgetBase
             // death
             case -1:
             {
+                // override vars
                 actionName = "Death";
-                targetName = sourceName; // target of "death" is actually combatant
-                targetId = sourceId;
                 iconUrl = "/static/img/death.png";
-                // show active effects at death
-                actionDescription = "Active Effects:\n";
+                actionDescription = "";
+                // build description elements
+                actionDescriptionElement = document.createElement("div");
+                var activeEffectsTitleElement = document.createElement("div");
+                activeEffectsTitleElement.classList.add("textBold");
+                activeEffectsTitleElement.innerText = "Active Effects:";
+                actionDescriptionElement.appendChild(activeEffectsTitleElement);
+
+                // list active effects
+                var activeEffectContainerElement = document.createElement("div");
+                activeEffectContainerElement.classList.add("active-effects");
                 var effectCount = 0;
                 if (targetName in this.effectTracker) {
                     for (var j in this.effectTracker[targetName]) {
+                        // set vars, make sure effect is active
                         var effectData = this.effectTracker[targetName][j];
                         if (!effectData.active) {
                             continue;
                         }
+                        // fetch effect action data
+                        var effectAction = this.actionData.getActionByName(effectData.effect);
+                        if (!effectAction) {
+                            continue;
+                        }
                         effectCount++;
-                        actionDescription += effectData.effect + "\n";
+                        // create container element
+                        var activeEffectElement = document.createElement("div");
+                        activeEffectElement.classList.add("active-effect");
+                        // icon
+                        var activeEffectIconElement = document.createElement("img");
+                        activeEffectIconElement.classList.add("action-icon");
+                        activeEffectElement.appendChild(activeEffectIconElement);
+                        // name
+                        var activeEffectNameElement = document.createElement("span");
+                        activeEffectNameElement.classList.add("action-name");
+                        activeEffectElement.appendChild(activeEffectNameElement);
+                        // set elements
+                        this._setActionElement(
+                            activeEffectElement,
+                            {
+                                "logData" : [{
+                                    "actionId"      : effectAction.id,
+                                    "actionName"    : effectData.effect,
+                                    "sourceName"    : effectData.source,
+                                    "targetName"    : targetName,
+                                }],
+                                "time"    : effectData.startTime
+                            }
+                        );
+                        // add
+                        activeEffectContainerElement.appendChild(activeEffectElement);
                     }
                 }
+                // add (none) text if no active effect
                 if (effectCount == 0) {
-                    actionDescription += "(none)\n";
+                    activeEffectContainerElement.innerText = "(none)";
                 }
+                actionDescriptionElement.appendChild(activeEffectContainerElement);
+
                 // show damage taken that lead to the death
-                actionDescription += "\nLast Damage Taken:\n"
+                var lastActionsTitleElement = document.createElement("div");
+                lastActionsTitleElement.classList.add("textBold");
+                lastActionsTitleElement.innerText = "Last Damage Taken:";
+                actionDescriptionElement.appendChild(lastActionsTitleElement)
+                // itterate timeline to find last damage taken
                 var lastDamages = [];
                 for (var j in this.actionTimeline) {
-                    if (
-                        [MESSAGE_TYPE_SINGLE_TARGET, MESSAGE_TYPE_AOE].indexOf(this.actionTimeline[j].logData[0].type) == -1 ||
-                        this.actionTimeline[j].logData[0].targetName != targetName ||
-                        this.actionTimeline[j].logData[0].flags.indexOf("damage") == -1
-                    ) {
-                        continue;
+                    var action = this.actionTimeline[j];
+                    for (var k in action.logData) {
+                        if (
+                            [MESSAGE_TYPE_SINGLE_TARGET, MESSAGE_TYPE_AOE].indexOf(this.actionTimeline[j].logData[0].type) == -1 ||
+                            action.logData[k].targetName != targetName ||
+                            action.logData[k].flags.indexOf("damage") == -1
+                        ) {
+                            continue;
+                        }
+                        lastDamages.push(action);
+                        if (lastDamages.length > 5) {
+                            lastDamages.shift();
+                        }
+                        break;
                     }
-                    lastDamages.push(this.actionTimeline[j].logData[0]);
-                    if (lastDamages.length > 5) {
-                        lastDamages.shift();
-                    }
+
                 }
+                // create elements for last damages taken
+                var lastDamageContainerElement = document.createElement("div");
+                lastDamageContainerElement.classList.add("last-damages-taken");
                 for (var j in lastDamages) {
-                    actionDescription += lastDamages[j].actionName + " (" + lastDamages[j].damage + (lastDamages[j].flags.indexOf("crit") != -1 ? "!" : "") + ")\n";
+                    var lastDamageElement = document.createElement("div");
+                    lastDamageElement.classList.add("last-damage");
+                    // icon
+                    var lastDamageIconElement = document.createElement("img");
+                    lastDamageIconElement.classList.add("action-icon");
+                    lastDamageElement.appendChild(lastDamageIconElement)
+                    // name
+                    var lastDamageNameElement = document.createElement("span");
+                    lastDamageNameElement.classList.add("action-name");
+                    lastDamageElement.appendChild(lastDamageNameElement);
+                    // set element data
+                    this._setActionElement(lastDamageElement, lastDamages[j]);
+                    // damage
+                    var lastDamageDamageElement = document.createElement("span");
+                    lastDamageDamageElement.classList.add("action-damage");
+                    lastDamageDamageElement.innerText = "n/a"
+                    for (var k in lastDamages[j].logData) {
+                        var logData = lastDamages[j].logData[k];
+                        if (logData.targetName != targetName || typeof(logData.damage) == "undefined") {
+                            continue;
+                        }
+                        lastDamageDamageElement.innerText = logData.damage + 
+                            (logData.flags.indexOf("crit") != -1 ? "!" : "") +
+                            " / " + logData.targetCurrentHp +
+                            " / " + logData.targetMaxHp
+                        ;
+                        break
+                    }
+                    lastDamageElement.appendChild(lastDamageDamageElement);
+                    lastDamageContainerElement.appendChild(lastDamageElement);                  
                 }
                 if (lastDamages.length == 0) {
-                    actionDescription += "(none)\n";
+                    lastDamageContainerElement.innerText = "(none)";
                 }
+                actionDescriptionElement.appendChild(lastDamageContainerElement);
                 break;
             }
         }
@@ -649,8 +751,8 @@ class WidgetTimelime extends WidgetBase
                 if (typeof(timelineAction.logData[j].damage) != "undefined") {
                     targetDamageElement.innerText = timelineAction.logData[j].damage + 
                         (timelineAction.logData[j].flags.indexOf("crit") != -1 ? "!" : "") +
-                        "/" + timelineAction.logData[j].targetCurrentHp +
-                        "/" + timelineAction.logData[j].targetMaxHp
+                        " / " + timelineAction.logData[j].targetCurrentHp +
+                        " / " + timelineAction.logData[j].targetMaxHp
                     ;
                 }
                 targetElement.appendChild(targetDamageElement);
@@ -660,17 +762,44 @@ class WidgetTimelime extends WidgetBase
             }
         }
 
+        // set timestamp
+        var actionTimestampDisplay = actionTimestampDate.getMinutes() + ":" + 
+            (actionTimestampDate.getSeconds() < 10 ? "0" : "") + 
+            actionTimestampDate.getSeconds() + "." +
+            actionTimestampDate.getMilliseconds()
+        ;
+        if (actionTimestamp < 0) {
+            var actionTimestampSeconds = Math.floor(Math.abs(actionTimestamp) / 1000);
+            var actionTimestampMillis = Math.abs(actionTimestamp) % 1000;
+            actionTimestampDisplay = "-0:" +
+                (actionTimestampSeconds < 10 ? "0" : "") +
+                actionTimestampSeconds +
+                ":" +
+                (actionTimestampMillis < 10 ? "0" : "") +
+                (actionTimestampMillis < 100 ? "0" : "") +
+                actionTimestampMillis
+            ;
+        }
+
         // update plain text elements
         var textElementData = [
             ["action-name", actionName],
             ["action-desc", actionDescription],
-            ["action-time", actionTimestampDate.getMinutes() + ":" + (actionTimestampDate.getSeconds() < 10 ? "0" : "") + actionTimestampDate.getSeconds() + "." + actionTimestampDate.getMilliseconds()],
+            ["action-time", actionTimestampDisplay],
             ["action-flags", actionFlags]
         ];
         for (var i in textElementData) {
             var textElements = element.getElementsByClassName(textElementData[i][0]);
             for (var j = 0; j < textElements.length; j++) {
                 textElements[j].innerText = textElementData[i][1];
+            }
+        }
+        // override action description if action description element is provided
+        if (actionDescriptionElement) {
+            var descContainerElements = element.getElementsByClassName("action-desc");
+            for (var j = 0; j < descContainerElements.length; j++) {
+                descContainerElements[j].innerHTML = "";
+                descContainerElements[j].appendChild(actionDescriptionElement);
             }
         }
     }
@@ -702,18 +831,22 @@ class WidgetTimelime extends WidgetBase
         for (var i in this.actionTimeline) {
             if (
                 combatant.ids.indexOf(this.actionTimeline[i].logData[0].sourceId) == -1 ||
-                (
-                    this.actionTimeline[i].time.getTime() == timelineAction.time.getTime() &&
-                    this.actionTimeline[i].logData[0].actionId == timelineAction.logData[0].actionId
-                ) ||
-                Math.abs(timestamp - this.actionTimeline[i].time.getTime()) > 1000
+                Math.abs(timestamp - this.actionTimeline[i].time.getTime()) > 5000
             ) {
                 continue;
             }
+            // is this action
+            var isThisAction = (
+                this.actionTimeline[i].time.getTime() == timelineAction.time.getTime() &&
+                this.actionTimeline[i].logData[0].actionId == timelineAction.logData[0].actionId
+            );
             hasOtherActions = true;
             // create element
             var otherActionElement = document.createElement("div");
             otherActionElement.classList.add("other-action");
+            if (isThisAction) {
+                otherActionElement.classList.add("this-action");
+            }
             var oaTimeElement = document.createElement("span");
             oaTimeElement.classList.add("action-time");
             otherActionElement.appendChild(oaTimeElement);

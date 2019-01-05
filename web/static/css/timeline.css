@@ -65,6 +65,37 @@
 }
 #timeline-mouseover .action-desc {
     font-size: 14px;
+    margin-top: 5px;
+    margin-bottom: 10px;
+}
+#timeline-mouseover .action-desc .active-effects, #timeline-mouseover .action-desc .last-damages-taken {
+    margin-top: 3px;
+    margin-bottom: 10px;
+}
+#timeline-mouseover .action-desc .active-effect, #timeline-mouseover .action-desc .last-damage {
+    margin-top: 2px;
+}
+#timeline-mouseover .action-desc .active-effect .action-icon, #timeline-mouseover .action-desc .last-damage .action-icon {
+    width: 16px;
+    height: 16px;
+    vertical-align: middle;
+    margin-right: 5px;
+}
+#timeline-mouseover .action-desc .active-effect .action-name, #timeline-mouseover .action-desc .last-damage .action-name {
+    font-weight: normal;
+    font-size: 14px;
+    vertical-align: middle;
+}
+#timeline-mouseover .action-desc .last-damage .action-damage {
+    margin-left: 5px;
+    vertical-align: middle;
+    font-size:10px;
+}
+#timeline-mouseover .action-desc .last-damage .action-damage::before {
+    content: "(";
+}
+#timeline-mouseover .action-desc .last-damage .action-damage::after {
+    content: ")";
 }
 #timeline-mouseover .action-info {
     margin-top: 5px;
@@ -73,6 +104,7 @@
     font-size: 12px;
     background-image: url(/static/img/timeline_time.png);
     background-repeat: no-repeat;
+    background-position: left -1px;
     padding-left:18px;
     display: block;
 }
@@ -80,6 +112,7 @@
     font-size: 12px;
     background-image: url(/static/img/timeline_target.png);
     background-repeat: no-repeat;
+    background-position: left -1px;
     padding-left:18px;
     display: block;
     margin-top: 5px;
@@ -126,7 +159,7 @@
     text-align: left;
     font-weight: normal;
     font-size: 14px;
-    max-width: 80%;
+    width: 60%;
 }
 #timeline-overlay .action-icon {
     width: 28px;
@@ -143,17 +176,43 @@
     margin-top: 5px;
     margin-bottom: 10px;
 }
+#timeline-overlay .action-desc .active-effects, #timeline-overlay .action-desc .last-damages-taken {
+    margin-top: 3px;
+    margin-bottom: 10px;
+}
+#timeline-overlay .action-desc .active-effect, #timeline-overlay .action-desc .last-damage {
+    margin-top: 2px;
+}
+#timeline-overlay .action-desc .active-effect .action-icon, #timeline-overlay .action-desc .last-damage .action-icon {
+    width: 16px;
+    height: 16px;
+}
+#timeline-overlay .action-desc .active-effect .action-name, #timeline-overlay .action-desc .last-damage .action-name {
+    font-weight: normal;
+    font-size: 14px;
+    vertical-align: middle;
+}
+#timeline-overlay .action-desc .last-damage .action-damage {
+    margin-left: 5px;
+    vertical-align: middle;
+}
+#timeline-overlay .action-desc .last-damage .action-damage::before {
+    content: "(";
+}
+#timeline-overlay .action-desc .last-damage .action-damage::after {
+    content: ")";
+}
 #timeline-overlay .action-info .action-time {
     background-image: url(/static/img/timeline_time.png);
     background-repeat: no-repeat;
-    background-position: left 1px;
+    background-position: left 0px;
     padding-left:20px;
     display: block;
 }
 #timeline-overlay .action-info .action-flags {
     background-image: url(/static/img/timeline_flags.png);
     background-repeat: no-repeat;
-    background-position: left 1px;
+    background-position: left 0px;
     padding-left:20px;
     margin-top: 5px;
     display: block;
@@ -161,7 +220,7 @@
 #timeline-overlay .action-info .action-targets {
     background-image: url(/static/img/timeline_target.png);
     background-repeat: no-repeat;
-    background-position: left 1px;
+    background-position: left 0px;
     padding-left:20px;
     display: block;
     margin-top: 5px;
@@ -208,6 +267,10 @@
     margin-top: 4px;
     cursor: pointer;
 }
+#timeline-overlay .other-action.this-action {
+    background: #355d03;
+    padding: 5px 0px;    
+}
 #timeline-overlay .other-action .action-time {
     background-image: url(/static/img/timeline_time.png);
     background-repeat: no-repeat;
@@ -220,7 +283,7 @@
 #timeline-overlay .other-action .action-icon {
     width: 18px;
     height: 18px;
-    margin-right: 3px;
+    margin-right: 5px;
 }
 #timeline-overlay .other-action .action-name {
     font-size: 14px;
