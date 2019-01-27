@@ -193,6 +193,9 @@
 /** TIMELINE OVERLAY **/
 #timeline-overlay {
     padding-top: 0;
+    overflow-y: scroll;
+    z-index: 2;
+    top: 0;
 }
 #timeline-overlay .inner {
     margin: 10% auto;
@@ -201,6 +204,7 @@
     font-weight: normal;
     font-size: 14px;
     width: 60%;
+    padding-bottom: 25px;
 }
 #timeline-overlay .action-icon {
     max-width: 28px;

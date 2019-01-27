@@ -1,6 +1,6 @@
 #combatants {
     width: 20%;
-    height: 100%;
+    min-height: 100%;
     position: fixed;
     overflow: hidden;
     border-right: 1px solid #696969;
@@ -79,9 +79,16 @@
 }
 
 @media(max-width: 940px) {
-    .combatant-info { text-align:  center; }
+    .combatant, .combatant.pet { padding: 3px 8px; }
+    .combatant-info .info-text span { font-size: 10px; }
     .combatant-info .job-icon { width: 24px; height: 24px; }
+    .combatant-info .info-text .parse { font-size: 12px; }
+    .combatant.pet .job-icon { margin: 0; }
+}
+@media(max-width: 720px) {
+    .combatant, .combatant.pet { padding: 5px 8px; }
+    .combatant-info { text-align:  center; }
     .combatant-info .info-text { margin-left: 0; display: block; }
     .combatant-info .info-text .name { display: none; }
-    .combatant-info .info-text .parse { font-size: 12px; margin-top: 5px; }
+    .combatant-info .info-text .parse { margin-top: 2px; }
 }

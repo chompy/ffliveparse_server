@@ -10,6 +10,19 @@ This is the main server component, it listens for log data from the ACT plugin a
 When you generate a key for yourself you are given a personal parse page. This page takes data from your ACT and displays the parses and action timelines with it. You are free to share this page with others.
 
 
+## Stream Mode
+
+You can access a more streaming friendly layout of the parses by appending #stream to the end of your parse URL.
+
+If your URL looks like this...
+
+https://www.ffliveparse.com/abc123
+
+...then...
+
+https://www.ffliveparse.com/abc123#stream
+
+
 ## Viewing Past Encounters
 
 Eventually you'll be able to view data on past encounters. While encounter data is currently being collected a way to view past data has not yet been implemented.

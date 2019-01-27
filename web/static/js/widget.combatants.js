@@ -187,21 +187,18 @@ class WidgetCombatants extends WidgetBase
             } else if (a.petOwnerName) {
                 for (var i = 0; i < t.combatants.length; i++) {
                     if (t.combatants[i].name == a.petOwnerName) {
-                        var aDps = (b.data.Damage / t.encounterDuration);
-                        var bDps = (t.combatants[i].data.Damage / t.encounterDuration);
-                        return aDps - bDps;
+                        a = t.combatants[i];
+                        break;
                     }
                 }
             } else if (b.petOwnerName) {
                 for (var i = 0; i < t.combatants.length; i++) {
                     if (t.combatants[i].name == b.petOwnerName) {
-                        var aDps = (a.data.Damage / t.encounterDuration);
-                        var bDps = (t.combatants[i].data.Damage / t.encounterDuration);
-                        return bDps - aDps;
+                        b = t.combatants[i];
+                        break;
                     }
                 }
             }
-
             // sort by user config sort option
             switch (t.userConfig["sortBy"])
             {

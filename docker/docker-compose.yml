@@ -8,6 +8,7 @@ services:
             - "31593:31593/udp"
         env_file:
             - "docker.env"
+        restart: always
         volumes:
             - "ffliveparse-data:/app/data/database"
             - "/mnt/ffliveparse_logs:/app/data/logs"
@@ -21,6 +22,7 @@ services:
             - "docker.env"
         links:
             - "ffliveparse-app"
+        restart: always
         volumes:
             - "/etc/letsencrypt:/etc/letsencrypt"
             - "/var/www/letsencrypt:/var/www/letsencrypt"

@@ -48,7 +48,6 @@ class WidgetTimelime extends WidgetBase
         this.actionData = null;
         this.statusData = null;
         this.effectTracker = {};
-        this.enemyIds = [];
         // other
         this.lastTimeKey = 0;
         this.tickTimeout = null;
@@ -96,6 +95,7 @@ class WidgetTimelime extends WidgetBase
         }
         // window resize
         this.addEventListener("resize", function(e) { t._onWindowResize(); });
+        setTimeout(function() { t._onWindowResize(); }, 1000);
         // escape close overlay
         this.addEventListener("keyup", function(e) {
             if (e.keyCode == 27) {
@@ -126,8 +126,8 @@ class WidgetTimelime extends WidgetBase
         this.timeKeyContainerElement.classList.add("time-key-container");
         this.timelineElement.append(this.timeKeyContainerElement);
         var npcCombatant = {
-            "ids"           : [-1],
-            "name"          : "Enemy Combatants",
+            "ids"           : [],
+            "names"         : [],
             "isNpc"         : true,
             "data"          : { "ID" : -1 },
             "combatant"     : null,
@@ -135,7 +135,6 @@ class WidgetTimelime extends WidgetBase
         npcCombatant["element"] = this._createTimelineElement(npcCombatant);
         this.combatants = [npcCombatant];
         this.effectTracker = {};
-        this.enemyIds = [];
     }
 
     /**
@@ -175,9 +174,9 @@ class WidgetTimelime extends WidgetBase
                         this._fixTimelineActionCombatants();
                     }
                     // update data-name attribute
-                    if (combatant.name && this.combatants[j].name != combatant.name) {
+                    if (combatant.name && this.combatants[j].names[0] != combatant.name) {
                         this.combatants[j].element.setAttribute("data-name", combatant.name);
-                        this.combatants[j].name = combatant.name;
+                        this.combatants[j].names[0] = combatant.name;
                     }                    
                     isExisting = true;
                     break;
@@ -189,8 +188,8 @@ class WidgetTimelime extends WidgetBase
             // new combatant
             var newTimelineCombatant = {
                 "ids"           : combatant.ids.slice(),
+                "names"         : [combatant.name],
                 "data"          : combatant.data,
-                "name"          : combatant.name,
                 "element"       : this._createTimelineElement(combatant),
                 "combatant"     : combatant
             };
@@ -363,7 +362,11 @@ class WidgetTimelime extends WidgetBase
     {
         var element = document.createElement("div");
         element.classList.add("combatant", "combatant-timeline");
-        element.setAttribute("data-name", combatant.name);
+        if (typeof(combatant.name) != "undefined") {
+            element.setAttribute("data-name", combatant.name);
+        } else if (typeof(combatant.names) != "undefined") {
+            element.setAttribute("data-name", combatant.names[0]);
+        }
         this.timelineElement.appendChild(element);
         return element;
     }
@@ -511,6 +514,11 @@ class WidgetTimelime extends WidgetBase
                         sourceId = this.combatants[j].ids[0];
                         action.logData[0].sourceId = sourceId;
                         break;
+                    } else if (this.combatants[j].names.indexOf(sourceName) != -1) {
+                        var index = this.combatants[j].names.indexOf(sourceName);
+                        sourceId = this.combatants[j].ids[index];
+                        action.logData[0].sourceId = sourceId;
+                        break;                        
                     }
                 }
             }
@@ -523,10 +531,10 @@ class WidgetTimelime extends WidgetBase
             for (var j = 0; j < this.combatants.length; j++) {
                 if (
                     this.combatants[j].ids.indexOf(sourceId) != -1 ||
-                    this.combatants[j].name == sourceName
+                    this.combatants[j].names.indexOf(sourceName) != -1
                 ) {
                     combatant = this.combatants[j];
-                    if (!combatant.name) {
+                    if (combatant.names.length == 0) {
                         combatant.element.setAttribute("data-name", sourceName);
                     }
                     break;
@@ -534,17 +542,19 @@ class WidgetTimelime extends WidgetBase
             }
             // check if source is enemy combatant
             if (
-                combatant.ids.indexOf(-1) != -1 &&
-                this.enemyIds.indexOf(sourceId) == -1
+                typeof(combatant.isNpc) != "undefined" &&
+                combatant.isNpc &&
+                combatant.ids.indexOf(sourceId) == -1
             ) {
                 for (var j = 0; j < this.combatants.length; j++) {
                     if (targetId && this.combatants[j].ids.indexOf(targetId) != -1) {
-                        this.enemyIds.push(sourceId);
+                        combatant.ids.push(sourceId);
+                        combatant.names.push(sourceName);
                         break;
                     }
                 }
                 // no valid timeline to place on
-                if (this.enemyIds.indexOf(sourceId) == -1) {
+                if (combatant.ids.indexOf(sourceId) == -1) {
                     continue;
                 }
             }
@@ -667,7 +677,7 @@ class WidgetTimelime extends WidgetBase
         for (var j = 0; j < this.combatants.length; j++) {
             if (
                 this.combatants[j].ids.indexOf(sourceId) != -1 ||
-                this.combatants[j].name == sourceName
+                this.combatants[j].names.indexOf(sourceName) != -1
             ) {
                 combatant = this.combatants[j];
                 break;
@@ -951,7 +961,6 @@ class WidgetTimelime extends WidgetBase
             ) {
                 continue;
             }
-            console.log(combatant.combatant ? combatant.combatant.name : "");
             // is this the currently selected action?
             var isThisAction = (
                 this.actionTimeline[i].time.getTime() == timelineAction.time.getTime() &&
