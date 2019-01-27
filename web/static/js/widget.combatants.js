@@ -144,6 +144,10 @@ class WidgetCombatants extends WidgetBase
         if (!element.classList.contains(roleClass)) {
             element.classList.add(roleClass);
         }
+        // pet tag
+        if (combatant.petOwnerName) {
+            element.classList.add("pet");
+        }
         // job icon
         var jobIconElement = element.getElementsByClassName("job-icon")[0];
         var jobIconSrc = "/static/img/job/" + combatant.data.Job.toLowerCase() + ".png";
@@ -175,6 +179,30 @@ class WidgetCombatants extends WidgetBase
     {
         var t = this;
         this.combatants.sort(function(a, b) {
+            // keep pet with their owner
+            if (a.petOwnerName && a.petOwnerName == b.name) {
+                return -1;
+            } else if (b.petOwnerName && b.petOwnerName == a.name) {
+                return 0;
+            } else if (a.petOwnerName) {
+                for (var i = 0; i < t.combatants.length; i++) {
+                    if (t.combatants[i].name == a.petOwnerName) {
+                        var aDps = (b.data.Damage / t.encounterDuration);
+                        var bDps = (t.combatants[i].data.Damage / t.encounterDuration);
+                        return aDps - bDps;
+                    }
+                }
+            } else if (b.petOwnerName) {
+                for (var i = 0; i < t.combatants.length; i++) {
+                    if (t.combatants[i].name == b.petOwnerName) {
+                        var aDps = (a.data.Damage / t.encounterDuration);
+                        var bDps = (t.combatants[i].data.Damage / t.encounterDuration);
+                        return bDps - aDps;
+                    }
+                }
+            }
+
+            // sort by user config sort option
             switch (t.userConfig["sortBy"])
             {
                 case "healing":
@@ -257,9 +285,16 @@ class WidgetCombatants extends WidgetBase
         if (combatant.EncounterUID != this.encounterId) {
             return;
         }
-        // don't add combatants with no job
-        if (!combatant.Job.trim()) {
+        // don't add combatants with no job and is not a pet
+        if (!combatant.Job.trim() && combatant.Name.indexOf("(") == -1) {
             return;
+        }
+        // parse out name of pet owner
+        var petOwnerName = "";
+        if (combatant.Name.indexOf("(") != -1) {
+            petOwnerName = combatant.Name.split("(")[1].trim();
+            petOwnerName = petOwnerName.substr(0, petOwnerName.length - 1);
+            combatant.Job = "pet";
         }
         // update existing
         for (var i = 0; i < this.combatants.length; i++) {
@@ -281,6 +316,7 @@ class WidgetCombatants extends WidgetBase
             "ids"           : [combatant.ID],
             "data"          : combatant,
             "element"       : combatantElement,
+            "petOwnerName"  : petOwnerName,
             "name"          : "", // name to be set from log data (so sending player name gets set as well instead of "YOU")
         });
         // update combatant element
@@ -323,6 +359,7 @@ class WidgetCombatants extends WidgetBase
                     if (this.combatants[i].ids.indexOf(logLineData.sourceId) != -1) {
                         this.combatants[i].name = logLineData.sourceName;
                         this._updateCombatantElement(this.combatants[i]);
+                        this._displayCombatants();
                     }
                 }
                 break;

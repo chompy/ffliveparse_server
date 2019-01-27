@@ -28,8 +28,11 @@ const ActPluginVersionNumber int32 = 5
 // Name - app name
 const Name string = "FFLiveParse"
 
-// DataPath - path where user data is stored
-const DataPath = "./data"
+// DatabasePath - path to database file
+const DatabasePath = "./data/database/db.sqlite"
+
+// LogPath - path where log data is stored
+const LogPath = "./data/logs"
 
 // TickRate - how often combatant and encounter data should be sent to web user in ms
 const TickRate = 3000

@@ -43,6 +43,8 @@ class ActionData
         }
         var data = this.actionData[actionId];
         data["id"] = actionId;
+        data["name"] = data["name_en"];
+        data["description"] = data["help_en"];
         return data;
     }
 
@@ -62,6 +64,8 @@ class ActionData
         for (var actionId in this.actionData) {
             if (this.actionData[actionId]["name_en"].toLowerCase() == name) {
                 this.actionData[actionId]["id"] = actionId;
+                this.actionData[actionId]["name"] = this.actionData[actionId]["name_en"];
+                this.actionData[actionId]["description"] = this.actionData[actionId]["help_en"];
                 this.actionDataNameCache[name] = actionId;
                 return this.actionData[actionId];
             }

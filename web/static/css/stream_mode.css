@@ -13,6 +13,10 @@ html.mode-stream, .mode-stream body {
     background-color: none;
 }
 
+.mode-stream #combatants .combatant.pet {
+    display: none;
+}
+
 @media(max-width: 940px) {
     .mode-stream .combatant-info { text-align: left; }
     .mode-stream .combatant-info .job-icon { width: 32px; height: 32px; }

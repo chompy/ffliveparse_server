@@ -3,6 +3,8 @@
     border-bottom: 1px solid #fff;
     padding: 10px 8px;
     color: #fff;
+    position: relative;
+    z-index: 2;
 }
 #head #logo, #head #webId, #head #zone-info, #head #encounterId {
     display: inline-block;

@@ -148,10 +148,8 @@ func (d *Data) ClearLogLines() {
 
 // getDatabase - get encounter database for given user
 func getDatabase(user user.Data) (*sql.DB, error) {
-	// get database path
-	dbPath := filepath.Join(app.DataPath, "db.sqlite")
 	// open database connection
-	database, err := sql.Open("sqlite3", dbPath)
+	database, err := sql.Open("sqlite3", app.DatabasePath)
 	if err != nil {
 		return nil, err
 	}
@@ -285,7 +283,7 @@ func (d *Data) SaveEncounter() error {
 		if err != nil {
 			return err
 		}
-		logFilePath := filepath.Join(app.DataPath, d.Encounter.UID+"_LogLines.dat")
+		logFilePath := filepath.Join(app.LogPath, d.Encounter.UID+"_LogLines.dat")
 		err = ioutil.WriteFile(logFilePath, compressedLogData, 0644)
 		if err != nil {
 			return err
@@ -368,7 +366,7 @@ func GetPreviousEncounter(user user.Data, encounterUID string) (Data, error) {
 	}
 	rows.Close()
 	// fetch log lines file
-	logFilePath := filepath.Join(app.DataPath, encounterUID+"_LogLines.dat")
+	logFilePath := filepath.Join(app.LogPath, encounterUID+"_LogLines.dat")
 	compressedLogBytes, err := ioutil.ReadFile(logFilePath)
 	if err != nil {
 		return Data{}, err

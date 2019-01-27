@@ -92,6 +92,7 @@ class Application
             t.initUserConfig();
             t.initWidgets();
             fetchActionData();            
+            fetchStatusData();
         };
         // socket message event
         socket.onmessage = function(event) {

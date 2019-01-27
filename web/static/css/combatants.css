@@ -31,6 +31,12 @@
 .combatant.combatant-npc .info-text span {
     line-height: 32px;
 }
+.combatant.pet {
+    background: #175906;
+    color: #fff;
+    padding: 4px 8px;
+    min-height: 32px;
+}
 
 .combatant .info {
     width: 20%;
@@ -61,6 +67,15 @@
 .combatant-info .info-text .parse {
     font-weight: bold;
     font-size: 16px;
+}
+.combatant.pet .job-icon {
+    width: 24px;
+    height: 24px;
+    margin-left: 7px;
+    margin-right: 7px;
+}
+.combatant.pet .info-text .parse {
+    font-size: 12px;
 }
 
 @media(max-width: 940px) {

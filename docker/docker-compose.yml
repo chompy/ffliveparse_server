@@ -9,7 +9,8 @@ services:
         env_file:
             - "docker.env"
         volumes:
-            - "ffliveparse-data:/app/data"
+            - "ffliveparse-data:/app/data/database"
+            - "/mnt/ffliveparse_logs:/app/data/logs"
 
     ffliveparse-nginx:
         build: "nginx/"

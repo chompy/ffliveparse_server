@@ -38,7 +38,7 @@ img.loading {
     color: transparent;
 }
 
-#errorOverlay, #loadingMessage, #timeline-overlay {
+#errorOverlay, #loadingMessage, #timeline-overlay, #modal {
     background: #000000b3;
     position: fixed;
     width: 100%;

@@ -20,7 +20,6 @@ package user
 import (
 	"database/sql"
 	"fmt"
-	"path/filepath"
 	"time"
 
 	"../app"
@@ -54,11 +53,8 @@ func createUserTables(database *sql.DB) error {
 
 // NewManager - get new user manager
 func NewManager() (Manager, error) {
-
-	// get database path
-	dbPath := filepath.Join(app.DataPath, "db.sqlite")
 	// open database connection
-	database, err := sql.Open("sqlite3", dbPath)
+	database, err := sql.Open("sqlite3", app.DatabasePath)
 	if err != nil {
 		return Manager{}, err
 	}

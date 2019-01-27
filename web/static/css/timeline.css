@@ -19,16 +19,57 @@
     position: absolute;
     height: 100%;
     cursor: pointer;
+    z-index: 1;
+}
+.combatant-timeline .action.type-gain-effect::after {
+    display: block;
+    position: absolute;
+    top: -15px;
+    bottom: 0;
+    right: 0;
+    margin: auto;
+    z-index: 2;
+    content: "+";
+    font-size:24px;
+    max-height: 28px;
+    color: #cdff00;
+    text-shadow: 2px 2px black;    
+}
+.combatant-timeline .action.type-lose-effect::after {
+    display: block;
+    position: absolute;
+    top: -15px;
+    bottom: 0;
+    right: 0;
+    margin: auto;
+    z-index: 2;
+    content: "-";
+    font-size:24px;
+    max-height: 28px;
+    color: #cdff00;
+    text-shadow: 2px 2px black;    
 }
 .combatant-timeline .action .icon {
-    margin-top: 10px;
-    width: 28px;
+    max-width: 28px;
     max-height: 28px;
     vertical-align: middle;
     display: inline-block;
     opacity: 0;
     transition: opacity .5s, margin-right .5s;
+    position: absolute;  
+    top: 0;  
+    bottom: 0;  
+    right: 0;  
+    margin: auto;
 }
+.combatant-timeline .action.type-gain-effect, .combatant-timeline .action.type-lose-effect {
+    z-index: 3;
+}
+.combatant-timeline .action.type-gain-effect .icon, .combatant-timeline .action.type-lose-effect .icon {
+    max-width: 24px;
+    max-height: 24px;
+}
+
 .combatant-timeline .action.flag-crit .icon {
     border: 1px dashed yellow;
 }
@@ -162,7 +203,7 @@
     width: 60%;
 }
 #timeline-overlay .action-icon {
-    width: 28px;
+    max-width: 28px;
     height: 28px;
     vertical-align: -4px;
     margin-right: 5px;
@@ -281,7 +322,7 @@
     min-width: 80px;
 }
 #timeline-overlay .other-action .action-icon {
-    width: 18px;
+    max-width: 18px;
     height: 18px;
     margin-right: 5px;
 }
