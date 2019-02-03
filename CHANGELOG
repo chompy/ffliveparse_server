@@ -1,0 +1,6 @@
+1.07
+
+- Fix sort order of pets.
+- Corrected an issue that should stop the server from crashing.
+- Server now uses log lines to correct player names before storing encounter data, this will be used when past encounters are viewable.
+- Preliminary past encounters page.
