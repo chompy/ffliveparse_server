@@ -1,0 +1,47 @@
+{{ define "title" }} :: Stats{{ end }}
+
+{{ define "headerLeft" }}
+<div id="logo"><a href="/">{{.AppName}}</a></div>
+<div id="webId">Encounters</div>
+{{ end }}
+
+{{ define "content" }}
+    <div id="encounterContent">
+        <h2>Past Encounters for {{ .WebIDString }}</h2>
+
+        {{ range $val := .Encounters }}
+        <div class="encounterItem encounterSuccess">
+            <div class="encounterTime" data-timestamp="{{ $val.Encounter.StartTime.Unix }}"><a href="/{{ $val.User.GetWebIDString }}/{{ $val.Encounter.UID }}">1</a></div>
+            <div class="encounterZone">{{ $val.Encounter.Zone }}</div>
+            <div class="encounterLength">{{ $val.Encounter.EndTime.Sub $val.Encounter.StartTime }}</div>
+            <div class="encounterCombatants">
+            {{ range $combatant := $val.Combatants }}
+            <span class="encounterCombatant">{{ $combatant.Name }}</span>
+            {{ end }}
+            </div>
+        </div>
+        {{ end }}
+
+        <div class="encounterPagination textCenter">
+            {{ if lt 1 .EncounterCurrentPage }}
+            <a href="/encounters?uid={{ .WebIDString }}&offset={{ .EncounterPrevPageOffset }}">&laquo; Previous</a>
+            {{ end }}
+            {{ .EncounterCurrentPage }} / {{ .EncounterTotalPage }}
+            {{ if ge .EncounterTotalPage .EncounterCurrentPage }}
+            <a href="/encounters?uid={{ .WebIDString }}&offset={{ .EncounterNextPageOffset }}">Next &raquo;</a>
+            {{ end }}            
+        </div>
+
+    </div>
+{{ end }}
+
+{{ define "scripts" }}
+<script type="text/javascript">
+    var encounterTimeElements = document.getElementsByClassName("encounterTime");
+    for (var i = 0; i < encounterTimeElements.length; i++) {
+        var timestamp = encounterTimeElements[i].getAttribute("data-timestamp");
+        var date = new Date(timestamp * 1000);
+        encounterTimeElements[i].getElementsByTagName("a")[0].innerText = date.toLocaleString();
+    }
+</script>
+{{ end }}

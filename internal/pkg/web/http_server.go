@@ -22,6 +22,7 @@ import (
 	"html/template"
 	"io/ioutil"
 	"log"
+	"math"
 	"net/http"
 	"path/filepath"
 	"strconv"
@@ -48,17 +49,22 @@ var htmlTemplates map[string]*template.Template
 
 // templateData - Struct containing data to be made available to html template
 type templateData struct {
-	User               user.Data
-	HasUser            bool
-	WebIDString        string
-	EncounterUID       string
-	AppName            string
-	VersionString      string
-	ActVersionString   string
-	ErrorMessage       string
-	StatActConnections int
-	StatActiveWebUsers int
-	StatPageLoads      int
+	User                    user.Data
+	HasUser                 bool
+	WebIDString             string
+	EncounterUID            string
+	AppName                 string
+	VersionString           string
+	ActVersionString        string
+	ErrorMessage            string
+	StatActConnections      int
+	StatActiveWebUsers      int
+	StatPageLoads           int
+	Encounters              []act.Data
+	EncounterCurrentPage    int
+	EncounterTotalPage      int
+	EncounterNextPageOffset int
+	EncounterPrevPageOffset int
 }
 
 // websocketConnection - Websocket connection data associated with user data
@@ -216,6 +222,80 @@ func HTTPStartServer(port uint16, userManager *user.Manager, actManager *act.Man
 		td.StatPageLoads = pageLoads
 		// render stats template
 		htmlTemplates["stats.tmpl"].ExecuteTemplate(w, "base.tmpl", td)
+	})
+	// display past encounters
+	http.HandleFunc("/encounters", func(w http.ResponseWriter, r *http.Request) {
+		// inc page load count
+		pageLoads += 1
+		// set resposne headers
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		// build template data
+		td := getBaseTemplateData()
+		// get user web uid
+		webUid := r.URL.Query().Get("uid")
+		if webUid == "" {
+			displayError(
+				w,
+				"User was not provided.",
+				http.StatusNotFound,
+			)
+			return
+		}
+		// get user data
+		userData, err := userManager.LoadFromWebIDString(webUid)
+		if err != nil {
+			displayError(
+				w,
+				"Unable to find session for user \""+webUid+".\"",
+				http.StatusNotFound,
+			)
+			log.Println("Error when attempting to retreive user", webUid, ",", err)
+			return
+		}
+		addUserToTemplateData(&td, userData)
+		td.WebIDString = webUid
+		// get offset
+		offsetString := r.URL.Query().Get("offset")
+		offset := int64(0)
+		if offsetString != "" {
+			offset, err = strconv.ParseInt(offsetString, 10, 64)
+			if err != nil {
+				displayError(
+					w,
+					"Invalid offset",
+					http.StatusInternalServerError,
+				)
+				return
+			}
+		}
+		if offset < 0 {
+			offset = 0
+		}
+		// get encounters
+		td.Encounters, err = act.GetPreviousEncounters(userData, int(offset))
+		if err == nil {
+			totalEncounterCount, err := act.GetPreviousEncounterCount(userData)
+			if offset > int64(totalEncounterCount)-act.PastEncounterFetchLimit {
+				offset = int64(totalEncounterCount) - act.PastEncounterFetchLimit
+			}
+			if err == nil {
+				td.EncounterTotalPage = int(math.Floor(float64(totalEncounterCount)/float64(act.PastEncounterFetchLimit))) - 1
+				td.EncounterCurrentPage = 1 + int(math.Floor(float64(offset)/float64(act.PastEncounterFetchLimit)))
+				td.EncounterNextPageOffset = int(offset) + act.PastEncounterFetchLimit
+				td.EncounterPrevPageOffset = int(offset) - act.PastEncounterFetchLimit
+			}
+		}
+		if err != nil {
+			displayError(
+				w,
+				"Unable to fetch past encounters.",
+				http.StatusInternalServerError,
+			)
+			log.Println("Error when fetching patch encounter for", webUid, ",", err)
+			return
+		}
+		// render encounters template
+		htmlTemplates["encounters.tmpl"].ExecuteTemplate(w, "base.tmpl", td)
 	})
 	// setup main page/index
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {

@@ -1,0 +1,49 @@
+#encounterContent {
+    margin:20px;
+
+}
+
+#encounterContent .encounterItem {
+    padding: 5px;
+}
+
+#encounterContent .encounterItem div {
+    display: inline-block;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+#encounterContent .encounterItem .encounterTime {
+    width: 20%;
+}
+
+#encounterContent .encounterItem .encounterZone {
+    width: 30%;
+}
+
+#encounterContent .encounterItem .encounterLength {
+    width: 15%;
+}
+
+#encounterContent .encounterItem .encounterCombatants {
+    width: 30%;
+}
+
+#encounterContent .encounterItem .encounterCombatants .encounterCombatant::after {
+    display: inline;
+    content: ", ";
+}
+
+#encounterContent .encounterItem .encounterCombatants .encounterCombatant:last-child::after {
+    content: "";
+}
+
+#encounterContent .encounterPagination {
+    margin-top: 15px;
+    font-size: 20px;
+}
+
+#encounterContent .encounterPagination a {
+    font-size: 14px;
+}

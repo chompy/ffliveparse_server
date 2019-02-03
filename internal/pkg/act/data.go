@@ -37,6 +37,9 @@ import (
 // lastUpdateInactiveTime - Time in ms between last data updata before data is considered inactive
 const lastUpdateInactiveTime = 300000
 
+// pastEncounterFetchLimit - Max number of past encounters to fetch in one request
+const PastEncounterFetchLimit = 10
+
 // Data - data about an ACT session
 type Data struct {
 	Session          Session
@@ -335,7 +338,7 @@ func GetPreviousEncounter(user user.Data, encounterUID string) (Data, error) {
 			&encounter.SuccessLevel,
 		)
 		if err != nil {
-			return Data{}, nil
+			return Data{}, err
 		}
 		break
 	}
@@ -398,6 +401,79 @@ func GetPreviousEncounter(user user.Data, encounterUID string) (Data, error) {
 		d.SaveEncounter()
 	}
 	return d, nil
+}
+
+// GetPreviousEncounters - retrieve list of previous encounters
+func GetPreviousEncounters(user user.Data, offset int) ([]Data, error) {
+	// get database
+	database, err := getDatabase(user)
+	if err != nil {
+		return nil, err
+	}
+	defer database.Close()
+	// fetch encounters
+	rows, err := database.Query(
+		"SELECT uid FROM encounter WHERE DATETIME(start_time) > '01-01-2019 00:00:00' AND user_id = ? ORDER BY DATETIME(start_time) ASC LIMIT ? OFFSET ?",
+		user.ID,
+		PastEncounterFetchLimit,
+		offset,
+	)
+	if err != nil {
+		return nil, err
+	}
+	// fetch encounter uids
+	uidList := make([]string, 0)
+	for rows.Next() {
+		var encounterUID string
+		err = rows.Scan(
+			&encounterUID,
+		)
+		uidList = append(uidList, encounterUID)
+		if err != nil {
+			return nil, err
+		}
+	}
+	rows.Close()
+	// get full encounter data with each uid
+	encounters := make([]Data, 0)
+	for _, encounterUID := range uidList {
+		prevEncounter, err := GetPreviousEncounter(user, encounterUID)
+		if err != nil {
+			return nil, err
+		}
+		encounters = append(encounters, prevEncounter)
+	}
+	return encounters, nil
+}
+
+// GetPreviousEncounterCount - get total number of previous encounters
+func GetPreviousEncounterCount(user user.Data) (int, error) {
+	// get database
+	database, err := getDatabase(user)
+	if err != nil {
+		return 0, err
+	}
+	defer database.Close()
+	// fetch encounter counter
+	rows, err := database.Query(
+		"SELECT COUNT(*) FROM encounter WHERE DATETIME(start_time) > '01-01-2019 00:00:00' AND user_id = ?",
+		user.ID,
+	)
+	if err != nil {
+		return 0, err
+	}
+	// retrieve count
+	var count int
+	for rows.Next() {
+		err = rows.Scan(
+			&count,
+		)
+		if err != nil {
+			return 0, err
+		}
+	}
+	rows.Close()
+	return count, nil
 }
 
 // IsActive - Check if data is actively being updated (i.e. active ACT connection)
