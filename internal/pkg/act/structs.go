@@ -42,6 +42,7 @@ type Combatant struct {
 	EncounterUID   string
 	ActEncounterID uint32
 	ID             int32
+	ParentID       int32
 	Name           string
 	Job            string
 	Damage         int32

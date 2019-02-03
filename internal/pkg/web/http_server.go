@@ -48,14 +48,17 @@ var htmlTemplates map[string]*template.Template
 
 // templateData - Struct containing data to be made available to html template
 type templateData struct {
-	User             user.Data
-	HasUser          bool
-	WebIDString      string
-	EncounterUID     string
-	AppName          string
-	VersionString    string
-	ActVersionString string
-	ErrorMessage     string
+	User               user.Data
+	HasUser            bool
+	WebIDString        string
+	EncounterUID       string
+	AppName            string
+	VersionString      string
+	ActVersionString   string
+	ErrorMessage       string
+	StatActConnections int
+	StatActiveWebUsers int
+	StatPageLoads      int
 }
 
 // websocketConnection - Websocket connection data associated with user data
@@ -72,6 +75,8 @@ func HTTPStartServer(port uint16, userManager *user.Manager, actManager *act.Man
 	if err != nil {
 		log.Panicln("Error occured while loading HTML templates,", err)
 	}
+	// count page loads
+	pageLoads := 0
 	// websocket connection list
 	websocketConnections := make([]websocketConnection, 0)
 	// serve static assets
@@ -130,7 +135,8 @@ func HTTPStartServer(port uint16, userManager *user.Manager, actManager *act.Man
 			return
 		}
 		// log
-		log.Println("New web socket session for ACT user", userData.ID, "from", ws.RemoteAddr())
+
+		log.Println("New web socket session for ACT user", userData.ID, "from", ws.Request().RemoteAddr)
 		// get act data from web ID
 		actData, err := actManager.GetDataWithWebID(userID)
 		if err != nil {
@@ -179,6 +185,8 @@ func HTTPStartServer(port uint16, userManager *user.Manager, actManager *act.Man
 		wsReader(ws, actManager)
 	}))
 	http.HandleFunc("/new", func(w http.ResponseWriter, r *http.Request) {
+		// inc page load count
+		pageLoads += 1
 		// create a new user
 		userData, err := userManager.New()
 		if err != nil {
@@ -196,8 +204,23 @@ func HTTPStartServer(port uint16, userManager *user.Manager, actManager *act.Man
 		// perform redirect to home page
 		http.Redirect(w, r, "/", http.StatusFound)
 	})
+	// display stats
+	http.HandleFunc("/stats", func(w http.ResponseWriter, r *http.Request) {
+		// set resposne headers
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		// build template data
+		td := getBaseTemplateData()
+		// collect stats
+		td.StatActConnections = actManager.DataCount()
+		td.StatActiveWebUsers = len(websocketConnections)
+		td.StatPageLoads = pageLoads
+		// render stats template
+		htmlTemplates["stats.tmpl"].ExecuteTemplate(w, "base.tmpl", td)
+	})
 	// setup main page/index
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		// inc page load count
+		pageLoads += 1
 		// split url path in to parts
 		urlPathParts := strings.Split(strings.TrimLeft(r.URL.Path, "/"), "/")
 		// get web id from url path
@@ -353,7 +376,7 @@ func globalWsWriter(websocketConnections *[]websocketConnection, events *emitter
 				if websocketConnection.connection == nil || event.Args[0] != websocketConnection.userData.ID {
 					continue
 				}
-				log.Println("ACT event", event.OriginalTopic, ", send data for user", websocketConnection.userData.ID, "to", websocketConnection.connection.RemoteAddr())
+				//log.Println("ACT event", event.OriginalTopic, ", send data for user", websocketConnection.userData.ID, "to", websocketConnection.connection.RemoteAddr())
 				websocket.Message.Send(
 					websocketConnection.connection,
 					event.Args[1],

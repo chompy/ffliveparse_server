@@ -317,3 +317,8 @@ func (m *Manager) GetDataWithWebID(webID string) (*Data, error) {
 	}
 	return m.GetDataWithUserID(userID), nil
 }
+
+// DataCount - get number of data objects
+func (m *Manager) DataCount() int {
+	return len(m.data)
+}

@@ -38,7 +38,8 @@ func Listen(port uint16, manager *Manager) {
 	for {
 		n, addr, err := serverConn.ReadFromUDP(buf)
 		if err != nil {
-			log.Panicln("Failed to read message from", addr, ",", err)
+			log.Println("Failed to read message from", addr, ",", err)
+			continue
 		}
 		_, err = manager.ParseDataString(buf[0:n], addr)
 		if err != nil {

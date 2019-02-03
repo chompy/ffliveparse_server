@@ -1,0 +1,17 @@
+#statsContent {
+    padding: 10px;
+}
+
+#statsContent .statItem {
+    margin-bottom: 5px;
+}
+
+#statsContent .statItem .statName {
+    display: inline-block;
+    min-width: 332px;
+    margin-right: 10px;
+}
+
+#statsContent .statItem .statValue {
+    display: inline-block;
+}

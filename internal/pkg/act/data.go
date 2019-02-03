@@ -22,6 +22,8 @@ import (
 	"io/ioutil"
 	"log"
 	"path/filepath"
+	"strconv"
+	"strings"
 	"time"
 
 	"../app"
@@ -82,6 +84,7 @@ func (d *Data) UpdateEncounter(encounter Encounter) {
 		d.Encounter = encounter
 		// save encounter if it is no longer active
 		if !d.Encounter.Active {
+			d.UpdateCombatantNames()
 			err := d.SaveEncounter()
 			if err != nil {
 				log.Println("Error while saving encounter", d.Encounter.UID, err)
@@ -91,6 +94,7 @@ func (d *Data) UpdateEncounter(encounter Encounter) {
 	}
 	// save + clear current encounter if one exists
 	if d.Encounter.ActID != 0 {
+		d.UpdateCombatantNames()
 		err := d.SaveEncounter()
 		if err != nil {
 			log.Println("Error while saving encounter", d.Encounter.UID, err)
@@ -185,6 +189,7 @@ func initDatabase(database *sql.DB) error {
 		CREATE TABLE IF NOT EXISTS combatant
 		(
 			id INTEGER,
+			parent_id INTEGER,
 			user_id INTEGER,
 			encounter_uid VARCHAR(32),
 			name VARCHAR(256),
@@ -248,14 +253,15 @@ func (d *Data) SaveEncounter() error {
 	for _, combatant := range d.Combatants {
 		stmt, err := database.Prepare(`
 			REPLACE INTO combatant
-			(id, encounter_uid, user_id, name, job, damage, damage_taken, damage_healed, deaths, hits, heals, kills) VALUES
-			(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			(id, parent_id, encounter_uid, user_id, name, job, damage, damage_taken, damage_healed, deaths, hits, heals, kills) VALUES
+			(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		`)
 		if err != nil {
 			return err
 		}
 		_, err = stmt.Exec(
 			combatant.ID,
+			combatant.ParentID,
 			combatant.EncounterUID,
 			d.User.ID,
 			combatant.Name,
@@ -336,7 +342,7 @@ func GetPreviousEncounter(user user.Data, encounterUID string) (Data, error) {
 	rows.Close()
 	// fetch combatants
 	rows, err = database.Query(
-		"SELECT id, encounter_uid, name, job, damage, damage_taken, damage_healed, deaths, hits, heals, kills FROM combatant WHERE user_id = ? AND encounter_uid = ?",
+		"SELECT id, parent_id, encounter_uid, name, job, damage, damage_taken, damage_healed, deaths, hits, heals, kills FROM combatant WHERE user_id = ? AND encounter_uid = ?",
 		user.ID,
 		encounterUID,
 	)
@@ -344,10 +350,12 @@ func GetPreviousEncounter(user user.Data, encounterUID string) (Data, error) {
 		return Data{}, err
 	}
 	combatants := make([]Combatant, 0)
+	var parentID sql.NullInt64
 	for rows.Next() {
 		combatant := Combatant{}
 		err := rows.Scan(
 			&combatant.ID,
+			&parentID,
 			&combatant.EncounterUID,
 			&combatant.Name,
 			&combatant.Job,
@@ -359,6 +367,9 @@ func GetPreviousEncounter(user user.Data, encounterUID string) (Data, error) {
 			&combatant.Heals,
 			&combatant.Kills,
 		)
+		if parentID.Valid {
+			combatant.ParentID = int32(parentID.Int64)
+		}
 		if err != nil {
 			return Data{}, err
 		}
@@ -376,16 +387,67 @@ func GetPreviousEncounter(user user.Data, encounterUID string) (Data, error) {
 		return Data{}, err
 	}
 	// return data set
-	return Data{
+	d := Data{
 		User:       user,
 		Encounter:  encounter,
 		Combatants: combatants,
 		LogLines:   logLines,
-	}, nil
+	}
+	// update combatant names by syncing with log lines
+	if d.UpdateCombatantNames() {
+		d.SaveEncounter()
+	}
+	return d, nil
 }
 
 // IsActive - Check if data is actively being updated (i.e. active ACT connection)
 func (d *Data) IsActive() bool {
 	dur := time.Now().Sub(d.LastUpdate)
 	return int64(dur/time.Millisecond) < lastUpdateInactiveTime
+}
+
+// UpdateCombatantNames - Scan log lines to find correct combatant names
+func (d *Data) UpdateCombatantNames() bool {
+	hasUpdate := false
+	for index, combatant := range d.Combatants {
+		if len(combatant.Job) == 0 || strings.Contains(combatant.Name, " (") {
+			continue
+		}
+		for _, logLine := range d.LogLines {
+			logSplit := strings.Split(logLine.LogLine[15:], ":")
+			if logSplit[0] != "15" {
+				continue
+			}
+			actorId, err := strconv.ParseInt(logSplit[1], 16, 32)
+			if err != nil {
+				continue
+			}
+			if int32(actorId) == combatant.ID {
+				if combatant.Name != logSplit[2] {
+					d.Combatants[index].Name = logSplit[2]
+					hasUpdate = true
+				}
+				break
+			}
+		}
+	}
+	// fix pets
+	for index, combatant := range d.Combatants {
+		if combatant.ParentID != 0 || (combatant.Job != "" && !strings.Contains(combatant.Name, " (")) {
+			continue
+		}
+		nameSplit := strings.Split(combatant.Name, " (")
+		if len(nameSplit) < 2 {
+			continue
+		}
+		ownerName := nameSplit[1][:len(nameSplit[1])-1]
+		for _, ownerCombatant := range d.Combatants {
+			if ownerName == ownerCombatant.Name {
+				hasUpdate = true
+				d.Combatants[index].ParentID = ownerCombatant.ID
+				break
+			}
+		}
+	}
+	return hasUpdate
 }

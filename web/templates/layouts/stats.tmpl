@@ -1,0 +1,25 @@
+{{ define "title" }} :: Stats{{ end }}
+
+{{ define "headerLeft" }}
+<div id="logo"><a href="/">{{.AppName}}</a></div>
+<div id="webId">Stats</div>
+{{ end }}
+
+{{ define "content" }}
+    <div id="statsContent">
+
+        <div class="statItem">
+            <div class="statName">Active ACT Connections</div>
+            <div class="statValue">{{ .StatActConnections }}</div>
+        </div>
+        <div class="statItem">
+            <div class="statName">Active Web Users</div>
+            <div class="statValue">{{ .StatActiveWebUsers }}</div>
+        </div>
+        <div class="statItem">
+            <div class="statName">Page Loads</div>
+            <div class="statValue">{{ .StatPageLoads }}</div>
+        </div>
+
+    </div>
+{{ end }}

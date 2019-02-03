@@ -178,26 +178,22 @@ class WidgetCombatants extends WidgetBase
     _displayCombatants()
     {
         var t = this;
+        // re-sort so all pets are at the bottom
+        this.combatants.sort(function(a, b) {
+            if (a.petOwnerName != "" && b.petOwnerName == "") {
+                return 1;
+            } else if (b.petOwnerName != "" && a.petOwnerName == "") {
+                return -1;
+            }
+            return 0;
+        });
         this.combatants.sort(function(a, b) {
             // keep pet with their owner
-            if (a.petOwnerName && a.petOwnerName == b.name) {
-                return -1;
-            } else if (b.petOwnerName && b.petOwnerName == a.name) {
+            if (b.petOwnerName) {
+                if (b.petOwnerName != a.name) {
+                    return 1;
+                }
                 return 0;
-            } else if (a.petOwnerName) {
-                for (var i = 0; i < t.combatants.length; i++) {
-                    if (t.combatants[i].name == a.petOwnerName) {
-                        a = t.combatants[i];
-                        break;
-                    }
-                }
-            } else if (b.petOwnerName) {
-                for (var i = 0; i < t.combatants.length; i++) {
-                    if (t.combatants[i].name == b.petOwnerName) {
-                        b = t.combatants[i];
-                        break;
-                    }
-                }
             }
             // sort by user config sort option
             switch (t.userConfig["sortBy"])
@@ -292,6 +288,14 @@ class WidgetCombatants extends WidgetBase
             petOwnerName = combatant.Name.split("(")[1].trim();
             petOwnerName = petOwnerName.substr(0, petOwnerName.length - 1);
             combatant.Job = "pet";
+        } else if (combatant.Name == "Demi-Bahamut") {
+            combatant.Job = "pet";
+            for (var i = 0; i < this.combatants.length; i++) {
+                if (this.combatants[i].data.Job == "Smn" && this.combatants[i].data.Name != "Demi-Bahamut") {
+                    petOwnerName = this.combatants[i].data.Name;
+                    break;
+                }
+            }
         }
         // update existing
         for (var i = 0; i < this.combatants.length; i++) {
