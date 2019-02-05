@@ -135,14 +135,14 @@ func (d *Data) UpdateCombatant(combatant Combatant) {
 
 // UpdateLogLine - Add log line
 func (d *Data) UpdateLogLine(logLine LogLine) {
+	// update log last update flag
+	d.LastUpdate = time.Now()
 	// ensure there is a current encounter and that data is for it
 	if logLine.ActEncounterID == 0 || d.Encounter.ActID == 0 || d.Encounter.UID == "" || logLine.ActEncounterID != d.Encounter.ActID {
 		return
 	}
 	// set encounter UID
 	logLine.EncounterUID = d.Encounter.UID
-	// update log last update flag
-	d.LastUpdate = time.Now()
 	// add to log line list
 	d.LogLines = append(d.LogLines, logLine)
 }
@@ -413,7 +413,7 @@ func GetPreviousEncounters(user user.Data, offset int) ([]Data, error) {
 	defer database.Close()
 	// fetch encounters
 	rows, err := database.Query(
-		"SELECT uid FROM encounter WHERE DATETIME(start_time) > '01-01-2019 00:00:00' AND user_id = ? ORDER BY DATETIME(start_time) ASC LIMIT ? OFFSET ?",
+		"SELECT uid FROM encounter WHERE DATETIME(start_time) > '01-01-2019 00:00:00' AND DATETIME(end_time) > DATETIME(start_time) AND user_id = ? ORDER BY DATETIME(start_time) DESC LIMIT ? OFFSET ?",
 		user.ID,
 		PastEncounterFetchLimit,
 		offset,
@@ -456,7 +456,7 @@ func GetPreviousEncounterCount(user user.Data) (int, error) {
 	defer database.Close()
 	// fetch encounter counter
 	rows, err := database.Query(
-		"SELECT COUNT(*) FROM encounter WHERE DATETIME(start_time) > '01-01-2019 00:00:00' AND user_id = ?",
+		"SELECT COUNT(*) FROM encounter WHERE DATETIME(start_time) > '01-01-2019 00:00:00' AND DATETIME(end_time) > DATETIME(start_time) AND user_id = ?",
 		user.ID,
 	)
 	if err != nil {

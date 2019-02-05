@@ -165,12 +165,23 @@ class WidgetTimelime extends WidgetBase
             // update existing
             var isExisting = false;
             for (var j = 0; j < this.combatants.length; j++) {
-                if (this.combatants[j].data.Name == combatant.data.Name) {
+                if (
+                    this.combatants[j].data.ID == combatant.data.ID ||
+                    (this.combatants[j].combatant && this.combatants[j].combatant.petOwnerName == combatant.petOwnerName && this.combatants[j].combatant.name == combatant.name)
+                ) {
                     this.combatants[j].data = combatant.data;
                     this.timelineElement.appendChild(this.combatants[j].element);
                     // update id list, fix timeline actions
                     if (this.combatants[j].ids.toString() != combatant.ids.toString()) {
                         this.combatants[j].ids = combatant.ids.slice();
+                        // if combatant id ends up in enemy/npc list then delete their id
+                        if (j != 0) {
+                            for (var k in this.combatants[0].ids) {
+                                if (combatant.ids.indexOf(this.combatants[0].ids[k])) {
+                                    this.combatants[0].ids.splice(k);
+                                }
+                            }
+                        }
                         this._fixTimelineActionCombatants();
                     }
                     // update data-name attribute

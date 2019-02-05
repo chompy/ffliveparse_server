@@ -206,6 +206,11 @@ func (m *Manager) doTick(userID int64) {
 			log.Println("Tick with no session data, killing thread.")
 			return
 		}
+		// clear session if no longer active
+		if !data.IsActive() {
+			m.ClearData(data)
+			return
+		}
 		if data.Encounter.UID == "" {
 			continue
 		}
@@ -316,6 +321,21 @@ func (m *Manager) GetDataWithWebID(webID string) (*Data, error) {
 		return nil, err
 	}
 	return m.GetDataWithUserID(userID), nil
+}
+
+// ClearData - remove data from memory
+func (m *Manager) ClearData(d *Data) {
+	for index, data := range m.data {
+		if data.User.ID == d.User.ID {
+			m.data = append(m.data[:index], m.data[index+1:]...)
+			if d.Encounter.ActID != 0 {
+				d.SaveEncounter()
+				d.ClearEncounter()
+			}
+			log.Println("Remove ACT session for user", d.User.ID, "(LoadedDataCount:", len(m.data), ")")
+			break
+		}
+	}
 }
 
 // DataCount - get number of data objects

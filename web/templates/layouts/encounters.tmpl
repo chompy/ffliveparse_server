@@ -5,9 +5,22 @@
 <div id="webId">Encounters</div>
 {{ end }}
 
+{{ define "headerRight" }}
+<div id="appHeaderRight">
+    <a href="/{{ .WebIDString }}">Parse</a>
+</div>
+{{ end }}
+
 {{ define "content" }}
     <div id="encounterContent">
         <h2>Past Encounters for {{ .WebIDString }}</h2>
+
+        <div class="encounterItem">
+            <div class="encounterTime"><strong>Start Time</strong></div>
+            <div class="encounterZone"><strong>Zone</strong></div>
+            <div class="encounterLength"><strong>Length</strong></div>
+            <div class="encounterCombatants"><strong>Combatants</strong></div>
+        </div>
 
         {{ range $val := .Encounters }}
         <div class="encounterItem encounterSuccess">
@@ -27,7 +40,7 @@
             <a href="/encounters?uid={{ .WebIDString }}&offset={{ .EncounterPrevPageOffset }}">&laquo; Previous</a>
             {{ end }}
             {{ .EncounterCurrentPage }} / {{ .EncounterTotalPage }}
-            {{ if ge .EncounterTotalPage .EncounterCurrentPage }}
+            {{ if gt .EncounterTotalPage .EncounterCurrentPage }}
             <a href="/encounters?uid={{ .WebIDString }}&offset={{ .EncounterNextPageOffset }}">Next &raquo;</a>
             {{ end }}            
         </div>
@@ -40,6 +53,7 @@
     var encounterTimeElements = document.getElementsByClassName("encounterTime");
     for (var i = 0; i < encounterTimeElements.length; i++) {
         var timestamp = encounterTimeElements[i].getAttribute("data-timestamp");
+        if (!timestamp) { continue; }
         var date = new Date(timestamp * 1000);
         encounterTimeElements[i].getElementsByTagName("a")[0].innerText = date.toLocaleString();
     }

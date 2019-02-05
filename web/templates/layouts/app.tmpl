@@ -13,6 +13,14 @@
 </div>
 {{ end }}
 
+{{ define "headerRight" }}
+<div id="appHeaderRight">
+    <!-- <a href="#">Triggers</a> -->
+    <!-- <a href="#">Extensions</a> -->
+    <a href="/encounters?uid={{ .WebIDString }}">History</a>
+</div>
+{{ end }}
+
 {{ define "content" }}
 <div id="timeline-overlay" class="hide">
     <div class="close">x</div>

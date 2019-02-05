@@ -256,9 +256,9 @@ func HTTPStartServer(port uint16, userManager *user.Manager, actManager *act.Man
 		td.WebIDString = webUid
 		// get offset
 		offsetString := r.URL.Query().Get("offset")
-		offset := int64(0)
+		offset := int(0)
 		if offsetString != "" {
-			offset, err = strconv.ParseInt(offsetString, 10, 64)
+			offsetI64, err := strconv.ParseInt(offsetString, 10, 64)
 			if err != nil {
 				displayError(
 					w,
@@ -267,6 +267,7 @@ func HTTPStartServer(port uint16, userManager *user.Manager, actManager *act.Man
 				)
 				return
 			}
+			offset = int(offsetI64)
 		}
 		if offset < 0 {
 			offset = 0
@@ -275,11 +276,11 @@ func HTTPStartServer(port uint16, userManager *user.Manager, actManager *act.Man
 		td.Encounters, err = act.GetPreviousEncounters(userData, int(offset))
 		if err == nil {
 			totalEncounterCount, err := act.GetPreviousEncounterCount(userData)
-			if offset > int64(totalEncounterCount)-act.PastEncounterFetchLimit {
-				offset = int64(totalEncounterCount) - act.PastEncounterFetchLimit
-			}
 			if err == nil {
-				td.EncounterTotalPage = int(math.Floor(float64(totalEncounterCount)/float64(act.PastEncounterFetchLimit))) - 1
+				td.EncounterTotalPage = int(math.Floor(float64(totalEncounterCount)/float64(act.PastEncounterFetchLimit))) + 1
+				if offset > totalEncounterCount-act.PastEncounterFetchLimit {
+					offset = (td.EncounterTotalPage - 1) * act.PastEncounterFetchLimit
+				}
 				td.EncounterCurrentPage = 1 + int(math.Floor(float64(offset)/float64(act.PastEncounterFetchLimit)))
 				td.EncounterNextPageOffset = int(offset) + act.PastEncounterFetchLimit
 				td.EncounterPrevPageOffset = int(offset) - act.PastEncounterFetchLimit

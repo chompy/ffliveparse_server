@@ -297,9 +297,13 @@ class WidgetCombatants extends WidgetBase
                 }
             }
         }
+
         // update existing
         for (var i = 0; i < this.combatants.length; i++) {
-            if (this.combatants[i].data.Name == combatant.Name) {
+            if (
+                this.combatants[i].data.ID == combatant.ID || 
+                (this.combatants[i].petOwnerName == petOwnerName && this.combatants[i].data.Name == combatant.Name)
+            ) {
                 if (this.combatants[i].ids.indexOf(combatant.ID) == -1) {
                     this.combatants[i].ids.push(combatant.ID);
                 }

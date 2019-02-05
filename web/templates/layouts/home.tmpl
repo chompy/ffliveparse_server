@@ -2,6 +2,9 @@
 <div id="logo"><a href="/">{{.AppName}}</a></div>
 {{ end }}
 
+{{ define "headerRight" }}
+{{ end }}
+
 {{ define "content" }}
 
 <div id="homeContent">
@@ -85,6 +88,29 @@
             </form>
         </div>
         <div class="spacer"></div>
+    </div>
+
+    <div class="homeSection">
+        <h3>Version Notes 1.08</h3>
+        <p>
+            <strong>Enhancements:</strong>
+            <ul>
+                <li>Past encounters can now be accessed.</li>
+                <li>Server now removes old ACT sessions from memory after ~5 minutes of inactivity.</li>
+            </ul>
+        </p>
+        <p>
+            <strong>Bug Fixes</strong>
+            <ul>
+                <li>Fixed duplicate combatants in timeline. (Needs more testing.)</li>
+            </ul>
+        </p>
+        <p>
+            <strong>Known Bugs</strong>
+            <ul>
+                <li>Sometimes player actions end up in Enemy combatant timeline.</li>
+            </ul>
+        </p>
     </div>
     
 </div>

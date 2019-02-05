@@ -20,10 +20,13 @@ package app
 import "fmt"
 
 // VersionNumber - version number
-const VersionNumber int32 = 107
+const VersionNumber int32 = 108
 
-// ActPluginVersionNumber - act plugin version, must match number recieved from Act plugin to parse data
-const ActPluginVersionNumber int32 = 5
+// ActPluginMinVersionNumber - act plugin min version
+const ActPluginMinVersionNumber int32 = 5
+
+// ActPluginMinVersionNumber - act plugin max version
+const ActPluginMaxVersionNumber int32 = 6
 
 // Name - app name
 const Name string = "FFLiveParse"
@@ -47,5 +50,5 @@ func GetVersionString() string {
 
 // GetActVersionString - get act version as string in format X.XX
 func GetActVersionString() string {
-	return fmt.Sprintf("%.2f", float32(ActPluginVersionNumber)/100.0)
+	return fmt.Sprintf("%.2f", float32(ActPluginMaxVersionNumber)/100.0)
 }

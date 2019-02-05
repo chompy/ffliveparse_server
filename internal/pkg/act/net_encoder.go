@@ -80,6 +80,7 @@ func EncodeCombatantBytes(value *Combatant) []byte {
 	data[0] = DataTypeCombatant
 	writeString(&data, value.EncounterUID)
 	writeInt32(&data, value.ID)
+	writeInt32(&data, value.ParentID)
 	writeString(&data, value.Name)
 	writeString(&data, value.Job)
 	writeInt32(&data, value.Damage)

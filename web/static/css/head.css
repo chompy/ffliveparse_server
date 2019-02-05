@@ -28,3 +28,13 @@
 #head .right-side {
     float: right;
 }
+
+#head .right-side #appHeaderRight {
+    display: inline-block;
+}
+
+#head .right-side #appHeaderRight a::after {
+    margin-left: 5px;
+    content: "|";
+    display: inline-block;
+}
