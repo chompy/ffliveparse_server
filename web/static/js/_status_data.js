@@ -69,7 +69,7 @@ function fetchStatusData()
         if (data) {
             _statusData = new StatusData(data);
             window.dispatchEvent(
-                new CustomEvent("status-data-ready", {"detail" : _statusData})
+                new CustomEvent("app:status-data", {"detail" : _statusData})
             );
         }
     });

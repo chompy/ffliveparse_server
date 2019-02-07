@@ -1,5 +1,16 @@
-1.07
+1.09
+- Server now links pets to their masters and resolves names of combatants (YOU > Player Name, etc).
+- Increased inactivity timeline to 30 minutes.
+- Fixed issues in timeline display.
+- Fixed issue where past encounter could not be loaded if log file was missing.
 
+1.08
+- Improved past encounters.
+- Server now removes old ACT sessions from memory after ~5 minutes of inactivity.
+- Fixed duplicate combatants in timeline. (Needs more testing.)
+- Sometimes player actions end up in Enemy combatant timeline.
+
+1.07
 - Fix sort order of pets.
 - Corrected an issue that should stop the server from crashing.
 - Server now uses log lines to correct player names before storing encounter data, this will be used when past encounters are viewable.

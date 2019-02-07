@@ -89,7 +89,7 @@ function fetchActionData()
         if (data) {
             _actionData = new ActionData(data);
             window.dispatchEvent(
-                new CustomEvent("action-data-ready", {"detail" : _actionData})
+                new CustomEvent("app:action-data", {"detail" : _actionData})
             );
         }
     });

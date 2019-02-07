@@ -48,6 +48,8 @@ class WidgetTimelime extends WidgetBase
         this.actionData = null;
         this.statusData = null;
         this.effectTracker = {};
+        this.enemyElement = null;
+        this.enemyCombatant = null;
         // other
         this.lastTimeKey = 0;
         this.tickTimeout = null;
@@ -76,9 +78,9 @@ class WidgetTimelime extends WidgetBase
         var t = this;
         this.addEventListener("act:encounter", function(e) { t._updateEncounter(e); });
         this.addEventListener("act:logLine", function(e) { t._onLogLine(e); });
-        this.addEventListener("combatants-display", function(e) { t._updateCombatants(e); });
-        this.addEventListener("action-data-ready", function(e) { t.actionData = e.detail; if (t.statusData) { t._renderTimeline(); } });
-        this.addEventListener("status-data-ready", function(e) { t.statusData = e.detail; if (t.actionData) { t._renderTimeline(); } });
+        this.addEventListener("widget-combatants:display", function(e) { t._updateCombatants(e); });
+        this.addEventListener("app:action-data", function(e) { t.actionData = e.detail; if (t.statusData) { t._renderTimeline(); } });
+        this.addEventListener("app:status-data", function(e) { t.statusData = e.detail; if (t.actionData) { t._renderTimeline(); } });
         // horizontal scrolling
         function hScrollTimeline(e) {
             var delta = Math.max(-1, Math.min(1, (e.wheelDelta || -e.detail)));
@@ -125,15 +127,10 @@ class WidgetTimelime extends WidgetBase
         this.timeKeyContainerElement = document.createElement("div");
         this.timeKeyContainerElement.classList.add("time-key-container");
         this.timelineElement.append(this.timeKeyContainerElement);
-        var npcCombatant = {
-            "ids"           : [],
-            "names"         : [],
-            "isNpc"         : true,
-            "data"          : { "ID" : -1 },
-            "combatant"     : null,
-        };
-        npcCombatant["element"] = this._createTimelineElement(npcCombatant);
-        this.combatants = [npcCombatant];
+        this.enemyElement = this._createTimelineElement();
+        this.enemyCombatant = new Combatant();
+        this.enemyCombatant._timelineElement = this.enemyElement;
+        this.combatants = [];
         this.effectTracker = {};
     }
 
@@ -163,85 +160,27 @@ class WidgetTimelime extends WidgetBase
         for (var i = 0; i < combatants.length; i++) {
             var combatant = combatants[i];
             // update existing
-            var isExisting = false;
+            var hasCombatant = false;
             for (var j = 0; j < this.combatants.length; j++) {
                 if (
-                    this.combatants[j].data.ID == combatant.data.ID ||
-                    (this.combatants[j].combatant && this.combatants[j].combatant.petOwnerName == combatant.petOwnerName && this.combatants[j].combatant.name == combatant.name)
+                    this.combatants[j].compare(combatant)
                 ) {
-                    this.combatants[j].data = combatant.data;
-                    this.timelineElement.appendChild(this.combatants[j].element);
-                    // update id list, fix timeline actions
-                    if (this.combatants[j].ids.toString() != combatant.ids.toString()) {
-                        this.combatants[j].ids = combatant.ids.slice();
-                        // if combatant id ends up in enemy/npc list then delete their id
-                        if (j != 0) {
-                            for (var k in this.combatants[0].ids) {
-                                if (combatant.ids.indexOf(this.combatants[0].ids[k])) {
-                                    this.combatants[0].ids.splice(k);
-                                }
-                            }
-                        }
-                        this._fixTimelineActionCombatants();
-                    }
-                    // update data-name attribute
-                    if (combatant.name && this.combatants[j].names[0] != combatant.name) {
-                        this.combatants[j].element.setAttribute("data-name", combatant.name);
-                        this.combatants[j].names[0] = combatant.name;
-                    }                    
-                    isExisting = true;
+                    hasCombatant = true;
+                    this.timelineElement.appendChild(this.combatants[j]._timelineElement);
                     break;
                 }
             }
-            if (isExisting) {
+            if (hasCombatant) {
                 continue;
             }
             // new combatant
-            var newTimelineCombatant = {
-                "ids"           : combatant.ids.slice(),
-                "names"         : [combatant.name],
-                "data"          : combatant.data,
-                "element"       : this._createTimelineElement(combatant),
-                "combatant"     : combatant
-            };
-            this.combatants.push(newTimelineCombatant);
-            this._fixTimelineActionCombatants();
+            var combatantElement = this._createTimelineElement();
+            combatant._timelineElement = combatantElement;
+            this.combatants.push(combatant);
             // force window resize event
             this._onWindowResize();
         }
     }
-
-    /**
-     * Itterate timeline actions and move actions to their
-     * correct combatants.
-     */
-    _fixTimelineActionCombatants()
-    {
-            // itterate action timeline and move new combatant actions to their timeline from npc timline
-            for (var i in this.actionTimeline) {
-                var action = this.actionTimeline[i];
-                if (
-                    !action.element ||
-                    typeof(action.logData[0].sourceId) == "undefined"
-                ) {
-                    continue;
-                }
-
-                for (var j in this.combatants) {
-                    if (
-                        this.combatants[j].ids.indexOf(action.logData[0].sourceId) != -1 &&
-                        action.element.parentElement == this.combatants[0].element
-                    ) {
-                        // remove from npc timeline
-                        this.combatants[0].element.removeChild(action.element);
-                        // add to player timeline
-                        this.combatants[j].element.appendChild(action.element);
-                        break;
-                    }
-                }
-            }
-    }
-
 
     /**
      * Queue up action recieved from "act:logline" event.
@@ -257,6 +196,35 @@ class WidgetTimelime extends WidgetBase
             {
                 logLineData["actionType"] = "action";
                 this._addAction(logLineData, event.detail.Time, event.detail.EncounterUID);
+                // if friendly is attacking enemy then add enemy to
+                // list of enemy combatants and allow their actions to show
+                // under enemy combatant timeline
+                if (
+                    logLineData.flags.indexOf("damage") != -1 &&
+                    !this.enemyCombatant.compare(logLineData.targetId) &&
+                    !this.enemyCombatant.compare(logLineData.targetName)
+                ) {
+                    // target cannot be in combatant list
+                    for (var i in this.combatants) {
+                        if (this.combatants[i].compare(logLineData.targetId)) {
+                            return;
+                        }
+                    }
+                    // look for source in combatant list
+                    for (var i in this.combatants) {
+                        var combatant = this.combatants[i];
+                        if (
+                            !combatant.compare(logLineData.targetId) &&
+                            combatant.compare(logLineData.sourceId)
+                        ) {
+                            console.log(logLineData);
+                            this.enemyCombatant.ids.push(logLineData.targetId);
+                            this.enemyCombatant.names.push(logLineData.targetName);
+                            break;
+                        }
+                    }
+                }
+                
                 break;
             }
             case MESSAGE_TYPE_DEATH:
@@ -367,17 +335,12 @@ class WidgetTimelime extends WidgetBase
 
     /**
      * Create new timeline element.
-     * @param {dict} combatant 
+     * @return DOMElement
      */
-    _createTimelineElement(combatant)
+    _createTimelineElement()
     {
         var element = document.createElement("div");
         element.classList.add("combatant", "combatant-timeline");
-        if (typeof(combatant.name) != "undefined") {
-            element.setAttribute("data-name", combatant.name);
-        } else if (typeof(combatant.names) != "undefined") {
-            element.setAttribute("data-name", combatant.names[0]);
-        }
         this.timelineElement.appendChild(element);
         return element;
     }
@@ -436,18 +399,17 @@ class WidgetTimelime extends WidgetBase
         ) + "px";
         // resize timeline elements to match height of combatant elements
         for (var i = 0; i < this.combatants.length; i++) {
-            if (!this.combatants[i].combatant) {
+            if (typeof(this.combatants[i]._parseElement) == "undefined") {
                 continue;
             }
-            var newHeight = this.combatants[i].combatant.element.offsetHeight - 1;
-            this.combatants[i].element.style.height = newHeight + "px";
+            var newHeight = this.combatants[i]._parseElement.offsetHeight - 1;
+            this.combatants[i]._timelineElement.style.height = newHeight + "px";
         }
-
         // resize npc timelin
         var npcElements = document.getElementsByClassName("combatant-npc");
         if (npcElements.length > 0) {
             var newHeight = npcElements[0].offsetHeight - 1;
-            this.combatants[0].element.style.height = newHeight + "px";
+            this.enemyElement.style.height = newHeight + "px";
         }
     }
 
@@ -461,9 +423,12 @@ class WidgetTimelime extends WidgetBase
         var timelinePixelLength = TIMELINE_PIXEL_OFFSET + parseInt(TIMELINE_PIXELS_PER_MILLISECOND * timestamp);
         // resize combatant timelines
         for (var i = 0; i < this.combatants.length; i++) {
-            if (this.combatants[i].element.offsetWidth < timestamp) {
-                this.combatants[i].element.style.width = timelinePixelLength + "px";
+            if (this.combatants[i]._timelineElement.offsetWidth < timestamp) {
+                this.combatants[i]._timelineElement.style.width = timelinePixelLength + "px";
             }
+        }
+        if (this.enemyElement.offsetWidth < timestamp) {
+            this.enemyElement.style.width = timelinePixelLength + "px";
         }
         // resize time key container
         if (this.timeKeyContainerElement && this.timeKeyContainerElement.offsetWidth < timelinePixelLength) {
@@ -480,6 +445,33 @@ class WidgetTimelime extends WidgetBase
                 this.lastTimeKey = parseInt(timestamp / 1000) + 1;
             }
         }
+    }
+
+    /**
+     * Find best combatant given list of identifying values.
+     * @param {array} compareValues 
+     * @return Combatant
+     */
+    _findCombatant(compareValues)
+    {
+        var combatant = null;
+        for (var i in compareValues) {
+            if (this.enemyCombatant.compare(compareValues[i])) {
+                combatant = this.enemyCombatant;
+            }
+            if (!combatant) {
+                for (var j = 0; j < this.combatants.length; j++) {
+                    if (this.combatants[j].compare(compareValues[i])) {
+                        combatant = this.combatants[j];
+                        break;
+                    }
+                }
+            }
+            if (combatant) {
+                break;
+            }
+        }
+        return combatant;
     }
 
     /**
@@ -517,57 +509,10 @@ class WidgetTimelime extends WidgetBase
             if (timestamp < -10000) {
                 continue;
             }   
-
-            // populate source id if not set
-            if (!sourceId && sourceName) {
-                for (var j = 0; j < this.combatants.length; j++) {
-                    if (this.combatants[j].combatant && this.combatants[j].combatant.name == sourceName) {
-                        sourceId = this.combatants[j].ids[0];
-                        action.logData[0].sourceId = sourceId;
-                        break;
-                    } else if (this.combatants[j].names.indexOf(sourceName) != -1) {
-                        var index = this.combatants[j].names.indexOf(sourceName);
-                        sourceId = this.combatants[j].ids[index];
-                        action.logData[0].sourceId = sourceId;
-                        break;                        
-                    }
-                }
-            }
-            if (!sourceId) {
-                continue;
-            }
-
             // find combatant
-            var combatant = this.combatants[0];
-            for (var j = 0; j < this.combatants.length; j++) {
-                if (
-                    this.combatants[j].ids.indexOf(sourceId) != -1 ||
-                    this.combatants[j].names.indexOf(sourceName) != -1
-                ) {
-                    combatant = this.combatants[j];
-                    if (combatant.names.length == 0) {
-                        combatant.element.setAttribute("data-name", sourceName);
-                    }
-                    break;
-                }
-            }
-            // check if source is enemy combatant
-            if (
-                typeof(combatant.isNpc) != "undefined" &&
-                combatant.isNpc &&
-                combatant.ids.indexOf(sourceId) == -1
-            ) {
-                for (var j = 0; j < this.combatants.length; j++) {
-                    if (targetId && this.combatants[j].ids.indexOf(targetId) != -1) {
-                        combatant.ids.push(sourceId);
-                        combatant.names.push(sourceName);
-                        break;
-                    }
-                }
-                // no valid timeline to place on
-                if (combatant.ids.indexOf(sourceId) == -1) {
-                    continue;
-                }
+            var combatant = this._findCombatant([sourceId, sourceName]);
+            if (!combatant) {
+                continue;
             }
             // get action data
             var actionData = null;
@@ -644,7 +589,7 @@ class WidgetTimelime extends WidgetBase
                 t._showOverlay(t.actionTimeline[index]);
             }
             // add element
-            combatant.element.appendChild(action.element);
+            combatant._timelineElement.appendChild(action.element);
         }
         // resize all timelines
         if (endTime > 0) {
@@ -684,15 +629,9 @@ class WidgetTimelime extends WidgetBase
         var actionTimestamp = timelineAction.time.getTime() - this.startTime.getTime();
         var actionTimestampDate = new Date(actionTimestamp);
         // find combatant
-        var combatant = this.combatants[0];
-        for (var j = 0; j < this.combatants.length; j++) {
-            if (
-                this.combatants[j].ids.indexOf(sourceId) != -1 ||
-                this.combatants[j].names.indexOf(sourceName) != -1
-            ) {
-                combatant = this.combatants[j];
-                break;
-            }
+        var combatant = this._findCombatant([sourceId, sourceName]);
+        if (!combatant) {
+            return;
         }
         // get icon
         var iconUrl = "/static/img/attack.png"; // default
@@ -947,18 +886,9 @@ class WidgetTimelime extends WidgetBase
         // set elements
         this._setActionElement(this.timelineOverlayElement, timelineAction);
         // find combatant ids
-        var combatant = this.combatants[0];
-        for (var j = 0; j < this.combatants.length; j++) {
-            if (
-                this.combatants[j].ids.indexOf(timelineAction.logData[0].sourceId) != -1 ||
-                (
-                    this.combatants[j].combatant &&
-                    this.combatants[j].combatant.name == timelineAction.logData[0].sourceName
-                )
-            ) {
-                combatant = this.combatants[j];
-                break;
-            }
+        var combatant = this._findCombatant([timelineAction.logData[0].sourceId, timelineAction.logData[0].sourceName]);
+        if (!combatant) {
+            return;
         }
         // find other actions
         var otherActionsElement = this.timelineOverlayElement.getElementsByClassName("other-actions")[0];
@@ -967,7 +897,7 @@ class WidgetTimelime extends WidgetBase
         var hasOtherActions = false;
         for (var i in this.actionTimeline) {
             if (
-                combatant.ids.indexOf(this.actionTimeline[i].logData[0].sourceId) == -1 ||
+                !combatant.compare(this.actionTimeline[i].logData[0].sourceId) ||
                 Math.abs(timestamp - this.actionTimeline[i].time.getTime()) > 5000
             ) {
                 continue;

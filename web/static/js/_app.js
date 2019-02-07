@@ -34,6 +34,8 @@ class Application
         this.connected = false;
         // user config
         this.userConfig = {};
+        // list of combatants
+        this.combatants = [];
     }
 
     /**
@@ -120,20 +122,36 @@ class Application
             console.log(">> An error has occured,", event);
         };
         // log incoming data
+        var t = this;
         var lastEncounterUid = null;
-        var currentCombatants = [];
         window.addEventListener("act:encounter", function(e) {
             if (e.detail.ID != lastEncounterUid) {
                 console.log(">> Receieved new encounter, ", e.detail);
                 lastEncounterUid = e.detail.UID;
-                currentCombatants = [];
+                t.combatants = [];
             }
         });
         window.addEventListener("act:combatant", function(e) {
-            if (currentCombatants.indexOf(e.detail.Name) == -1) {
-                console.log(">> Receieved new combatant, ", e.detail);
-                currentCombatants.push(e.detail.Name);
+            // update combatant list
+            var combatant = null;
+            for (var i in t.combatants) {
+                if (t.combatants[i].compare(e.detail.ID)) {
+                    t.combatants[i].update(e.detail);
+                    combatant = t.combatants[i]
+                    break;
+                }
             }
+            // add new combatant
+            if (!combatant) {
+                console.log(">> Receieved new combatant, ", e.detail);
+                combatant = new Combatant();
+                combatant.update(e.detail);
+                t.combatants.push(combatant);
+            }
+            // push event with combatant
+            window.dispatchEvent(
+                new CustomEvent("app:combatant", {"detail" : combatant})
+            );
         });
         // flags
         window.addEventListener("onFlag", function(e) {

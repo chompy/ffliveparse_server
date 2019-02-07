@@ -78,8 +78,7 @@ class WidgetCombatants extends WidgetBase
         // hook events
         var t = this;
         this.addEventListener("act:encounter", function(e) { t._updateEncounter(e); });
-        this.addEventListener("act:combatant", function(e) { t._updateCombatants(e); });
-        this.addEventListener("act:logLine", function(e) { t._onLogLine(e); });
+        this.addEventListener("app:combatant", function(e) { t._updateCombatants(e); });
     }
 
     /**
@@ -122,11 +121,11 @@ class WidgetCombatants extends WidgetBase
 
     /**
      * Update combatant element.
-     * @param {array} combatant 
+     * @param {Combatant} combatant 
      */
     _updateCombatantElement(combatant)
     {
-        var element = combatant.element;
+        var element = combatant._parseElement;
         // assign class for roles
         var jobUpper = combatant.data.Job.toUpperCase();
         var defaultRoleClass = "combatant-dps";
@@ -145,7 +144,7 @@ class WidgetCombatants extends WidgetBase
             element.classList.add(roleClass);
         }
         // pet tag
-        if (combatant.petOwnerName) {
+        if (combatant.data.Job == "Pet") {
             element.classList.add("pet");
         }
         // job icon
@@ -153,15 +152,15 @@ class WidgetCombatants extends WidgetBase
         var jobIconSrc = "/static/img/job/" + combatant.data.Job.toLowerCase() + ".png";
         if (jobIconSrc != jobIconElement.src) {
             jobIconElement.src = jobIconSrc;
-            jobIconElement.title = combatant.data.Job.toUpperCase() + " - " + combatant.name;
-            jobIconElement.alt = combatant.data.Job.toUpperCase() + " - " + combatant.name;
+            jobIconElement.title = combatant.data.Job.toUpperCase() + " - " + combatant.getDisplayName();
+            jobIconElement.alt = combatant.data.Job.toUpperCase() + " - " + combatant.getDisplayName();
         }
         // name
         var nameElement = element.getElementsByClassName("name")[0];
-        if (nameElement.innerText != combatant.name) {
-            nameElement.innerText = combatant.name;
-            element.setAttribute("data-name", combatant.name);
-            element.title = combatant.name;
+        if (nameElement.innerText != combatant.getDisplayName()) {
+            nameElement.innerText = combatant.getDisplayName();
+            element.setAttribute("data-name", combatant.getDisplayName());
+            element.title = combatant.getDisplayName();
         }
         // dps
         var dpsElement = element.getElementsByClassName("parse")[0];
@@ -180,17 +179,15 @@ class WidgetCombatants extends WidgetBase
         var t = this;
         // re-sort so all pets are at the bottom
         this.combatants.sort(function(a, b) {
-            if (a.petOwnerName != "" && b.petOwnerName == "") {
+            if (a.data.ParentID > 0 && b.data.ParentID == 0) {
                 return 1;
-            } else if (b.petOwnerName != "" && a.petOwnerName == "") {
-                return -1;
             }
             return 0;
         });
         this.combatants.sort(function(a, b) {
             // keep pet with their owner
-            if (b.petOwnerName) {
-                if (b.petOwnerName != a.name) {
+            if (b.data.ParentID) {
+                if (!a.compare(b.data.ParentID)) {
                     return 1;
                 }
                 return 0;
@@ -237,14 +234,13 @@ class WidgetCombatants extends WidgetBase
                     return bDps - aDps;
                 }
             }
-
-        })
+        });
         for (var i = 0; i < this.combatants.length; i++) {
-            this.combatantsElement.appendChild(this.combatants[i].element);
+            this.combatantsElement.appendChild(this.combatants[i]._parseElement);
         }
         // trigger custom event
         window.dispatchEvent(
-            new CustomEvent("combatants-display", {"detail" : this.combatants})
+            new CustomEvent("widget-combatants:display", {"detail" : this.combatants})
         );
     }
 
@@ -275,101 +271,33 @@ class WidgetCombatants extends WidgetBase
     {
         var combatant = event.detail;
         // must be part of same encounter
-        if (combatant.EncounterUID != this.encounterId) {
+        if (combatant.data.EncounterUID != this.encounterId) {
             return;
         }
-        // don't add combatants with no job and is not a pet
-        if (!combatant.Job.trim() && combatant.Name.indexOf("(") == -1) {
+        // must have a job
+        if (!combatant.data.Job) {
             return;
         }
-        // parse out name of pet owner
-        var petOwnerName = "";
-        if (combatant.Name.indexOf("(") != -1) {
-            petOwnerName = combatant.Name.split("(")[1].trim();
-            petOwnerName = petOwnerName.substr(0, petOwnerName.length - 1);
-            combatant.Job = "pet";
-        } else if (combatant.Name == "Demi-Bahamut") {
-            combatant.Job = "pet";
-            for (var i = 0; i < this.combatants.length; i++) {
-                if (this.combatants[i].data.Job == "Smn" && this.combatants[i].data.Name != "Demi-Bahamut") {
-                    petOwnerName = this.combatants[i].data.Name;
-                    break;
-                }
-            }
-        }
-
         // update existing
         for (var i = 0; i < this.combatants.length; i++) {
             if (
-                this.combatants[i].data.ID == combatant.ID || 
-                (this.combatants[i].petOwnerName == petOwnerName && this.combatants[i].data.Name == combatant.Name)
+                this.combatants[i].compare(combatant)
             ) {
-                if (this.combatants[i].ids.indexOf(combatant.ID) == -1) {
-                    this.combatants[i].ids.push(combatant.ID);
-                }
-                this.combatants[i].data = combatant;
-                this._updateCombatantElement(
-                    this.combatants[i]
-                );
+                this._updateCombatantElement(this.combatants[i]);
                 this._displayCombatants();
                 return;
             }
         }
         // new combatant
         var combatantElement = this._buildCombatantElement(combatant);
-        this.combatants.push({
-            "ids"           : [combatant.ID],
-            "data"          : combatant,
-            "element"       : combatantElement,
-            "petOwnerName"  : petOwnerName,
-            "name"          : "", // name to be set from log data (so sending player name gets set as well instead of "YOU")
-        });
+        combatant._parseElement = combatantElement;
+        this.combatants.push(combatant);
         // update combatant element
         this._updateCombatantElement(
             this.combatants[this.combatants.length - 1]
         );
         // display
         this._displayCombatants();
-    }
-
-    /**
-     * Retrieve character names from "act:logline" event as this
-     * will ensure we grab the sending player's actual name instead of "YOU".
-     * @param {Event} event 
-     */
-    _onLogLine(event)
-    {
-        // check if any combatants need names
-        var needName = false;
-        for (var i in this.combatants) {
-            if (!this.combatants[i].name) {
-                needName = true;
-                break;
-            }
-        }
-        if (!needName) {
-            return;
-        }
-        // parse log line data to fetch combatant name
-        var logLineData = parseLogLine(event.detail.LogLine);
-        switch (logLineData.type)
-        {
-            case MESSAGE_TYPE_SINGLE_TARGET:
-            case MESSAGE_TYPE_AOE:
-            {
-                for (var i in this.combatants) {
-                    if (this.combatants[i].name) {
-                        continue;
-                    }
-                    if (this.combatants[i].ids.indexOf(logLineData.sourceId) != -1) {
-                        this.combatants[i].name = logLineData.sourceName;
-                        this._updateCombatantElement(this.combatants[i]);
-                        this._displayCombatants();
-                    }
-                }
-                break;
-            }
-        }
     }
 
 }

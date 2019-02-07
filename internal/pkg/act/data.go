@@ -21,6 +21,7 @@ import (
 	"database/sql"
 	"io/ioutil"
 	"log"
+	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -35,7 +36,7 @@ import (
 )
 
 // lastUpdateInactiveTime - Time in ms between last data updata before data is considered inactive
-const lastUpdateInactiveTime = 300000
+const lastUpdateInactiveTime = 1800000 // 30 minutes
 
 // pastEncounterFetchLimit - Max number of past encounters to fetch in one request
 const PastEncounterFetchLimit = 10
@@ -87,7 +88,6 @@ func (d *Data) UpdateEncounter(encounter Encounter) {
 		d.Encounter = encounter
 		// save encounter if it is no longer active
 		if !d.Encounter.Active {
-			d.UpdateCombatantNames()
 			err := d.SaveEncounter()
 			if err != nil {
 				log.Println("Error while saving encounter", d.Encounter.UID, err)
@@ -97,7 +97,6 @@ func (d *Data) UpdateEncounter(encounter Encounter) {
 	}
 	// save + clear current encounter if one exists
 	if d.Encounter.ActID != 0 {
-		d.UpdateCombatantNames()
 		err := d.SaveEncounter()
 		if err != nil {
 			log.Println("Error while saving encounter", d.Encounter.UID, err)
@@ -124,12 +123,20 @@ func (d *Data) UpdateCombatant(combatant Combatant) {
 	// look for existing, update if found
 	for index, storedCombatant := range d.Combatants {
 		if storedCombatant.ID == combatant.ID {
+			// don't update name or parent id
+			combatant.Name = storedCombatant.Name
+			combatant.ParentID = storedCombatant.ParentID
+			if storedCombatant.ParentID > 0 {
+				combatant.Job = storedCombatant.Job
+			}
 			d.Combatants[index] = combatant
 			return
 		}
 	}
 	// add new
 	d.Combatants = append(d.Combatants, combatant)
+	// fix combatants
+	d.Combatants = SyncCombatants(d.Combatants)
 	log.Println("Add combatant", combatant.Name, "(", combatant.ID, ") to encounter", combatant.EncounterUID, "(TotalCombatants:", len(d.Combatants), ")")
 }
 
@@ -145,6 +152,8 @@ func (d *Data) UpdateLogLine(logLine LogLine) {
 	logLine.EncounterUID = d.Encounter.UID
 	// add to log line list
 	d.LogLines = append(d.LogLines, logLine)
+	// update names if needed
+	d.SyncNameFromLogLine(logLine)
 }
 
 // ClearLogLines - Clear log line buffer
@@ -379,15 +388,20 @@ func GetPreviousEncounter(user user.Data, encounterUID string) (Data, error) {
 		combatants = append(combatants, combatant)
 	}
 	rows.Close()
+	// fix combatants
+	combatants = SyncCombatants(combatants)
 	// fetch log lines file
 	logFilePath := filepath.Join(app.LogPath, encounterUID+"_LogLines.dat")
 	compressedLogBytes, err := ioutil.ReadFile(logFilePath)
-	if err != nil {
+	if err != nil && !os.IsNotExist(err) {
 		return Data{}, err
 	}
-	logLines, _, err := DecodeLogLineBytesFile(compressedLogBytes)
-	if err != nil {
-		return Data{}, err
+	var logLines []LogLine
+	if err == nil {
+		logLines, _, err = DecodeLogLineBytesFile(compressedLogBytes)
+		if err != nil {
+			return Data{}, err
+		}
 	}
 	// return data set
 	d := Data{
@@ -395,10 +409,6 @@ func GetPreviousEncounter(user user.Data, encounterUID string) (Data, error) {
 		Encounter:  encounter,
 		Combatants: combatants,
 		LogLines:   logLines,
-	}
-	// update combatant names by syncing with log lines
-	if d.UpdateCombatantNames() {
-		d.SaveEncounter()
 	}
 	return d, nil
 }
@@ -482,48 +492,58 @@ func (d *Data) IsActive() bool {
 	return int64(dur/time.Millisecond) < lastUpdateInactiveTime
 }
 
-// UpdateCombatantNames - Scan log lines to find correct combatant names
-func (d *Data) UpdateCombatantNames() bool {
+// SyncNameFromLogLine - Given a log line, try to fetch combatant name and update with it
+func (d *Data) SyncNameFromLogLine(logLine LogLine) (bool, error) {
+	logSplit := strings.Split(logLine.LogLine[15:], ":")
+	// needs to be specific type of log line
+	if logSplit[0] != "15" {
+		return false, nil
+	}
+	// parse id
+	actorId, err := strconv.ParseInt(logSplit[1], 16, 32)
+	if err != nil {
+		return false, err
+	}
+	// itterate combatants, update as needed
 	hasUpdate := false
 	for index, combatant := range d.Combatants {
+		// ignore pets/non job combatants
 		if len(combatant.Job) == 0 || strings.Contains(combatant.Name, " (") {
 			continue
 		}
-		for _, logLine := range d.LogLines {
-			logSplit := strings.Split(logLine.LogLine[15:], ":")
-			if logSplit[0] != "15" {
-				continue
-			}
-			actorId, err := strconv.ParseInt(logSplit[1], 16, 32)
-			if err != nil {
-				continue
-			}
-			if int32(actorId) == combatant.ID {
-				if combatant.Name != logSplit[2] {
-					d.Combatants[index].Name = logSplit[2]
-					hasUpdate = true
-				}
-				break
-			}
-		}
-	}
-	// fix pets
-	for index, combatant := range d.Combatants {
-		if combatant.ParentID != 0 || (combatant.Job != "" && !strings.Contains(combatant.Name, " (")) {
-			continue
-		}
-		nameSplit := strings.Split(combatant.Name, " (")
-		if len(nameSplit) < 2 {
-			continue
-		}
-		ownerName := nameSplit[1][:len(nameSplit[1])-1]
-		for _, ownerCombatant := range d.Combatants {
-			if ownerName == ownerCombatant.Name {
+		if int32(actorId) == combatant.ID {
+			if combatant.Name != logSplit[2] {
+				d.Combatants[index].Name = logSplit[2]
 				hasUpdate = true
-				d.Combatants[index].ParentID = ownerCombatant.ID
-				break
 			}
 		}
 	}
-	return hasUpdate
+	return hasUpdate, nil
+}
+
+// SyncCombatants - Perform fixes to combatant data (pet fix, etc)
+func SyncCombatants(combatants []Combatant) []Combatant {
+	for index, combatant := range combatants {
+		// is pet, fix
+		if strings.Contains(combatant.Name, " (") {
+			nameSplit := strings.Split(combatant.Name, " (")
+			ownerName := nameSplit[1][:len(nameSplit[1])-1]
+			hasParent := false
+			for _, ownerCombatant := range combatants {
+				if ownerName == ownerCombatant.Name {
+					hasParent = true
+					combatants[index].Name = nameSplit[0]
+					combatants[index].ParentID = ownerCombatant.ID
+					combatants[index].Job = "Pet"
+					break
+				}
+			}
+			// cannot find an owner, not valid, delete
+			if !hasParent {
+				combatants = append(combatants[:index], combatants[index+1:]...)
+				return SyncCombatants(combatants)
+			}
+		}
+	}
+	return combatants
 }
