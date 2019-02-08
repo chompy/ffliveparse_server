@@ -106,10 +106,11 @@ func DecodeCombatantBytes(data []byte) (Combatant, int, error) {
 		return Combatant{}, 0, errors.New("invalid data type for Combatant")
 	}
 	pos := 1
-	return Combatant{
+	c := Combatant{
 		ActEncounterID: readUint32(data, &pos),
 		ID:             readInt32(data, &pos),
 		Name:           readString(data, &pos),
+		ActName:        "",
 		Job:            readString(data, &pos),
 		Damage:         readInt32(data, &pos),
 		DamageTaken:    readInt32(data, &pos),
@@ -118,7 +119,9 @@ func DecodeCombatantBytes(data []byte) (Combatant, int, error) {
 		Hits:           readInt32(data, &pos),
 		Heals:          readInt32(data, &pos),
 		Kills:          readInt32(data, &pos),
-	}, pos, nil
+	}
+	c.ActName = c.Name
+	return c, pos, nil
 }
 
 // DecodeLogLineBytes - Create LogLine struct from incomming data packet

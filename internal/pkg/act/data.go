@@ -205,6 +205,7 @@ func initDatabase(database *sql.DB) error {
 			user_id INTEGER,
 			encounter_uid VARCHAR(32),
 			name VARCHAR(256),
+			act_name VARCHAR(256),
 			job VARCHAR(3),
 			damage INTEGER,
 			damage_taken INTEGER,
@@ -265,8 +266,8 @@ func (d *Data) SaveEncounter() error {
 	for _, combatant := range d.Combatants {
 		stmt, err := database.Prepare(`
 			REPLACE INTO combatant
-			(id, parent_id, encounter_uid, user_id, name, job, damage, damage_taken, damage_healed, deaths, hits, heals, kills) VALUES
-			(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			(id, parent_id, encounter_uid, user_id, name, act_name, job, damage, damage_taken, damage_healed, deaths, hits, heals, kills) VALUES
+			(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		`)
 		if err != nil {
 			return err
@@ -277,6 +278,7 @@ func (d *Data) SaveEncounter() error {
 			combatant.EncounterUID,
 			d.User.ID,
 			combatant.Name,
+			combatant.ActName,
 			combatant.Job,
 			combatant.Damage,
 			combatant.DamageTaken,
@@ -319,7 +321,7 @@ func (d *Data) ClearEncounter() {
 }
 
 // GetPreviousEncounter - retrieve previous encounter data from database
-func GetPreviousEncounter(user user.Data, encounterUID string) (Data, error) {
+func GetPreviousEncounter(user user.Data, encounterUID string, fetchLogs bool) (Data, error) {
 	// get database
 	database, err := getDatabase(user)
 	if err != nil {
@@ -391,16 +393,18 @@ func GetPreviousEncounter(user user.Data, encounterUID string) (Data, error) {
 	// fix combatants
 	combatants = SyncCombatants(combatants)
 	// fetch log lines file
-	logFilePath := filepath.Join(app.LogPath, encounterUID+"_LogLines.dat")
-	compressedLogBytes, err := ioutil.ReadFile(logFilePath)
-	if err != nil && !os.IsNotExist(err) {
-		return Data{}, err
-	}
 	var logLines []LogLine
-	if err == nil {
-		logLines, _, err = DecodeLogLineBytesFile(compressedLogBytes)
-		if err != nil {
+	if fetchLogs {
+		logFilePath := filepath.Join(app.LogPath, encounterUID+"_LogLines.dat")
+		compressedLogBytes, err := ioutil.ReadFile(logFilePath)
+		if err != nil && !os.IsNotExist(err) {
 			return Data{}, err
+		}
+		if err == nil {
+			logLines, _, err = DecodeLogLineBytesFile(compressedLogBytes)
+			if err != nil {
+				return Data{}, err
+			}
 		}
 	}
 	// return data set
@@ -447,7 +451,7 @@ func GetPreviousEncounters(user user.Data, offset int) ([]Data, error) {
 	// get full encounter data with each uid
 	encounters := make([]Data, 0)
 	for _, encounterUID := range uidList {
-		prevEncounter, err := GetPreviousEncounter(user, encounterUID)
+		prevEncounter, err := GetPreviousEncounter(user, encounterUID, false)
 		if err != nil {
 			return nil, err
 		}
@@ -524,45 +528,62 @@ func (d *Data) SyncNameFromLogLine(logLine LogLine) (bool, error) {
 // SyncCombatants - Perform fixes to combatant data (pet fix, etc)
 func SyncCombatants(combatants []Combatant) []Combatant {
 	for index, combatant := range combatants {
-		if strings.Contains(combatant.Name, " (") {
-			// is pet, fix
-			nameSplit := strings.Split(combatant.Name, " (")
-			ownerName := nameSplit[1][:len(nameSplit[1])-1]
-			hasParent := false
-			for _, ownerCombatant := range combatants {
-				if ownerName == ownerCombatant.Name {
-					hasParent = true
-					combatants[index].Name = nameSplit[0]
-					combatants[index].ParentID = ownerCombatant.ID
-					combatants[index].Job = "Pet"
-					break
+		// > 1000000000 ID seems to be player summoned entities
+		if combatant.ID >= 1000000000 && combatant.ParentID == 0 {
+			if strings.Contains(combatant.Name, " (") {
+				// is pet, fix
+				nameSplit := strings.Split(combatant.Name, " (")
+				ownerName := nameSplit[1][:len(nameSplit[1])-1]
+				hasParent := false
+				for _, ownerCombatant := range combatants {
+					if ownerCombatant.ID < 1000000000 && ownerName == ownerCombatant.Name {
+						hasParent = true
+						combatants[index].Name = nameSplit[0]
+						combatants[index].ParentID = ownerCombatant.ID
+						combatants[index].Job = "Pet"
+						break
+					}
 				}
-			}
-			// cannot find an owner, not valid, delete
-			if !hasParent {
-				combatants = append(combatants[:index], combatants[index+1:]...)
-				return SyncCombatants(combatants)
-			}
+				// cannot find an owner, not valid, delete
+				if !hasParent {
+					combatants = append(combatants[:index], combatants[index+1:]...)
+					return SyncCombatants(combatants)
+				}
 
-		} else if combatant.Name == "Demi-Bahamut" && combatant.Job == "Smn" {
-			// demi-bahamut, pair with smn as pet
-			// don't know smn that used it, pair it with first available smn
-			// this will show all demi-bahamuts with a single smn, oh well...
-			combatants[index].Job = "Pet"
-			hasSmn := false
-			for _, ownerCombatant := range combatants {
-				if ownerCombatant.Name != "Demi-Bahamut" && ownerCombatant.Job == "Smn" {
-					hasSmn = true
-					combatants[index].ParentID = ownerCombatant.ID
+			} else if combatant.Name == "Demi-Bahamut" && combatant.Job == "Smn" {
+				// demi-bahamut, pair with smn as pet
+				// don't know smn that used it, pair it with first available smn
+				// this will show all demi-bahamuts with a single smn, oh well...
+				combatants[index].Job = "Pet"
+				hasSmn := false
+				for _, ownerCombatant := range combatants {
+					if ownerCombatant.ID < 1000000000 && ownerCombatant.Name != "Demi-Bahamut" && ownerCombatant.Job == "Smn" {
+						hasSmn = true
+						combatants[index].ParentID = ownerCombatant.ID
+					}
 				}
-			}
-			// no smn to pair with, delete
-			if !hasSmn {
-				combatants = append(combatants[:index], combatants[index+1:]...)
-				return SyncCombatants(combatants)
+				// no smn to pair with, delete
+				if !hasSmn {
+					combatants = append(combatants[:index], combatants[index+1:]...)
+					return SyncCombatants(combatants)
+				}
+			} else {
+				// mark parent id for combatants that share the same name as parent
+				for _, ownerCombatant := range combatants {
+					if ownerCombatant.ID < 1000000000 && ((ownerCombatant.ActName != "" && ownerCombatant.ActName == combatant.Name) || ownerCombatant.Name == combatant.Name) {
+						combatants[index].ActName = combatant.Name
+						combatants[index].Name = "(Object)"
+						combatants[index].ParentID = ownerCombatant.ID
+						combatants[index].Job = "Pet"
+						// ast summons earthly star as seperate entity
+						if ownerCombatant.Job == "Ast" {
+							combatants[index].Name = "Earthly Star"
+						}
+						break
+					}
+				}
 			}
 		}
-
 	}
 	return combatants
 }

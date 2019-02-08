@@ -152,7 +152,7 @@ func HTTPStartServer(port uint16, userManager *user.Manager, actManager *act.Man
 		// relay previous encounter data if encounter id was provided
 		if encounterUID != "" && (actData == nil || encounterUID != actData.Encounter.UID) {
 			log.Println("Load previous encounter data (EncounterUID:", encounterUID, ", UserID:", userData.ID, ")")
-			previousEncounter, err := act.GetPreviousEncounter(userData, encounterUID)
+			previousEncounter, err := act.GetPreviousEncounter(userData, encounterUID, true)
 			if err != nil {
 				log.Println("Error when retreiving previous encounter", encounterUID, "for user", userData.ID, ",", err)
 				return
@@ -224,15 +224,20 @@ func HTTPStartServer(port uint16, userManager *user.Manager, actManager *act.Man
 		htmlTemplates["stats.tmpl"].ExecuteTemplate(w, "base.tmpl", td)
 	})
 	// display past encounters
-	http.HandleFunc("/encounters", func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc("/history/", func(w http.ResponseWriter, r *http.Request) {
 		// inc page load count
 		pageLoads += 1
 		// set resposne headers
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		// build template data
 		td := getBaseTemplateData()
-		// get user web uid
-		webUid := r.URL.Query().Get("uid")
+		// split url path in to parts
+		urlPathParts := strings.Split(strings.TrimLeft(r.URL.Path, "/"), "/")
+		// get web id from url path
+		webUid := ""
+		if len(urlPathParts) > 1 {
+			webUid = urlPathParts[1]
+		}
 		if webUid == "" {
 			displayError(
 				w,

@@ -44,6 +44,7 @@ type Combatant struct {
 	ID             int32
 	ParentID       int32
 	Name           string
+	ActName        string
 	Job            string
 	Damage         int32
 	DamageTaken    int32

@@ -11,6 +11,7 @@ services:
         restart: always
         volumes:
             - "ffliveparse-data:/app/data/database"
+            - "ffliveparse-logging:/app/data/logging"
             - "/mnt/ffliveparse_logs:/app/data/logs"
 
     ffliveparse-nginx:
@@ -31,3 +32,5 @@ volumes:
     "ffliveparse-data": 
         external:
             name: "ffliveparse-data"
+    
+    "ffliveparse-logging":

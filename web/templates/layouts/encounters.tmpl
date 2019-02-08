@@ -2,13 +2,11 @@
 
 {{ define "headerLeft" }}
 <div id="logo"><a href="/">{{.AppName}}</a></div>
-<div id="webId">Encounters</div>
+<div id="webId"><a href="/{{ .WebIDString }}">{{ .WebIDString }}</a></div>
+<div id="zone-info"><span>History</span></div>
 {{ end }}
 
 {{ define "headerRight" }}
-<div id="appHeaderRight">
-    <a href="/{{ .WebIDString }}">Parse</a>
-</div>
 {{ end }}
 
 {{ define "content" }}
@@ -37,11 +35,11 @@
 
         <div class="encounterPagination textCenter">
             {{ if lt 1 .EncounterCurrentPage }}
-            <a href="/encounters?uid={{ .WebIDString }}&offset={{ .EncounterPrevPageOffset }}">&laquo; Previous</a>
+            <a href="/history/{{ .WebIDString }}?offset={{ .EncounterPrevPageOffset }}">&laquo; Previous</a>
             {{ end }}
             {{ .EncounterCurrentPage }} / {{ .EncounterTotalPage }}
             {{ if gt .EncounterTotalPage .EncounterCurrentPage }}
-            <a href="/encounters?uid={{ .WebIDString }}&offset={{ .EncounterNextPageOffset }}">Next &raquo;</a>
+            <a href="/history/{{ .WebIDString }}?offset={{ .EncounterNextPageOffset }}">Next &raquo;</a>
             {{ end }}            
         </div>
 

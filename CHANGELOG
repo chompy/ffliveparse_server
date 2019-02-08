@@ -1,3 +1,7 @@
+1.10
+- Fixed issue with AST Earthly Star and SMN Demi-Bahamut.
+- Past encounter list no longer fetches log data for each encounter, should be faster.
+
 1.09
 - Server now links pets to their masters and resolves names of combatants (YOU > Player Name, etc).
 - Increased inactivity timeline to 30 minutes.
