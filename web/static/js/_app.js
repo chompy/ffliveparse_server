@@ -135,7 +135,7 @@ class Application
             // update combatant list
             var combatant = null;
             for (var i in t.combatants) {
-                if (t.combatants[i].compare(e.detail.ID)) {
+                if (t.combatants[i].compare(e.detail)) {
                     t.combatants[i].update(e.detail);
                     combatant = t.combatants[i]
                     break;

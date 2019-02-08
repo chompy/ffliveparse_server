@@ -524,8 +524,8 @@ func (d *Data) SyncNameFromLogLine(logLine LogLine) (bool, error) {
 // SyncCombatants - Perform fixes to combatant data (pet fix, etc)
 func SyncCombatants(combatants []Combatant) []Combatant {
 	for index, combatant := range combatants {
-		// is pet, fix
 		if strings.Contains(combatant.Name, " (") {
+			// is pet, fix
 			nameSplit := strings.Split(combatant.Name, " (")
 			ownerName := nameSplit[1][:len(nameSplit[1])-1]
 			hasParent := false
@@ -543,7 +543,26 @@ func SyncCombatants(combatants []Combatant) []Combatant {
 				combatants = append(combatants[:index], combatants[index+1:]...)
 				return SyncCombatants(combatants)
 			}
+
+		} else if combatant.Name == "Demi-Bahamut" && combatant.Job == "Smn" {
+			// demi-bahamut, pair with smn as pet
+			// don't know smn that used it, pair it with first available smn
+			// this will show all demi-bahamuts with a single smn, oh well...
+			combatants[index].Job = "Pet"
+			hasSmn := false
+			for _, ownerCombatant := range combatants {
+				if ownerCombatant.Name != "Demi-Bahamut" && ownerCombatant.Job == "Smn" {
+					hasSmn = true
+					combatants[index].ParentID = ownerCombatant.ID
+				}
+			}
+			// no smn to pair with, delete
+			if !hasSmn {
+				combatants = append(combatants[:index], combatants[index+1:]...)
+				return SyncCombatants(combatants)
+			}
 		}
+
 	}
 	return combatants
 }
