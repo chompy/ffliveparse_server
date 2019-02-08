@@ -498,6 +498,9 @@ func (d *Data) IsActive() bool {
 
 // SyncNameFromLogLine - Given a log line, try to fetch combatant name and update with it
 func (d *Data) SyncNameFromLogLine(logLine LogLine) (bool, error) {
+	if (len(logLine.LogLine) <= 15) {
+		return false, nil
+	}
 	logSplit := strings.Split(logLine.LogLine[15:], ":")
 	// needs to be specific type of log line
 	if logSplit[0] != "15" {
