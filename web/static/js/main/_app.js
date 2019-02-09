@@ -32,6 +32,8 @@ class Application
         this.widgets = {};
         // connection flag
         this.connected = false;
+        // worker
+        this.worker = null;
         // user config
         this.userConfig = {};
         // list of combatants
@@ -76,53 +78,69 @@ class Application
     }
 
     /**
-     * Connect to websocket server.
+     * Start the app.
      */
-    connect()
+    start()
     {
         var socketUrl = (window.location.protocol == "https:" ? "wss" : "ws") + "://" + window.location.host + "/ws/" + this.webId;
         if (this.encounterUid) {
             socketUrl += "/" + this.encounterUid;
         }
-        var socket = new WebSocket(socketUrl);
         var t = this;
-        // socket open event
-        socket.onopen = function(event) {
-            document.getElementById("loadingMessage").innerText = "Waiting for encounter data...";
-            console.log(">> Connected to server.");
-            t.connected = true;
-            t.initUserConfig();
-            t.initWidgets();
-            fetchActionData();            
-            fetchStatusData();
-        };
-        // socket message event
-        socket.onmessage = function(event) {
-            if (socket.readyState !== 1) {
-                return;
-            }
-            var fileReader = new FileReader();
-            fileReader.onload = function(event) {
-                var buffer = new Uint8Array(event.target.result);
-                try {
-                    parseMessage(buffer);
-                } catch (e) {
-                    console.log(">> Error parsing message,", buf2hex(buffer));
-                    throw e
+        // create worker
+        var worker = new Worker("/worker.min.js")
+        worker.postMessage({
+            url: socketUrl,
+            encounterUid: this.encounterUid
+        });
+        worker.onmessage = function(e) {
+
+            switch (e.data.type)
+            {
+                case "status_in_progress":
+                {
+                    // update status message
+                    document.getElementById("loadingMessage").classList.remove("hide");
+                    document.getElementById("loadingMessage").innerText = e.data.message;
+                    // handle initial connection
+                    if (!t.connected) {
+                        t.connected = true;
+                        t.initUserConfig();
+                        t.initWidgets();
+                        fetchActionData();            
+                        fetchStatusData();                        
+                    }
+                    break;
                 }
-            };
-            fileReader.readAsArrayBuffer(event.data);
+                case "status_ready":
+                {
+                    document.getElementById("loadingMessage").classList.add("hide");
+                    break;
+                }
+                case "error":
+                {
+                    document.getElementById("errorOverlay").classList.remove("hide");
+                    break;
+                }
+                case "act:encounter": 
+                case "act:combatant": 
+                case "act:logLine":
+                case "act:combatAction":
+                {
+                    var event = new CustomEvent(
+                        e.data.type,
+                        {
+                            detail: e.data.data
+                        }
+                    );
+                    window.dispatchEvent(event);
+                    break;
+                }
+            }
+
         };
-        socket.onclose = function(event) {
-            document.getElementById("errorOverlay").classList.remove("hide");
-            console.log(">> Connection closed,", event);
-        };
-        socket.onerror = function(event) {
-            document.getElementById("errorOverlay").classList.remove("hide");
-            console.log(">> An error has occured,", event);
-        };
+        
         // log incoming data
-        var t = this;
         var lastEncounterUid = null;
         window.addEventListener("act:encounter", function(e) {
             if (e.detail.ID != lastEncounterUid) {

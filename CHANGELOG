@@ -1,3 +1,7 @@
+1.11
+- Fixed an issue that caused the server to crash when parsing certain log lines.
+- Improved performance when loading encounters by using a web worker.
+
 1.10
 - Fixed issue with AST Earthly Star and SMN Demi-Bahamut.
 - Past encounter list no longer fetches log data for each encounter, should be faster.

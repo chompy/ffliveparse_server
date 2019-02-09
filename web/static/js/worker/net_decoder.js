@@ -79,13 +79,14 @@ function decodeEncounterBytes(data)
     output["StartTime"]     = new Date(output["StartTime"]);
     output["EndTime"]       = new Date(output["EndTime"]);
 
-    if (!ENCOUNTER_UID || output["UID"] == ENCOUNTER_UID) {
+    if (!encounterUid || output["UID"] == encounterUid) {
         if (output.Zone) {
             hasEncounter = true;
         }
-        window.dispatchEvent(
-            new CustomEvent("act:encounter", {"detail" : output})
-        );
+        postMessage({
+            "type"      : "act:encounter",
+            "data"      : output
+        });
     }
     return pos;
 }
@@ -111,10 +112,11 @@ function decodeCombatantBytes(data)
     output["Hits"]          = readInt32(data, pos); pos += SIZE_INT32;
     output["Heals"]         = readInt32(data, pos); pos += SIZE_INT32;
     output["Kills" ]        = readInt32(data, pos); pos += SIZE_INT32;
-    if (!ENCOUNTER_UID || output["EncounterUID"] == ENCOUNTER_UID) {
-        window.dispatchEvent(
-            new CustomEvent("act:combatant", {"detail" : output})
-        );
+    if (!encounterUid || output["EncounterUID"] == encounterUid) {
+        postMessage({
+            "type"      : "act:combatant",
+            "data"      : output
+        });
     }
     return pos;
 }
@@ -138,10 +140,11 @@ function decodeCombatActionBytes(data)
     output["SkillType"]     = readString(data, pos); pos += readUint16(data, pos) + SIZE_INT16;
     output["SwingType"]     = readByte(data, pos); pos += SIZE_BYTE;
     output["Critical"]      = readByte(data, pos) != 0; pos += SIZE_BYTE;
-    if (!ENCOUNTER_UID || output["EncounterUID"] == ENCOUNTER_UID) {
-        window.dispatchEvent(
-            new CustomEvent("act:combatAction", {"detail" : output})
-        );
+    if (!encounterUid || output["EncounterUID"] == encounterUid) {
+        postMessage({
+            "type"      : "act:combatAction",
+            "data"      : output
+        });
     }
     return pos;
 }
@@ -160,10 +163,11 @@ function decodeLogLineBytes(data)
     output["LogLine"]       = readString(data, pos); pos += readUint16(data, pos) + SIZE_INT16;
 
     output["Time"]          = new Date(output["Time"]);
-    if (!ENCOUNTER_UID || output["EncounterUID"] == ENCOUNTER_UID) {
-        window.dispatchEvent(
-            new CustomEvent("act:logLine", {"detail" : output})
-        );
+    if (!encounterUid || output["EncounterUID"] == encounterUid) {
+        postMessage({
+            "type"      : "act:logLine",
+            "data"      : output
+        });
     }
     return pos;
 }
@@ -179,9 +183,10 @@ function decodeFlagBytes(data)
     };
     output["Name"]          = readString(data, pos); pos += readUint16(data, pos) + SIZE_INT16;
     output["Value"]         = readByte(data, pos) != 0; pos += SIZE_BYTE;
-    window.dispatchEvent(
-        new CustomEvent("onFlag", {"detail" : output})
-    );
+    postMessage({
+        "type"      : "flag",
+        "data"      : output
+    });
     return pos;
 }
 
@@ -215,17 +220,19 @@ function parseNextMessage(buffer, pos, count)
     delete data;
     if (length <= 0) {
         if (hasEncounter) {
-            document.getElementById("loadingMessage").classList.add("hide");
+            postMessage({
+                "type"      : "status_ready"
+            });
         }
         return;
     }
     pos += length;
-    // every ~200 update loading message and setTimeout to prevent lockout of browser
-    if (count >= 200) {
-        if (hasEncounter) {
-            document.getElementById("loadingMessage").innerText = "Loading (" + ((pos / buffer.byteLength) * 100).toFixed(1) + "%)";
-        }
-        console.log(">> Read message batch. (" + pos + "/" + buffer.byteLength + " bytes) (" + ((pos / buffer.byteLength) * 100).toFixed(1) + "%).");
+    // every ~200 send status update and use setTimeout to prevent recursion error
+    if (count > 200) {
+        postMessage({
+            "type"      : "status_in_progress",
+            "message"   : "Loading (" + ((pos / buffer.byteLength) * 100).toFixed(1) + "%)"
+        });
         setTimeout(function() { parseNextMessage(buffer, pos, 0); }, 1);
         return;
     }
@@ -235,10 +242,6 @@ function parseNextMessage(buffer, pos, count)
 function parseMessage(data)
 {
     totalBytesRecieved += data.length;
-    // show load screen when parsing large chunks of data
-    if (data.length > 102400) {
-        document.getElementById("loadingMessage").classList.remove("hide");
-    }
     // decompress
     data = pako.inflate(data)
     if (data.length > 0) {

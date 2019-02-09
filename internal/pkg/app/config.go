@@ -20,7 +20,7 @@ package app
 import "fmt"
 
 // VersionNumber - version number
-const VersionNumber int32 = 110
+const VersionNumber int32 = 111
 
 // ActPluginMinVersionNumber - act plugin min version
 const ActPluginMinVersionNumber int32 = 5

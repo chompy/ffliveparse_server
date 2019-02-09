@@ -101,7 +101,18 @@ func HTTPStartServer(port uint16, userManager *user.Manager, actManager *act.Man
 				log.Panicln("Error occured while compiling javascript,", err)
 			}
 		}
-		fmt.Fprint(w, compiledJs)
+		fmt.Fprint(w, compiledJs["app.js"])
+	})
+	http.HandleFunc("/worker.min.js", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/javascript;charset=utf-8")
+		// in dev mode recompile js every request
+		if devMode {
+			compiledJs, err = compileJavascript()
+			if err != nil {
+				log.Panicln("Error occured while compiling javascript,", err)
+			}
+		}
+		fmt.Fprint(w, compiledJs["worker.js"])
 	})
 	// compile/minify css, serve compiled css
 	compiledCSS, err := compileCSS()
@@ -377,32 +388,39 @@ func getTemplates() (map[string]*template.Template, error) {
 }
 
 // compileJavascript - Compile all javascript in to single string that can be served from memory
-func compileJavascript() (string, error) {
+func compileJavascript() (map[string]string, error) {
 	log.Println("Compiling and minifying javascript...")
-	files, err := ioutil.ReadDir("./web/static/js")
-	if err != nil {
-		return "", err
-	}
-	compiledJs := ""
-	for _, file := range files {
-		filename := file.Name()
-		if !strings.HasSuffix(filename, ".js") {
-			continue
-		}
-		js, err := ioutil.ReadFile("./web/static/js/" + filename)
+	jsDirs := make(map[string]string)
+	jsDirs["app.js"] = "./web/static/js/main"
+	jsDirs["worker.js"] = "./web/static/js/worker"
+	output := make(map[string]string)
+	for jsFile, jsDir := range jsDirs {
+		files, err := ioutil.ReadDir(jsDir)
 		if err != nil {
-			return "", err
+			return output, err
 		}
-		compiledJs += string(js)
-	}
-	m := minify.New()
-	m.AddFunc("text/javascript", js.Minify)
-	compiledJs, err = m.String("text/javascript", compiledJs)
-	if err != nil {
-		return "", err
+		compiledJs := ""
+		for _, file := range files {
+			filename := file.Name()
+			if !strings.HasSuffix(filename, ".js") {
+				continue
+			}
+			js, err := ioutil.ReadFile(jsDir + "/" + filename)
+			if err != nil {
+				return output, err
+			}
+			compiledJs += string(js)
+		}
+		m := minify.New()
+		m.AddFunc("text/javascript", js.Minify)
+		compiledJs, err = m.String("text/javascript", compiledJs)
+		if err != nil {
+			return output, err
+		}
+		output[jsFile] = compiledJs
 	}
 	log.Println("...Done.")
-	return compiledJs, nil
+	return output, nil
 }
 
 // compileCSS - Compile all CSS in to single string that can be served from memory
