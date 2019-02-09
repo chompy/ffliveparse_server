@@ -1,0 +1,38 @@
+#encounter {
+    border-bottom: 1px solid #fff;
+    background: #2d2d2d;
+    padding: 4px 12px;
+    font-size: 12px;    
+    height: 21px;
+    line-height: 21px;
+}
+
+#encounter #encounter-time::before, #encounter #encounter-status::before {
+    display: inline-block;
+    content: "|";
+    margin-left: 1px;
+    margin-right: 5px;
+}
+
+#encounter #encounter-length {
+    font-size: 14px;
+    float: right;
+    color: #ff7979;
+    font-size: 18px;
+    font-weight: bold;
+}
+
+#encounter #encounter-length.active {
+    color: #00ff38;
+}
+
+#encounter #encounter-status {
+    font-weight: bold;
+    text-transform: uppercase;
+}
+
+@media (max-width: 512px) {
+    #encounter #encounter-time {
+        display: none;
+    }
+}

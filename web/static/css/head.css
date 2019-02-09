@@ -38,3 +38,14 @@
     content: "|";
     display: inline-block;
 }
+
+@media (max-width: 940px) {
+    #head #encounterId {
+        display: none;
+    }
+}
+@media (max-width: 600px) {
+    #head #zone-info #encounter-name {
+        display: none;
+    }
+}

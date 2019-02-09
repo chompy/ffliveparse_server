@@ -6,11 +6,6 @@
 {{ define "headerLeft" }}
 <div id="logo"><a href="/">{{.AppName}}</a></div>
 <div id="webId"><a href="/{{ .WebIDString }}">{{ .WebIDString }}</a></div>
-{{ if .EncounterUID }}<div id="encounterId">Encounter {{ .EncounterUID }}</div>{{ end }}
-<div id="zone-info">
-    <span class="name" id="encounter-name">(Unknown Zone)</span>
-    <span class="time" id="encounter-time">00:00</span>
-</div>
 {{ end }}
 
 {{ define "headerRight" }}
@@ -52,6 +47,12 @@
     </div>
 </div>
 <div id="loadingMessage">Loading...</div>
+<div id="encounter">
+    <span id="encounter-name"></span>
+    <span id="encounter-time" class="hide"></span>
+    <span id="encounter-status" class="hide"></span>
+    <span id="encounter-length"></span>
+</div>
 <div id="combatants">
     <div class="combatant combatant-info combatant-npc">
         <div class="info-text">

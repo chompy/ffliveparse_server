@@ -632,6 +632,12 @@ class WidgetTimelime extends WidgetBase
         if (!combatant) {
             return;
         }
+        // add flags as css classes
+        if (actionFlags) {
+            for (var i in timelineAction.logData[0].flags) {
+                element.classList.add("flag-" + timelineAction.logData[0].flags[i]);
+            }
+        }
         // get icon
         var iconUrl = "/static/img/attack.png"; // default
         if (typeof(combatant.isNpc) != "undefined" && combatant.isNpc) {
@@ -896,7 +902,10 @@ class WidgetTimelime extends WidgetBase
         var hasOtherActions = false;
         for (var i in this.actionTimeline) {
             if (
-                !combatant.compare(this.actionTimeline[i].logData[0].sourceId) ||
+                (
+                    !combatant.compare(this.actionTimeline[i].logData[0].sourceId) &&
+                    !combatant.compare(this.actionTimeline[i].logData[0].sourceName)
+                ) ||
                 Math.abs(timestamp - this.actionTimeline[i].time.getTime()) > 5000
             ) {
                 continue;
@@ -916,9 +925,12 @@ class WidgetTimelime extends WidgetBase
             var oaTimeElement = document.createElement("span");
             oaTimeElement.classList.add("action-time");
             otherActionElement.appendChild(oaTimeElement);
+            var oaIconContainerElement = document.createElement("div");
+            oaIconContainerElement.classList.add("action-icon-container");
             var oaIconElement = document.createElement("img");
             oaIconElement.classList.add("action-icon");
-            otherActionElement.appendChild(oaIconElement);
+            oaIconContainerElement.appendChild(oaIconElement);
+            otherActionElement.appendChild(oaIconContainerElement);
             var oaNameElement = document.createElement("span");
             oaNameElement.classList.add("action-name");
             otherActionElement.appendChild(oaNameElement);

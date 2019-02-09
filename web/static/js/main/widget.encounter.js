@@ -16,7 +16,9 @@ along with FFLiveParse.  If not, see <https://www.gnu.org/licenses/>.
 */
 
 var ENCOUNTER_TIME_ID = "encounter-time";
+var ENCOUNTER_LENGTH_ID = "encounter-length";
 var ENCOUNTER_NAME_ID = "encounter-name";
+var ENCOUNTER_STATUS_ID ="encounter-status";
 
 /**
  * Encounter data widget
@@ -33,7 +35,9 @@ class WidgetEncounter extends WidgetBase
         this.combatants = [];
         this.tickTimeout = null;
         this.encounterTimeElement = document.getElementById(ENCOUNTER_TIME_ID);
+        this.encounterLengthElement = document.getElementById(ENCOUNTER_LENGTH_ID);
         this.encounterNameElement = document.getElementById(ENCOUNTER_NAME_ID);
+        this.encounterStatusElement = document.getElementById(ENCOUNTER_STATUS_ID);
     }
 
     getName()
@@ -63,8 +67,10 @@ class WidgetEncounter extends WidgetBase
     reset()
     {
         this.combatants = [];
-        this.encounterTimeElement.innerText = "00:00";
-        this.encounterNameElement.innerText = "(Unknown Zone)";
+        this.encounterLengthElement.innerText = "00:00";
+        this.encounterNameElement.innerText = "-";
+        this.encounterStatusElement.innerText = "";
+        this.encounterTimeElement.innerText = "";
     }
 
     /**
@@ -98,7 +104,7 @@ class WidgetEncounter extends WidgetBase
         var seconds = Math.floor(duration / 1000 % 60);
         if (seconds < 0) { seconds = 0; }
         var padSeconds = seconds < 10 ? "0" : "";
-        this.encounterTimeElement.innerText = padMinutes + minutes + ":" + padSeconds + seconds;
+        this.encounterLengthElement.innerText = padMinutes + minutes + ":" + padSeconds + seconds;
     }
 
     /**
@@ -114,6 +120,13 @@ class WidgetEncounter extends WidgetBase
         }
         // update zone
         this.encounterNameElement.innerText = event.detail.Zone;
+        // update start time
+        if (event.detail.StartTime) {
+            this.encounterLengthElement.classList.remove("hide");
+            this.encounterTimeElement.classList.remove("hide");
+            this.encounterTimeElement.innerText = event.detail.StartTime.toLocaleString();
+        }
+
         // calculate encounter dps
         /*var encounterDps = event.detail.Damage / ((event.detail.EndTime.getTime() - event.detail.StartTime.getTime()) / 1000);
         if (!this._isValidParseNumber(encounterDps)) {
@@ -123,14 +136,40 @@ class WidgetEncounter extends WidgetBase
         // inactive
         if (!event.detail.Active) {
             this.startTime = null;
-            this.encounterTimeElement.classList.remove("active");
+            this.encounterLengthElement.classList.remove("active");
             var lastDuration = event.detail.EndTime.getTime() - event.detail.StartTime.getTime();
             this.setTimer(lastDuration);
+
+            this.encounterStatusElement.classList.remove("hide");
+
+            switch (event.detail.SuccessLevel) {
+                case 2:
+                case 3:
+                {
+                    this.encounterStatusElement.innerText = "Wipe";
+                    break;
+                }
+                case 1:
+                {
+                    this.encounterStatusElement.innerText = "Clear";
+                    break;
+                }
+                default:
+                {
+                    this.encounterStatusElement.innerText = "";
+                }
+            }
+            
             return;
         }
+        
         this.startTime = event.detail.StartTime;
+        
         // make active encounter
-        this.encounterTimeElement.classList.add("active");  
+        this.encounterLengthElement.classList.add("active");  
+        // hide status
+        this.encounterStatusElement.innerText = "";
+        this.encounterStatusElement.classList.add("hide");
     }
 
 }

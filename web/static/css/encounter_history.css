@@ -6,6 +6,9 @@
 #encounterContent .encounterItem {
     padding: 5px;
 }
+#encounterContent .encounterItem.encounterSuccess, #encounterContent .encounterItem.encounterSuccess a {
+    color: #06ea06;
+}
 
 #encounterContent .encounterItem div {
     display: inline-block;

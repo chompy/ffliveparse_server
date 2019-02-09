@@ -21,7 +21,7 @@
         </div>
 
         {{ range $val := .Encounters }}
-        <div class="encounterItem encounterSuccess">
+        <div class="encounterItem{{ if eq $val.Encounter.SuccessLevel 1 }} encounterSuccess{{ end }}">
             <div class="encounterTime" data-timestamp="{{ $val.Encounter.StartTime.Unix }}"><a href="/{{ $val.User.GetWebIDString }}/{{ $val.Encounter.UID }}">1</a></div>
             <div class="encounterZone">{{ $val.Encounter.Zone }}</div>
             <div class="encounterLength">{{ $val.Encounter.EndTime.Sub $val.Encounter.StartTime }}</div>
