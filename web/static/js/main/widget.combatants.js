@@ -187,6 +187,9 @@ class WidgetCombatants extends WidgetBase
         this.combatants.sort(function(a, b) {
             // keep pet with their owner
             if (b.data.ParentID) {
+                if (a.data.ParentID && a.data.ParentID == b.data.ParentID) {
+                    return a.data.Name.localeCompare(b.data.Name);
+                }                
                 if (!a.compare(b.data.ParentID)) {
                     return 1;
                 }

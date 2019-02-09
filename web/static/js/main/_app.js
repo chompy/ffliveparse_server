@@ -143,13 +143,17 @@ class Application
         // log incoming data
         var lastEncounterUid = null;
         window.addEventListener("act:encounter", function(e) {
-            if (e.detail.ID != lastEncounterUid) {
+            if (e.detail.UID != lastEncounterUid) {
                 console.log(">> Receieved new encounter, ", e.detail);
                 lastEncounterUid = e.detail.UID;
                 t.combatants = [];
             }
         });
         window.addEventListener("act:combatant", function(e) {
+            // must have a name
+            if (!e.detail.Name) {
+                return;
+            }
             // update combatant list
             var combatant = null;
             for (var i in t.combatants) {

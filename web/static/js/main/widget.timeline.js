@@ -217,7 +217,6 @@ class WidgetTimelime extends WidgetBase
                             !combatant.compare(logLineData.targetId) &&
                             combatant.compare(logLineData.sourceId)
                         ) {
-                            console.log(logLineData);
                             this.enemyCombatant.ids.push(logLineData.targetId);
                             this.enemyCombatant.names.push(logLineData.targetName);
                             break;

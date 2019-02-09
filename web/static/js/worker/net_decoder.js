@@ -26,6 +26,7 @@ var SIZE_INT32 = 4;
 
 var totalBytesRecieved= 0;
 var hasEncounter = false;
+var reportStatus = false;
 
 function readInt32(data, pos)
 {
@@ -229,10 +230,12 @@ function parseNextMessage(buffer, pos, count)
     pos += length;
     // every ~200 send status update and use setTimeout to prevent recursion error
     if (count > 200) {
-        postMessage({
-            "type"      : "status_in_progress",
-            "message"   : "Loading (" + ((pos / buffer.byteLength) * 100).toFixed(1) + "%)"
-        });
+        if (hasEncounter && reportStatus) {
+            postMessage({
+                "type"      : "status_in_progress",
+                "message"   : "Loading (" + ((pos / buffer.byteLength) * 100).toFixed(1) + "%)"
+            });
+        }
         setTimeout(function() { parseNextMessage(buffer, pos, 0); }, 1);
         return;
     }
@@ -242,6 +245,10 @@ function parseNextMessage(buffer, pos, count)
 function parseMessage(data)
 {
     totalBytesRecieved += data.length;
+    reportStatus = false;
+    if (data.length > 102400) {
+        reportStatus = true;
+    }
     // decompress
     data = pako.inflate(data)
     if (data.length > 0) {
