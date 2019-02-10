@@ -69,8 +69,10 @@ class WidgetEncounter extends WidgetBase
         this.combatants = [];
         this.encounterLengthElement.innerText = "00:00";
         this.encounterNameElement.innerText = "-";
+        this.encounterStatusElement.classList.add("hide");
         this.encounterStatusElement.innerText = "";
         this.encounterTimeElement.innerText = "";
+        this.encounterTimeElement.classList.add("hide");
     }
 
     /**
