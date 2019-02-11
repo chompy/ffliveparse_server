@@ -10,16 +10,16 @@
     padding: 10px 8px;
     white-space: nowrap;
 }
+.combatant.combatant-dps {
+    background-color: #723c3a;
+    color: #fff;
+}
 .combatant.combatant-healer {
     background-color: #2fa35f;
     color: #000;
 }
 .combatant.combatant-tank {
     background-color: #4f59c4;
-    color: #fff;
-}
-.combatant.combatant-dps {
-    background-color: #723c3a;
     color: #fff;
 }
 .combatant.combatant-npc {

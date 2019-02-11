@@ -394,7 +394,7 @@ class WidgetTimelime extends WidgetBase
     {
         // fix timeline element height
         this.timelineElement.style.height = (
-            window.innerHeight - document.getElementById("head").offsetHeight - document.getElementById("footer").offsetHeight
+            window.innerHeight - document.getElementById("head").offsetHeight - document.getElementById("encounter").offsetHeight - document.getElementById("footer").offsetHeight
         ) + "px";
         // resize timeline elements to match height of combatant elements
         for (var i = 0; i < this.combatants.length; i++) {

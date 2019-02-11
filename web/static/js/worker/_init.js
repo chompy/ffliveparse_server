@@ -29,46 +29,16 @@ var encounterUid = "";
  * Listen for message containing web socket url.
  */
 self.addEventListener("message", function(e) {
-
-    socket = new WebSocket(e.data.url);
     encounterUid = e.data.encounterUid;
-
-    socket.onopen = function(e) {
-        postMessage({
-            "type"    : "status_in_progress",
-            "message" : "Connected. Waiting for encounter data..."
-        });
-        console.log(">> Connected to server.");
-    };
-    socket.onmessage = function(e) {
-        if (socket.readyState !== 1) {
-            return;
+    var fileReader = new FileReader();
+    fileReader.onload = function(e) {
+        var buffer = new Uint8Array(e.target.result);
+        try {
+            parseMessage(buffer);
+        } catch (e) {
+            console.log(">> Error parsing message,", buf2hex(buffer));
+            throw e
         }
-        var fileReader = new FileReader();
-        fileReader.onload = function(e) {
-            var buffer = new Uint8Array(e.target.result);
-            try {
-                parseMessage(buffer);
-            } catch (e) {
-                console.log(">> Error parsing message,", buf2hex(buffer));
-                throw e
-            }
-        };
-        fileReader.readAsArrayBuffer(e.data);
     };
-    socket.onclose = function(event) {
-        postMessage({
-            "type"      : "error",
-            "message"   : "Lost connection to the server."
-        });
-        console.log(">> Connection closed,", event);
-    };
-    socket.onerror = function(event) {
-        postMessage({
-            "type"      : "error",
-            "message"   : "An error has occured."
-        });
-        console.log(">> An error has occured,", event);
-    };    
-
+    fileReader.readAsArrayBuffer(e.data.data); 
 });

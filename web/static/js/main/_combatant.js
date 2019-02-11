@@ -34,7 +34,9 @@ class Combatant
      */
     update(data)
     {
-        this.data = data;
+        if (!this.data || data.Job || !this.data.Job) {
+            this.data = data;
+        }
         if (this.ids.indexOf(this.data.ID) == -1) {
             this.ids.push(this.data.ID);
         }
