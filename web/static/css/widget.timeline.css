@@ -117,7 +117,7 @@
     margin-top: 2px;
 }
 #timeline-mouseover .action-desc .active-effect .action-icon, #timeline-mouseover .action-desc .last-damage .action-icon {
-    width: 16px;
+    max-width: 16px;
     height: 16px;
     vertical-align: middle;
     margin-right: 5px;

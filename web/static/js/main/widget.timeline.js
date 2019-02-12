@@ -47,7 +47,6 @@ class WidgetTimelime extends WidgetBase
         this.actionTimeline = [];
         this.actionData = null;
         this.statusData = null;
-        this.effectTracker = {};
         this.enemyElement = null;
         this.enemyCombatant = null;
         // other
@@ -131,7 +130,6 @@ class WidgetTimelime extends WidgetBase
         this.enemyCombatant = new Combatant();
         this.enemyCombatant._timelineElement = this.enemyElement;
         this.combatants = [];
-        this.effectTracker = {};
     }
 
     /**
@@ -264,16 +262,6 @@ class WidgetTimelime extends WidgetBase
                 var effect = regexParse[2];
                 var source = regexParse[3];
                 var time = parseInt(regexParse[4]);
-                if (!(target in this.effectTracker)) {
-                    this.effectTracker[target] = {};
-                }
-                this.effectTracker[target][effect + "/" + source] = {
-                    "effect"        : effect,
-                    "source"        : source,
-                    "startTime"     : event.detail.Time,
-                    "length"        : time * 1000,
-                    "active"        : true,
-                }
                 // add to timeline
                 logLineData["actionId"] = -2;
                 logLineData["actionName"] = effect;
@@ -295,12 +283,6 @@ class WidgetTimelime extends WidgetBase
                 var target = regexParse[1];
                 var effect = regexParse[2];
                 var source = regexParse[3];
-                if (!(target in this.effectTracker)) {
-                    this.effectTracker[target] = {};
-                }
-                if ((effect + "/" + source) in this.effectTracker[target]) {
-                    this.effectTracker[target][effect + "/" + source]["active"] = false;
-                }
                 // add to timeline
                 logLineData["actionId"] = -2;
                 logLineData["actionName"] = effect;
@@ -629,9 +611,6 @@ class WidgetTimelime extends WidgetBase
         var actionTimestampDate = new Date(actionTimestamp);
         // find combatant
         var combatant = this._findCombatant([sourceId, sourceName]);
-        if (!combatant) {
-            return;
-        }
         // add flags as css classes
         if (actionFlags) {
             for (var i in timelineAction.logData[0].flags) {
@@ -639,8 +618,8 @@ class WidgetTimelime extends WidgetBase
             }
         }
         // get icon
-        var iconUrl = "/static/img/attack.png"; // default
-        if (typeof(combatant.isNpc) != "undefined" && combatant.isNpc) {
+        var iconUrl = ""; // default
+        if (!combatant || combatant == this.enemyCombatant) {
             iconUrl = "/static/img/enemy.png"; // default npc icon
         }
         if (actionData && actionData.icon) {
@@ -649,8 +628,12 @@ class WidgetTimelime extends WidgetBase
                 iconUrl = STATUS_DATA_BASE_URL + actionData["icon"];
             }
         }
-        // override "attack" icon
-        if (actionName == "Attack") {
+        // sprint icon
+        if (actionId == 3) {
+            iconUrl = "/static/img/sprint.png";
+        }
+        // default icon, "attack"
+        if (!iconUrl || (combatant && combatant != this.enemyCombatant && actionName == "Attack")) {
             iconUrl = "/static/img/attack.png";
         }
         // special case actions
@@ -669,54 +652,90 @@ class WidgetTimelime extends WidgetBase
                 activeEffectsTitleElement.classList.add("textBold");
                 activeEffectsTitleElement.innerText = "Active Effects:";
                 actionDescriptionElement.appendChild(activeEffectsTitleElement);
-
-                // list active effects
+                // list active effects, and collect damages taken
                 var activeEffectContainerElement = document.createElement("div");
                 activeEffectContainerElement.classList.add("active-effects");
-                var effectCount = 0;
-                if (targetName in this.effectTracker) {
-                    for (var j in this.effectTracker[targetName]) {
-                        // set vars, make sure effect is active
-                        var effectData = this.effectTracker[targetName][j];
-                        if (!effectData.active) {
-                            continue;
-                        }
-                        // fetch effect action data
-                        var effectAction = this.actionData.getActionByName(effectData.effect);
-                        if (!effectAction) {
-                            continue;
-                        }
-                        effectCount++;
-                        // create container element
-                        var activeEffectElement = document.createElement("div");
-                        activeEffectElement.classList.add("active-effect");
-                        // icon
-                        var activeEffectIconElement = document.createElement("img");
-                        activeEffectIconElement.classList.add("action-icon");
-                        activeEffectElement.appendChild(activeEffectIconElement);
-                        // name
-                        var activeEffectNameElement = document.createElement("span");
-                        activeEffectNameElement.classList.add("action-name");
-                        activeEffectElement.appendChild(activeEffectNameElement);
-                        // set elements
-                        this._setActionElement(
-                            activeEffectElement,
-                            {
-                                "logData" : [{
-                                    "actionId"      : effectAction.id,
-                                    "actionName"    : effectData.effect,
-                                    "sourceName"    : effectData.source,
-                                    "targetName"    : targetName,
-                                }],
-                                "time"    : effectData.startTime
+                var activeEffectList = {};
+                for (var pass = 0; pass < 2; pass++) {
+                    for (var j in this.actionTimeline) {
+                        // set action vars
+                        var pAction = this.actionTimeline[j];
+                        var pActionName = typeof(pAction.logData[0].actionName) != "undefined" ? pAction.logData[0].actionName : "";
+                        var pActionType = typeof(pAction.logData[0].actionType) != "undefined" ? pAction.logData[0].actionType : "action";       
+                        // ensure timeline action is related to combatant
+                        var hasCombatant = false;
+                        for (var k in pAction.logData) {
+                            if (combatant && combatant.compare(pAction.logData[k].sourceName)) {
+                                hasCombatant = true;
+                                break;
                             }
-                        );
-                        // add
-                        activeEffectContainerElement.appendChild(activeEffectElement);
+                        }
+                        if (!hasCombatant) {
+                            continue;
+                        }
+                        // ensure timeline action occurs before death
+                        if (pAction.time.getTime() > timelineAction.time.getTime()) {
+                            continue;
+                        }
+                        switch (pass)
+                        {
+                            // first pass
+                            case 0:
+                            {
+                                // add action to active effect list
+                                if (
+                                    (pActionType == "gain-effect" || pActionType == "lose-effect") && (
+                                        typeof(activeEffectList[pActionName]) == "undefined" || (
+                                            activeEffectList[pActionName] && activeEffectList[pActionName].time.getTime() < pAction.time.getTime()
+                                        )
+                                    )
+                                ) {
+                                    activeEffectList[pActionName] = pAction;
+                                }
+                                break;
+                            }
+                            // second pass
+                            case 1:
+                            {
+                                if (pActionType != "death" || pAction.time.getTime() == timelineAction.time.getTime()) {
+                                    break;
+                                }
+                                for (var k in activeEffectList) {
+                                    if (activeEffectList[k] && activeEffectList[k].time.getTime() < pAction.time.getTime()) {
+                                        activeEffectList[k] = null;
+                                    }
+                                }
+                                break;
+                            }
+                        }
                     }
                 }
+                // display active effects
+                for (var j in activeEffectList) {
+                    if (!activeEffectList[j] || activeEffectList[j].logData[0].actionType != "gain-effect") {
+                        continue;
+                    }
+                    // create container element
+                    var activeEffectElement = document.createElement("div");
+                    activeEffectElement.classList.add("active-effect");
+                    // icon
+                    var activeEffectIconElement = document.createElement("img");
+                    activeEffectIconElement.classList.add("action-icon");
+                    activeEffectElement.appendChild(activeEffectIconElement);
+                    // name
+                    var activeEffectNameElement = document.createElement("span");
+                    activeEffectNameElement.classList.add("action-name");
+                    activeEffectElement.appendChild(activeEffectNameElement);
+                    // set elements
+                    this._setActionElement(
+                        activeEffectElement,
+                        activeEffectList[j]
+                    );
+                    // add
+                    activeEffectContainerElement.appendChild(activeEffectElement);
+                }
                 // add (none) text if no active effect
-                if (effectCount == 0) {
+                if (activeEffectList.length == 0) {
                     activeEffectContainerElement.innerText = "(none)";
                 }
                 actionDescriptionElement.appendChild(activeEffectContainerElement);
@@ -734,22 +753,25 @@ class WidgetTimelime extends WidgetBase
                         if (
                             [MESSAGE_TYPE_SINGLE_TARGET, MESSAGE_TYPE_AOE].indexOf(this.actionTimeline[j].logData[0].type) == -1 ||
                             action.logData[k].targetName != targetName ||
-                            action.logData[k].flags.indexOf("damage") == -1
+                            action.logData[k].flags.indexOf("damage") == -1 ||
+                            action.time.getTime() >= timelineAction.time.getTime()
                         ) {
                             continue;
                         }
                         lastDamages.push(action);
-                        if (lastDamages.length > 5) {
-                            lastDamages.shift();
-                        }
                         break;
                     }
-
                 }
+                lastDamages.sort(function(a, b) {
+                    return a.time.getTime() - b.time.getTime();
+                });
                 // create elements for last damages taken
                 var lastDamageContainerElement = document.createElement("div");
                 lastDamageContainerElement.classList.add("last-damages-taken");
-                for (var j in lastDamages) {
+                for (var j = 0; j < 5; j++) {
+                    if (typeof(lastDamages[j]) == "undefined") {
+                        continue;
+                    }
                     var lastDamageElement = document.createElement("div");
                     lastDamageElement.classList.add("last-damage");
                     // icon
