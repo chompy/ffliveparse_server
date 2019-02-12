@@ -82,6 +82,7 @@
 {{ define "scripts" }}
 <script type="text/javascript">
     var WEB_ID = "{{ .WebIDString }}";
+    var VERSION = "{{.VersionString}}";
     var ENCOUNTER_UID = "{{ .EncounterUID }}";
 </script>
 <script type="text/javascript" src="/app.min.js?v={{ .VersionString }}"></script>

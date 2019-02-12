@@ -27,7 +27,9 @@
             <div class="encounterLength">{{ $val.Encounter.EndTime.Sub $val.Encounter.StartTime }}</div>
             <div class="encounterCombatants">
             {{ range $combatant := $val.Combatants }}
+            {{ if ne $combatant.Job ""}}
             <span class="encounterCombatant">{{ $combatant.Name }}</span>
+            {{ end }}
             {{ end }}
             </div>
         </div>

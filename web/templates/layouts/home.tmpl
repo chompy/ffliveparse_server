@@ -90,12 +90,25 @@
         <div class="spacer"></div>
     </div>
     <div class="homeSection">
-        <h3>Version Notes 1.11</h3>
+        <h3>Version Notes 1.12</h3>
+        <p>
+            <strong>Features</strong>
+            <ul>
+                <li>Moved encounter information to seperate line, indication if clear or wipe.</li>
+            </ul>
+        </p>        
         <p>
             <strong>Bug Fixes</strong>
             <ul>
-                <li>Fixed an issue that caused the server to crash when parsing certain log lines.</li>
-                <li>Improved performance when loading encounters by using a web worker.</li>
+                <li>Tweaked web worker to (hopefully) fix issue where the timeline lags behind.</li>
+                <li>Fixed issue that caused pets to constantly resort in timeline.</li>
+                <li>Fixed issue (hopefully) where using the limit break would cause display glitches.</li>
+            </ul>
+        </p>
+        <p>
+            <strong>Known Bugs</strong>
+            <ul>
+                <li>Active effects and last damage taken that are displayed in death overlay aren't always accurate.</li>
             </ul>
         </p>
     </div>
