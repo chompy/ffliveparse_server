@@ -93,7 +93,7 @@ class Application
 
         // fetch worker.js
         var request = new XMLHttpRequest();
-        request.open("GET", "/worker.min.js", true);
+        request.open("GET", "/worker.min.js?v=" + VERSION, true);
         request.send();
         request.addEventListener("load", function(e) {
             console.log(">> Worker script loaded.");

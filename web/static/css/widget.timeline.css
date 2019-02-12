@@ -229,7 +229,7 @@
     margin-top: 2px;
 }
 #timeline-overlay .action-desc .active-effect .action-icon, #timeline-overlay .action-desc .last-damage .action-icon {
-    width: 16px;
+    max-width: 16px;
     height: 16px;
 }
 #timeline-overlay .action-desc .active-effect .action-name, #timeline-overlay .action-desc .last-damage .action-name {

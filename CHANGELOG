@@ -1,3 +1,9 @@
+1.12
+- Fixed issue (hopefully) where using the limit break would cause display glitches.
+- Fixed issue that caused pets to constantly resort in timeline.
+- Tweaked web worker to (hopefully) fix issue where the timeline lags behind.
+- Moved encounter information to seperate line, indication if clear or wipe.
+
 1.11
 - Fixed an issue that caused the server to crash when parsing certain log lines.
 - Improved performance when loading encounters by using a web worker.

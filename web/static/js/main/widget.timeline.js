@@ -47,7 +47,6 @@ class WidgetTimelime extends WidgetBase
         this.actionTimeline = [];
         this.actionData = null;
         this.statusData = null;
-        this.effectTracker = {};
         this.enemyElement = null;
         this.enemyCombatant = null;
         // other
@@ -131,7 +130,6 @@ class WidgetTimelime extends WidgetBase
         this.enemyCombatant = new Combatant();
         this.enemyCombatant._timelineElement = this.enemyElement;
         this.combatants = [];
-        this.effectTracker = {};
     }
 
     /**
@@ -264,16 +262,6 @@ class WidgetTimelime extends WidgetBase
                 var effect = regexParse[2];
                 var source = regexParse[3];
                 var time = parseInt(regexParse[4]);
-                if (!(target in this.effectTracker)) {
-                    this.effectTracker[target] = {};
-                }
-                this.effectTracker[target][effect + "/" + source] = {
-                    "effect"        : effect,
-                    "source"        : source,
-                    "startTime"     : event.detail.Time,
-                    "length"        : time * 1000,
-                    "active"        : true,
-                }
                 // add to timeline
                 logLineData["actionId"] = -2;
                 logLineData["actionName"] = effect;
@@ -295,12 +283,6 @@ class WidgetTimelime extends WidgetBase
                 var target = regexParse[1];
                 var effect = regexParse[2];
                 var source = regexParse[3];
-                if (!(target in this.effectTracker)) {
-                    this.effectTracker[target] = {};
-                }
-                if ((effect + "/" + source) in this.effectTracker[target]) {
-                    this.effectTracker[target][effect + "/" + source]["active"] = false;
-                }
                 // add to timeline
                 logLineData["actionId"] = -2;
                 logLineData["actionName"] = effect;
@@ -673,50 +655,90 @@ class WidgetTimelime extends WidgetBase
                 // list active effects
                 var activeEffectContainerElement = document.createElement("div");
                 activeEffectContainerElement.classList.add("active-effects");
-                var effectCount = 0;
-                if (targetName in this.effectTracker) {
-                    for (var j in this.effectTracker[targetName]) {
-                        // set vars, make sure effect is active
-                        var effectData = this.effectTracker[targetName][j];
-                        if (!effectData.active) {
-                            continue;
+                var activeEffectList = {};
+                for (var j in this.actionTimeline) {
+                    var pAction = this.actionTimeline[j];
+                    //var pTargetId = typeof(pAction.logData[0].targetId) != "undefined" ? pAction.logData[0].targetId : -1;
+                    var pSourceName = typeof(pAction.logData[0].sourceName) != "undefined" ? pAction.logData[0].sourceName : "";
+                    var pTargetName = typeof(pAction.logData[0].targetName) != "undefined" ? pAction.logData[0].targetName : "";
+
+                    var hasCombatant = false;
+                    for (var k in pAction.logData) {
+                        if (combatant.compare(pAction.logData[k].sourceName)) {
+                            hasCombatant = true;
+                            break;
                         }
-                        // fetch effect action data
-                        var effectAction = this.actionData.getActionByName(effectData.effect);
-                        if (!effectAction) {
-                            continue;
-                        }
-                        effectCount++;
-                        // create container element
-                        var activeEffectElement = document.createElement("div");
-                        activeEffectElement.classList.add("active-effect");
-                        // icon
-                        var activeEffectIconElement = document.createElement("img");
-                        activeEffectIconElement.classList.add("action-icon");
-                        activeEffectElement.appendChild(activeEffectIconElement);
-                        // name
-                        var activeEffectNameElement = document.createElement("span");
-                        activeEffectNameElement.classList.add("action-name");
-                        activeEffectElement.appendChild(activeEffectNameElement);
-                        // set elements
-                        this._setActionElement(
-                            activeEffectElement,
-                            {
-                                "logData" : [{
-                                    "actionId"      : effectAction.id,
-                                    "actionName"    : effectData.effect,
-                                    "sourceName"    : effectData.source,
-                                    "targetName"    : targetName,
-                                }],
-                                "time"    : effectData.startTime
+                    }
+
+                    if (!hasCombatant) {
+                        continue;
+                    }
+
+                    if (pAction.time.getTime() > timelineAction.time.getTime()) {
+                        continue;
+                    }
+
+
+                    var pDamage = typeof(pAction.logData[0].damage) != "undefined" ? pAction.logData[0].damage : 0;
+                    var pActionId = typeof(pAction.logData[0].actionId) != "undefined" ? pAction.logData[0].actionId : -99;
+                    var pActionName = typeof(pAction.logData[0].actionName) != "undefined" ? pAction.logData[0].actionName : "";
+                    var pActionType = typeof(pAction.logData[0].actionType) != "undefined" ? pAction.logData[0].actionType : "action";
+                    switch (pActionType)
+                    {
+                        case "death":
+                        {
+                            for (var k in activeEffectList) {
+                                if (activeEffectList[k] && activeEffectList[k].time.getTime() < pAction.time.getTime()) {
+                                    activeEffectList[k] = null;
+                                }
                             }
-                        );
-                        // add
-                        activeEffectContainerElement.appendChild(activeEffectElement);
+                            break;
+                        }
+                        case "gain-effect":
+                        {
+                            if (
+                                typeof(activeEffectList[pActionName]) == "undefined" || (
+                                    activeEffectList[pActionName] && activeEffectList[pActionName].time.getTime() < pAction.time.getTime()
+                                )
+                            ) {
+                                activeEffectList[pActionName] = pAction;
+                            }
+                            break;
+                        }
+                        case "lose-effect":
+                        {
+                            activeEffectList[pActionName] = null;
+                            break;
+                        }
                     }
                 }
+                console.log(activeEffectList);
+                
+                for (var j in activeEffectList) {
+                    if (!activeEffectList[j]) {
+                        continue;
+                    }
+                    // create container element
+                    var activeEffectElement = document.createElement("div");
+                    activeEffectElement.classList.add("active-effect");
+                    // icon
+                    var activeEffectIconElement = document.createElement("img");
+                    activeEffectIconElement.classList.add("action-icon");
+                    activeEffectElement.appendChild(activeEffectIconElement);
+                    // name
+                    var activeEffectNameElement = document.createElement("span");
+                    activeEffectNameElement.classList.add("action-name");
+                    activeEffectElement.appendChild(activeEffectNameElement);
+                    // set elements
+                    this._setActionElement(
+                        activeEffectElement,
+                        activeEffectList[j]
+                    );
+                    // add
+                    activeEffectContainerElement.appendChild(activeEffectElement);
+                }
                 // add (none) text if no active effect
-                if (effectCount == 0) {
+                if (activeEffectList.length == 0) {
                     activeEffectContainerElement.innerText = "(none)";
                 }
                 actionDescriptionElement.appendChild(activeEffectContainerElement);
