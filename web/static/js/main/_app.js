@@ -87,95 +87,73 @@ class Application
             socketUrl += "/" + this.encounterUid;
         }
         var t = this;
-        // fetch data needed by app
-        fetchActionData();
-        fetchStatusData();
-
-        // fetch worker.js
-        var request = new XMLHttpRequest();
-        request.open("GET", "/worker.min.js?v=" + VERSION, true);
-        request.send();
-        request.addEventListener("load", function(e) {
-            console.log(">> Worker script loaded.");
-            var workerBlobUrl = URL.createObjectURL(
-                new Blob(
-                    [request.response],
-                    {type: 'application/javascript'}
-                )
-            );
-            // create socket
-            var socket = new WebSocket(socketUrl);
-            socket.onopen = function(e) {
-                t.connected = true;
-                t.initUserConfig();
-                t.initWidgets();
-                console.log(">> Connected to server.");
-                document.getElementById("loadingMessage").innerText = "Connected. Waiting for encounter data...";
-            };
-            socket.onmessage = function(e) {
-                if (socket.readyState !== 1) {
-                    return;
+        // create worker
+        this.worker = new Worker("/worker.min.js?v=" + VERSION);
+        this.worker.onmessage = function(e) {
+            switch (e.data.type)
+            {
+                case "status_in_progress":
+                {
+                    // update status message
+                    document.getElementById("loadingMessage").classList.remove("hide");
+                    document.getElementById("loadingMessage").innerText = e.data.message;
+                    break;
                 }
-                var worker = new Worker(workerBlobUrl);
-                worker.postMessage({
-                    encounterUid: t.encounterUid,
-                    data: e.data
-                });
-                worker.onmessage = function(e) {
-                    switch (e.data.type)
-                    {
-                        case "status_in_progress":
+                case "status_ready":
+                {
+                    document.getElementById("loadingMessage").classList.add("hide");
+                    break;
+                }
+                case "error":
+                {
+                    document.getElementById("errorOverlay").classList.remove("hide");
+                    break;
+                }
+                case "act:encounter": 
+                case "act:combatant": 
+                case "act:logLine":
+                case "act:combatAction":
+                {
+                    var event = new CustomEvent(
+                        e.data.type,
                         {
-                            // update status message
-                            document.getElementById("loadingMessage").classList.remove("hide");
-                            document.getElementById("loadingMessage").innerText = e.data.message;
-                            break;
+                            detail: e.data.data
                         }
-                        case "status_ready":
-                        {
-                            document.getElementById("loadingMessage").classList.add("hide");
-                            worker.terminate();
-                            break;
-                        }
-                        case "error":
-                        {
-                            document.getElementById("errorOverlay").classList.remove("hide");
-                            break;
-                        }
-                        case "act:encounter": 
-                        case "act:combatant": 
-                        case "act:logLine":
-                        case "act:combatAction":
-                        {
-                            var event = new CustomEvent(
-                                e.data.type,
-                                {
-                                    detail: e.data.data
-                                }
-                            );
-                            window.dispatchEvent(event);
-                            break;
-                        }
-                    }
-                };
-            };
-            socket.onclose = function(event) {
-                document.getElementById("errorOverlay").classList.remove("hide");
-                console.log(">> Connection closed,", event);
-            };
-            socket.onerror = function(event) {
-                document.getElementById("errorOverlay").classList.remove("hide");
-                console.log(">> An error has occured,", event);
-            };    
-                
-        });
-        request.addEventListener("error", function(e) {
-            throw e;
-        });
-        request.addEventListener("abort", function(e) {
-            throw e;
-        });
+                    );
+                    window.dispatchEvent(event);
+                    break;
+                }
+            }
+        };
 
+        // create socket
+        var socket = new WebSocket(socketUrl);
+        socket.onopen = function(e) {
+            t.connected = true;
+            t.initUserConfig();
+            t.initWidgets();
+            fetchActionData();
+            fetchStatusData();
+            console.log(">> Connected to server.");
+            document.getElementById("loadingMessage").innerText = "Connected. Waiting for encounter data...";
+        };       
+        socket.onmessage = function(e) {
+            if (socket.readyState !== 1) {
+                return;
+            }
+            t.worker.postMessage({
+                encounterUid: t.encounterUid,
+                data: e.data
+            });            
+        };
+        socket.onclose = function(event) {
+            document.getElementById("errorOverlay").classList.remove("hide");
+            console.log(">> Connection closed,", event);
+        };
+        socket.onerror = function(event) {
+            document.getElementById("errorOverlay").classList.remove("hide");
+            console.log(">> An error has occured,", event);
+        };    
         // log incoming data
         var lastEncounterUid = null;
         window.addEventListener("act:encounter", function(e) {

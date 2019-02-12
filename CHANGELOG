@@ -1,3 +1,6 @@
+1.13
+- Fixed issue where timeline wouldn't load.
+
 1.12
 - Fixed issue (hopefully) where using the limit break would cause display glitches.
 - Fixed issue that caused pets to constantly resort in timeline.
