@@ -498,16 +498,16 @@ func (d *Data) IsActive() bool {
 
 // SyncNameFromLogLine - Given a log line, try to fetch combatant name and update with it
 func (d *Data) SyncNameFromLogLine(logLine LogLine) (bool, error) {
-	if (len(logLine.LogLine) <= 15) {
+	if len(logLine.LogLine) <= 15 {
 		return false, nil
 	}
 	logSplit := strings.Split(logLine.LogLine[15:], ":")
 	// needs to be specific type of log line
-	if logSplit[0] != "15" {
+	if logSplit[0] != "15" || len(logSplit) <= 2 {
 		return false, nil
 	}
 	// parse id
-	actorId, err := strconv.ParseInt(logSplit[1], 16, 32)
+	actorID, err := strconv.ParseInt(logSplit[1], 16, 32)
 	if err != nil {
 		return false, err
 	}
@@ -518,7 +518,7 @@ func (d *Data) SyncNameFromLogLine(logLine LogLine) (bool, error) {
 		if len(combatant.Job) == 0 || strings.Contains(combatant.Name, " (") {
 			continue
 		}
-		if int32(actorId) == combatant.ID {
+		if int32(actorID) == combatant.ID {
 			if combatant.Name != logSplit[2] {
 				d.Combatants[index].Name = logSplit[2]
 				hasUpdate = true
