@@ -25,7 +25,7 @@ const VersionNumber int32 = 113
 // ActPluginMinVersionNumber - act plugin min version
 const ActPluginMinVersionNumber int32 = 5
 
-// ActPluginMinVersionNumber - act plugin max version
+// ActPluginMaxVersionNumber - act plugin max version
 const ActPluginMaxVersionNumber int32 = 6
 
 // Name - app name

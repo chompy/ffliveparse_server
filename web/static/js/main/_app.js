@@ -16,6 +16,11 @@ along with FFLiveParse.  If not, see <https://www.gnu.org/licenses/>.
 */
 
 /**
+ * Number of workers to spawn.
+ */
+var WORKER_COUNT = 10;
+
+/**
  * Main application class.
  */
 class Application
@@ -32,8 +37,8 @@ class Application
         this.widgets = {};
         // connection flag
         this.connected = false;
-        // worker
-        this.worker = null;
+        // workers
+        this.workers = [];
         // user config
         this.userConfig = {};
         // list of combatants
@@ -88,44 +93,46 @@ class Application
         }
         var t = this;
         // create worker
-        this.worker = new Worker("/worker.min.js?v=" + VERSION);
-        this.worker.onmessage = function(e) {
-            switch (e.data.type)
-            {
-                case "status_in_progress":
+        for (var i = 0; i < WORKER_COUNT; i++) {
+            var worker = new Worker("/worker.min.js?v=" + VERSION);
+            worker.onmessage = function(e) {
+                switch (e.data.type)
                 {
-                    // update status message
-                    document.getElementById("loadingMessage").classList.remove("hide");
-                    document.getElementById("loadingMessage").innerText = e.data.message;
-                    break;
+                    case "status_in_progress":
+                    {
+                        // update status message
+                        document.getElementById("loadingMessage").classList.remove("hide");
+                        document.getElementById("loadingMessage").innerText = e.data.message;
+                        break;
+                    }
+                    case "status_ready":
+                    {
+                        document.getElementById("loadingMessage").classList.add("hide");
+                        break;
+                    }
+                    case "error":
+                    {
+                        document.getElementById("errorOverlay").classList.remove("hide");
+                        break;
+                    }
+                    case "act:encounter": 
+                    case "act:combatant": 
+                    case "act:logLine":
+                    case "act:combatAction":
+                    {
+                        var event = new CustomEvent(
+                            e.data.type,
+                            {
+                                detail: e.data.data
+                            }
+                        );
+                        window.dispatchEvent(event);
+                        break;
+                    }
                 }
-                case "status_ready":
-                {
-                    document.getElementById("loadingMessage").classList.add("hide");
-                    break;
-                }
-                case "error":
-                {
-                    document.getElementById("errorOverlay").classList.remove("hide");
-                    break;
-                }
-                case "act:encounter": 
-                case "act:combatant": 
-                case "act:logLine":
-                case "act:combatAction":
-                {
-                    var event = new CustomEvent(
-                        e.data.type,
-                        {
-                            detail: e.data.data
-                        }
-                    );
-                    window.dispatchEvent(event);
-                    break;
-                }
-            }
-        };
-
+            };
+            this.workers.push(worker);
+        }
         // create socket
         var socket = new WebSocket(socketUrl);
         socket.onopen = function(e) {
@@ -136,15 +143,20 @@ class Application
             fetchStatusData();
             console.log(">> Connected to server.");
             document.getElementById("loadingMessage").innerText = "Connected. Waiting for encounter data...";
-        };       
+        };
+        var workerIndex = 0;    
         socket.onmessage = function(e) {
             if (socket.readyState !== 1) {
                 return;
             }
-            t.worker.postMessage({
+            t.workers[workerIndex].postMessage({
                 encounterUid: t.encounterUid,
                 data: e.data
-            });            
+            });
+            workerIndex++;
+            if (workerIndex >= t.workers.length) {
+                workerIndex = 0;
+            }
         };
         socket.onclose = function(event) {
             document.getElementById("errorOverlay").classList.remove("hide");

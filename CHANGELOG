@@ -1,5 +1,6 @@
 1.13
 - Fixed issue where timeline wouldn't load.
+- Fixed crash in log line parser.
 
 1.12
 - Fixed issue (hopefully) where using the limit break would cause display glitches.
