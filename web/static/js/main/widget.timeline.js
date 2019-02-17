@@ -94,13 +94,6 @@ class WidgetTimelime extends WidgetBase
         }
         this.timelineElement.addEventListener("mousewheel", hScrollTimeline);
         this.timelineElement.addEventListener("DOMMouseScroll", hScrollTimeline);
-        // scroll combatant element with timeline
-        /*var combatantElement = document.getElementById("combatants");
-        if (combatantElement) {
-            this.timelineElement.addEventListener("scroll", function(e) {
-                combatantElement.style.marginTop = (-this.scrollTop) + "px"
-            });
-        }*/
         // drag scroll timeline
         var isMouseDown = false;
         this.timelineCanvas.addEventListener("mousedown", function(e) {
@@ -129,10 +122,13 @@ class WidgetTimelime extends WidgetBase
             t.combatantContainerElement.style.marginTop = combatantOffset + "px";
             t.timelineElement.style.marginTop = combatantOffset + "px";
         });
-
         // window resize
         this.addEventListener("resize", function(e) { t._resizeTimeline(); });
         setTimeout(function() { t._resizeTimeline(); }, 1000);
+        // mouse overlay
+        this.timelineCanvas.addEventListener("mousemove", function(e) {
+            
+        });
         // escape close overlay
         this.addEventListener("keyup", function(e) {
             if (e.keyCode == 27) {
@@ -208,6 +204,7 @@ class WidgetTimelime extends WidgetBase
             this.combatants.push(combatant);
             // resize timeline
             this._resizeTimeline();
+            this._renderTimeline();
         }
     }
 
@@ -388,6 +385,10 @@ class WidgetTimelime extends WidgetBase
             "element"       : null,
             "encounterUID"  : encounterUID
         });
+        // render timeline when all actions are loaded
+        if (!this.isActiveEncounter && time.getTime() >= this.endTime.getTime()) {
+            this._renderTimeline();
+        }
     }
 
     /**
@@ -441,7 +442,6 @@ class WidgetTimelime extends WidgetBase
         if (!time) {
             return;
         }
-
         // draw rectangle bg
         this.canvasContext.fillStyle = "#2d2d2d";
         this.canvasContext.fillRect(0, 0, this.timelineCanvas.width, 25);
@@ -549,52 +549,14 @@ class WidgetTimelime extends WidgetBase
         }
         // get current position
         var time = this._getCurrentTime();
-        var offsetPos = (time.getTime() - this.startTime.getTime()) * TIMELINE_PIXELS_PER_MILLISECOND;
         // clear canvas
         this.canvasContext.clearRect(0, 0, this.timelineCanvas.width, this.timelineCanvas.height);
         // render time keys
         this._renderTimeKeys(time);
         // render actions
         for (var i in this.actionTimeline) {
-            var action = this.actionTimeline[i];
-            this._addActionToCanvas(action);
-            // set data
-            //this._setActionElement(action.element, action);
-            // set offset relative to time
-            //action.element.style.right = pixelPosition + "px";
-            // mouse over tooltip
-            /*var t = this;
-            action.element.onmouseenter = function(e) {
-                var index = this.getAttribute("data-action-index");
-                if (!index || typeof(t.actionTimeline[index]) == "undefined") {
-                    return;
-                }
-                t._setActionElement(
-                    t.timelineMouseoverElement,
-                    t.actionTimeline[index]
-                );
-                t.timelineMouseoverElement.style.display = "block";
-            };
-            action.element.onmousemove = function(e) {
-                t.timelineMouseoverElement.style.left = e.pageX + "px";
-                if (e.pageX + t.timelineMouseoverElement.offsetWidth > window.innerWidth) {
-                    t.timelineMouseoverElement.style.left = (e.pageX - t.timelineMouseoverElement.offsetWidth) + "px";
-                }
-                t.timelineMouseoverElement.style.top = e.pageY + "px";
-            };
-            action.element.onmouseleave = function(e) {
-                t.timelineMouseoverElement.style.display = "none";
-            };*/
-            // timeline overlay
-            /*action.element.onclick = function(e) {
-                var index = this.getAttribute("data-action-index");
-                if (!index || typeof(t.actionTimeline[index]) == "undefined") {
-                    return;
-                }
-                t._showOverlay(t.actionTimeline[index]);
-            }*/
+            this._addActionToCanvas(this.actionTimeline[i]);
         }
-
     }
 
     /**
@@ -663,19 +625,11 @@ class WidgetTimelime extends WidgetBase
     _addActionToCanvas(timelineAction)
     {
         // get current timeline position
-        var timelinePos = null;
-        if (this.timelineSeek) {
-            timelinePos = new Date(this.timelineSeek);
-        }
-        if (!timelinePos) {
-            timelinePos = new Date();
-            if (!this.isActiveEncounter) {
-                timelinePos = this.endTime;
-            }
-        }
+        var timelinePos = this._getCurrentTime();
         // get log data
         var sourceName = typeof(timelineAction.logData[0].sourceName) != "undefined" ? timelineAction.logData[0].sourceName : "";
         var sourceId = typeof(timelineAction.logData[0].sourceId) != "undefined" ? timelineAction.logData[0].sourceId : "";
+        var actionType = typeof(timelineAction.logData[0].actionType) != "undefined" ? timelineAction.logData[0].actionType : "action";       
         // action vars
         var actionTimestamp = timelineAction.time.getTime() - this.startTime.getTime();
         // action takes place after encounter end, do nothing
@@ -697,26 +651,83 @@ class WidgetTimelime extends WidgetBase
         if (pixelPosition < 0 || pixelPosition > this.timelineCanvas.width) {
             return;
         }
-        // get top pos
+        // get top pos / height
         var topPos = 25;
+        var timelineHeight = 48;
         if (!combatant) {
             return;
         }
         if (combatant != this.enemyCombatant) {
             topPos = combatant._parseElement.offsetTop;
+            timelineHeight = combatant._parseElement.offsetHeight;
+        }
+        // determine draw width/height
+        var maxImageWidth = 32;
+        var maxImageHeight = 32;
+        if (actionType == "gain-effect" || actionType == "lose-effect") {
+            maxImageWidth = 18;
+            maxImageHeight = 24;
         }
         // draw icon to canvas
         if (typeof(this.images[iconUrl]) == "undefined") {
-            var image = new Image(28, 28);
+            var image = new Image();
             var t = this;
             this.images[iconUrl] = image;
             image.src = iconUrl;
+            image._loaded = false;
+            image.onload = function() {
+                image._loaded = true;
+                t._renderTimeline();
+            };
+            this.canvasContext.fillStyle = "#e7e7e7";
+            this.canvasContext.fillRect(
+                pixelPosition - (maxImageWidth / 2),
+                topPos,
+                maxImageWidth,
+                maxImageHeight
+            );
         }
-        this.canvasContext.drawImage(
-            this.images[iconUrl],
-            pixelPosition,
-            topPos
-        );
+        if (this.images[iconUrl]._loaded) {
+            var iWidth = this.images[iconUrl].width > maxImageWidth ? maxImageWidth : this.images[iconUrl].width;
+            var iHeight = this.images[iconUrl].height > maxImageHeight ? maxImageHeight : this.images[iconUrl].height;
+            this.canvasContext.drawImage(
+                this.images[iconUrl],
+                pixelPosition - (iWidth / 2),
+                topPos + ((timelineHeight - iHeight) / 2),
+                iWidth,
+                iHeight
+            );
+        }
+        // draw +/- for gain/lose effect
+        this.canvasContext.font = "24px sans-serif";
+        this.canvasContext.fillStyle = "#cdff00";
+        this.canvasContext.textAlign = "left";        
+        this.canvasContext.shadowColor = "#000";
+        this.canvasContext.shadowOffsetX = 2;
+        this.canvasContext.shadowOffsetY = 2;
+        switch (actionType) {
+            case "gain-effect":
+            {
+                this.canvasContext.fillText(
+                    "+",
+                    pixelPosition - (iWidth / 2) - 4,
+                    topPos + ((timelineHeight - 24) / 2) + 8
+                );
+                break;
+            }
+            case "lose-effect":
+            {
+                this.canvasContext.fillText(
+                    "-",
+                    pixelPosition - (iWidth / 2) - 2,
+                    topPos + ((timelineHeight - 24) / 2) + 10
+                );
+                break;
+            }
+        }
+        this.canvasContext.shadowColor = "";
+        this.canvasContext.shadowOffsetX = 0;
+        this.canvasContext.shadowOffsetY = 0;
     }
 
     /**
@@ -1049,11 +1060,14 @@ class WidgetTimelime extends WidgetBase
     }
 
     /**
-     * Display timeline action overlay.
-     * @param {object} timelineAction 
+     * Display timeline action overlay from mouseover event.
+     * @param {Event} event
      */
-    _showOverlay(timelineAction)
+    _showOverlay(event)
     {    
+
+
+
         // set elements
         this._setActionElement(this.timelineOverlayElement, timelineAction);
         // find combatant ids
