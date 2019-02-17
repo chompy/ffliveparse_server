@@ -16,6 +16,7 @@ along with FFLiveParse.  If not, see <https://www.gnu.org/licenses/>.
 */
 
 var TIMELINE_ELEMENT_ID = "timeline";
+var TIMELINE_CANVAS_ELEMENT_ID = "timeline-canvas";
 var TIMELINE_MOUSEOVER_ELEMENT_ID = "timeline-mouseover";
 var TIMELINE_OVERLAY_ELEMENT_ID = "timeline-overlay";
 var TIMELINE_PIXELS_PER_MILLISECOND = 0.07; // how many pixels represents a millisecond in timeline
@@ -33,10 +34,15 @@ class WidgetTimelime extends WidgetBase
     {
         super();
         // timeline related elements
+        this.combatantContainerElement = document.getElementById(COMBATANT_CONTAINER_ELEMENT_ID);
         this.timelineElement = document.getElementById(TIMELINE_ELEMENT_ID);
+        this.timelineCanvas = document.getElementById(TIMELINE_CANVAS_ELEMENT_ID);
+        this.canvasContext = this.timelineCanvas.getContext("2d");
         this.timelineMouseoverElement = document.getElementById(TIMELINE_MOUSEOVER_ELEMENT_ID);
         this.timelineOverlayElement = document.getElementById(TIMELINE_OVERLAY_ELEMENT_ID);
         this.timeKeyContainerElement = null;
+        this.images = {};
+        this.timelineSeek = null;
         // encounter data
         this.encounterId = null;
         this.startTime = null;
@@ -52,6 +58,7 @@ class WidgetTimelime extends WidgetBase
         // other
         this.lastTimeKey = 0;
         this.tickTimeout = null;
+        this.timelineVOffset = 0;
     }
 
     getName()
@@ -83,20 +90,49 @@ class WidgetTimelime extends WidgetBase
         // horizontal scrolling
         function hScrollTimeline(e) {
             var delta = Math.max(-1, Math.min(1, (e.wheelDelta || -e.detail)));
-            t.timelineElement.scrollLeft -= (delta * 40);
+            t._addSeek(delta * 300);
         }
         this.timelineElement.addEventListener("mousewheel", hScrollTimeline);
         this.timelineElement.addEventListener("DOMMouseScroll", hScrollTimeline);
         // scroll combatant element with timeline
-        var combatantElement = document.getElementById("combatants");
+        /*var combatantElement = document.getElementById("combatants");
         if (combatantElement) {
             this.timelineElement.addEventListener("scroll", function(e) {
                 combatantElement.style.marginTop = (-this.scrollTop) + "px"
             });
-        }
+        }*/
+        // drag scroll timeline
+        var isMouseDown = false;
+        this.timelineCanvas.addEventListener("mousedown", function(e) {
+            isMouseDown = true;
+        });
+        window.addEventListener("mouseup", function(e) {
+            isMouseDown = false;
+        });
+        this.timelineCanvas.addEventListener("mousemove", function(e) {
+            if (!isMouseDown) {
+                return;
+            }
+            t._addSeek(e.movementX * 15);
+            // vertical scroll
+            var combatantOffset = parseInt(t.combatantContainerElement.style.marginTop);
+            if (!combatantOffset) {
+                combatantOffset = 0;
+            }
+            combatantOffset = combatantOffset + (e.movementY * 2);
+            if (combatantOffset > 0) {
+                combatantOffset = 0;
+            } else if (combatantOffset < -(t.combatantContainerElement.offsetHeight - (window.innerHeight - t.timelineVOffset))) {
+                combatantOffset = -(t.combatantContainerElement.offsetHeight - (window.innerHeight - t.timelineVOffset));
+            }
+            
+            t.combatantContainerElement.style.marginTop = combatantOffset + "px";
+            t.timelineElement.style.marginTop = combatantOffset + "px";
+        });
+
         // window resize
-        this.addEventListener("resize", function(e) { t._onWindowResize(); });
-        setTimeout(function() { t._onWindowResize(); }, 1000);
+        this.addEventListener("resize", function(e) { t._resizeTimeline(); });
+        setTimeout(function() { t._resizeTimeline(); }, 1000);
         // escape close overlay
         this.addEventListener("keyup", function(e) {
             if (e.keyCode == 27) {
@@ -121,15 +157,13 @@ class WidgetTimelime extends WidgetBase
             }
         }
         this.actionTimeline = carryOverActions;
-        this.timelineElement.innerHTML = "";
         this.lastTimeKey = 0;
-        this.timeKeyContainerElement = document.createElement("div");
-        this.timeKeyContainerElement.classList.add("time-key-container");
-        this.timelineElement.append(this.timeKeyContainerElement);
-        this.enemyElement = this._createTimelineElement();
         this.enemyCombatant = new Combatant();
-        this.enemyCombatant._timelineElement = this.enemyElement;
         this.combatants = [];
+        this.timelineSeek = null;
+        this.combatantContainerElement.style.marginTop = "0px";
+        this.timelineElement.style.marginTop = "0px";
+        this.timelineVOffset = this.combatantContainerElement.offsetTop + document.getElementById("footer").offsetHeight;
     }
 
     /**
@@ -164,7 +198,6 @@ class WidgetTimelime extends WidgetBase
                     this.combatants[j].compare(combatant)
                 ) {
                     hasCombatant = true;
-                    this.timelineElement.appendChild(this.combatants[j]._timelineElement);
                     break;
                 }
             }
@@ -172,11 +205,9 @@ class WidgetTimelime extends WidgetBase
                 continue;
             }
             // new combatant
-            var combatantElement = this._createTimelineElement();
-            combatant._timelineElement = combatantElement;
             this.combatants.push(combatant);
-            // force window resize event
-            this._onWindowResize();
+            // resize timeline
+            this._resizeTimeline();
         }
     }
 
@@ -308,22 +339,12 @@ class WidgetTimelime extends WidgetBase
             clearTimeout(this.tickTimeout);
         }
         // render timeline
-        this._renderTimeline();
+        if (!this.timelineSeek && this.isActiveEncounter) {
+            this._renderTimeline();
+        }
         // run every half second
         var t = this;
         this.tickTimeout = setTimeout(function() { t._tick(); }, 500);
-    }
-
-    /**
-     * Create new timeline element.
-     * @return DOMElement
-     */
-    _createTimelineElement()
-    {
-        var element = document.createElement("div");
-        element.classList.add("combatant", "combatant-timeline");
-        this.timelineElement.appendChild(element);
-        return element;
     }
 
     /**
@@ -370,61 +391,17 @@ class WidgetTimelime extends WidgetBase
     }
 
     /**
-     * Resize elements.
+     * Resize timeline canvas.
      */
-    _onWindowResize()
+    _resizeTimeline()
     {
-        // fix timeline element height
-        this.timelineElement.style.height = (
-            window.innerHeight - document.getElementById("head").offsetHeight - document.getElementById("encounter").offsetHeight - document.getElementById("footer").offsetHeight
-        ) + "px";
-        // resize timeline elements to match height of combatant elements
-        for (var i = 0; i < this.combatants.length; i++) {
-            if (typeof(this.combatants[i]._parseElement) == "undefined") {
-                continue;
-            }
-            var newHeight = this.combatants[i]._parseElement.offsetHeight - 1;
-            this.combatants[i]._timelineElement.style.height = newHeight + "px";
-        }
-        // resize npc timelin
-        var npcElements = document.getElementsByClassName("combatant-npc");
-        if (npcElements.length > 0) {
-            var newHeight = npcElements[0].offsetHeight - 1;
-            this.enemyElement.style.height = newHeight + "px";
-        }
-    }
-
-    /**
-     * Resize timelines and add new time keys.
-     * @param {integer} timestamp
-     */
-    _resizeTimeline(timestamp)
-    {
-        var timestamp = parseInt(Math.ceil(timestamp / 1000)) * 1000;
-        var timelinePixelLength = TIMELINE_PIXEL_OFFSET + parseInt(TIMELINE_PIXELS_PER_MILLISECOND * timestamp);
-        // resize combatant timelines
-        for (var i = 0; i < this.combatants.length; i++) {
-            if (this.combatants[i]._timelineElement.offsetWidth < timestamp) {
-                this.combatants[i]._timelineElement.style.width = timelinePixelLength + "px";
-            }
-        }
-        if (this.enemyElement.offsetWidth < timestamp) {
-            this.enemyElement.style.width = timelinePixelLength + "px";
-        }
-        // resize time key container
-        if (this.timeKeyContainerElement && this.timeKeyContainerElement.offsetWidth < timelinePixelLength) {
-            this.timeKeyContainerElement.style.width = timelinePixelLength + "px";
-            // add more time keys
-            if (timestamp > this.lastTimeKey) {
-                for (var i = this.lastTimeKey; i < parseInt(timestamp / 1000) + 1; i++) {
-                    var timeKeyElement = document.createElement("div");
-                    timeKeyElement.classList.add("time-key");
-                    timeKeyElement.innerText = ((i / 60) < 10 ? "0" : "") + (Math.floor((i / 60)).toFixed(0)) + ":" + ((i % 60) < 10 ? "0" : "") + (i % 60);
-                    timeKeyElement.style.right = (parseInt(((i * 1000) * TIMELINE_PIXELS_PER_MILLISECOND) - 16)) + "px";
-                    this.timeKeyContainerElement.append(timeKeyElement);
-                }
-                this.lastTimeKey = parseInt(timestamp / 1000) + 1;
-            }
+        if (
+            this.timelineElement.offsetWidth != this.timelineCanvas.width ||
+            this.combatantContainerElement.offsetHeight != this.timelineCanvas.height
+        ) {
+            this.timelineCanvas.width = this.timelineElement.offsetWidth;
+            this.timelineCanvas.height = this.combatantContainerElement.offsetHeight;
+            this._renderTimeline();
         }
     }
 
@@ -456,6 +433,112 @@ class WidgetTimelime extends WidgetBase
     }
 
     /**
+     * Render time stamps and grid lines in timeline canvas.
+     * @param {Date} time 
+     */
+    _renderTimeKeys(time)
+    {
+        if (!time) {
+            return;
+        }
+
+        // draw rectangle bg
+        this.canvasContext.fillStyle = "#2d2d2d";
+        this.canvasContext.fillRect(0, 0, this.timelineCanvas.width, 25);
+        this.canvasContext.fillStyle = "#fff";
+        this.canvasContext.fillRect(0, 24, this.timelineCanvas.width, 1);
+        // set font
+        this.canvasContext.font = "16px sans-serif";
+        this.canvasContext.fillStyle = "#fff";
+        this.canvasContext.textAlign = "center";
+        // draw time keys
+        var duration = time.getTime() - this.startTime.getTime();
+        var offset = (duration % 1000) * TIMELINE_PIXELS_PER_MILLISECOND;
+        for (var i = 0; i < 99; i++) {
+            // draw text
+            var seconds = parseInt(duration / 1000) - i;
+            if (seconds < 0) {
+                break;
+            }
+            var timeKeyText = ((seconds / 60) < 10 ? "0" : "") + (Math.floor((seconds / 60)).toFixed(0)) + ":" + ((seconds % 60) < 10 ? "0" : "") + (seconds % 60);
+            var position = parseInt((i * 1000) * TIMELINE_PIXELS_PER_MILLISECOND) + offset;
+            if (position > this.timelineCanvas.width) {
+                break;
+            }
+            this.canvasContext.fillText(
+                timeKeyText,
+                position,
+                18
+            );
+            // draw vertical grid line
+            this.canvasContext.fillRect(position, 25, 1, this.timelineCanvas.height);
+        }
+
+        for (var i in this.combatants) {
+            if (typeof(this.combatants[i]._parseElement) == "undefined") {
+                continue;
+            }
+            this.canvasContext.fillRect(0, this.combatants[i]._parseElement.offsetTop, this.timelineCanvas.width, 1);
+        }
+
+    }
+
+    /**
+     * Set timeline viewport.
+     * @param {Date|integer} time 
+     */
+    _setSeek(time)
+    {
+        if (!time) {
+            this.timelineSeek = null;
+            this._renderTimeline();
+            return;
+        }
+        if (time instanceof Date) {
+            time = time.getTime();
+        }
+        if (this.isActiveEncounter && time >= new Date().getTime()) {
+            this.timelineSeek = null;
+            this._renderTimeline();
+            return;
+        }
+        if (this.timelineSeek != time) {
+            this.timelineSeek = time;
+            this._renderTimeline();
+        }
+    }
+
+    /**
+     * Add given time to seek value.
+     * @param {integer} timeAdd 
+     */
+    _addSeek(timeAdd)
+    {
+        if (!this.timelineSeek) {
+            this.timelineSeek = new Date().getTime();
+            if (!this.isActiveEncounter) {
+                this.timelineSeek = this.endTime.getTime();
+            }
+        }
+        this._setSeek(this.timelineSeek + timeAdd);
+    }
+
+    /**
+     * Get current position of timeline.
+     * @return {Date}
+     */
+    _getCurrentTime()
+    {
+        if (this.timelineSeek) {
+           return new Date(this.timelineSeek);
+        }
+        if (this.isActiveEncounter) {
+            return new Date(new Date().getTime() + 5000);
+        }
+        return this.endTime;
+    }
+
+    /**
      * Render actions to timeline DOM.
      */
     _renderTimeline()
@@ -464,82 +547,23 @@ class WidgetTimelime extends WidgetBase
         if (!this.actionData || !this.statusData || !this.startTime) {
             return;
         }
-        var endTime = 0;
+        // get current position
+        var time = this._getCurrentTime();
+        var offsetPos = (time.getTime() - this.startTime.getTime()) * TIMELINE_PIXELS_PER_MILLISECOND;
+        // clear canvas
+        this.canvasContext.clearRect(0, 0, this.timelineCanvas.width, this.timelineCanvas.height);
+        // render time keys
+        this._renderTimeKeys(time);
+        // render actions
         for (var i in this.actionTimeline) {
             var action = this.actionTimeline[i];
-            // ensure action isn't already rendered
-            if (action.element) {
-                continue;
-            }
-            // get log data + action data
-            var sourceName = typeof(action.logData[0].sourceName) != "undefined" ? action.logData[0].sourceName : "";
-            var sourceId = typeof(action.logData[0].sourceId) != "undefined" ? action.logData[0].sourceId : "";
-            var targetId = typeof(action.logData[0].targetId) != "undefined" ? action.logData[0].targetId : -1;
-            var targetName = typeof(action.logData[0].targetName) != "undefined" ? action.logData[0].targetName : "";
-            var damage = typeof(action.logData[0].damage) != "undefined" ? action.logData[0].damage : 0;
-            var actionId = typeof(action.logData[0].actionId) != "undefined" ? action.logData[0].actionId : -99;
-            var actionName = typeof(action.logData[0].actionName) != "undefined" ? action.logData[0].actionName : "";
-            var actionType = typeof(action.logData[0].actionType) != "undefined" ? action.logData[0].actionType : "action";
-            // get timestamp for action in current encounter
-            var timestamp = action.time.getTime() - this.startTime.getTime();
-            // action takes place after encounter end, do nothing
-            if (!this.isActiveEncounter && timestamp > this.endTime.getTime() - this.startTime.getTime()) {
-                continue;
-            }
-            // drop if occured more then 10 seconds before pull
-            if (timestamp < -10000) {
-                continue;
-            }   
-            // find combatant
-            var combatant = this._findCombatant([sourceId, sourceName]);
-            if (!combatant) {
-                continue;
-            }
-            // get action data
-            var actionData = null;
-            if (actionId > 0) {
-                actionData = this.actionData.getActionById(actionId);
-                if (actionData && typeof(actionData.name) != "undefined") {
-                    actionName = actionData.name;
-                }
-            }
-            // get status effect data
-            if (!actionData && actionId == -2 && actionName) {
-                var actionData = this.statusData.getStatusByName(actionName);
-            }
-            // set action desc
-            var actionDescription = actionData && actionData.description.trim() ? actionData.description.trim() : "(no description available)";
-            // record latest action so timeline can be resized
-            if (timestamp > endTime) {
-                endTime = timestamp;
-            }
-            // calculate action pixel position
-            var pixelPosition = parseInt((timestamp * TIMELINE_PIXELS_PER_MILLISECOND));
-            // create element
-            action.element = document.createElement("div");
-            action.element.classList.add("action", "type-" + actionType);
-            action.element.setAttribute("data-action-index", i);
-            if (typeof(action.logData[0].flags) != "undefined") {
-                for (var flagIndex in action.logData[0].flags) {
-                    action.element.classList.add("flag-" + action.logData[0].flags[flagIndex]);
-                }
-            }
-            // create icon            
-            var actionIconElement = document.createElement("img");
-            actionIconElement.classList.add("icon", "action-icon", "loading");
-            actionIconElement.onload = function() {
-                this.classList.remove("loading");
-                this.classList.add("appear");
-            };
-            action.element.appendChild(actionIconElement);
-            var actionNameElement = document.createElement("span");
-            actionNameElement.classList.add("name", "action-name");
+            this._addActionToCanvas(action);
             // set data
-            this._setActionElement(action.element, action);
+            //this._setActionElement(action.element, action);
             // set offset relative to time
-            action.element.style.right = pixelPosition + "px";
+            //action.element.style.right = pixelPosition + "px";
             // mouse over tooltip
-            var t = this;
+            /*var t = this;
             action.element.onmouseenter = function(e) {
                 var index = this.getAttribute("data-action-index");
                 if (!index || typeof(t.actionTimeline[index]) == "undefined") {
@@ -560,22 +584,139 @@ class WidgetTimelime extends WidgetBase
             };
             action.element.onmouseleave = function(e) {
                 t.timelineMouseoverElement.style.display = "none";
-            };
+            };*/
             // timeline overlay
-            action.element.onclick = function(e) {
+            /*action.element.onclick = function(e) {
                 var index = this.getAttribute("data-action-index");
                 if (!index || typeof(t.actionTimeline[index]) == "undefined") {
                     return;
                 }
                 t._showOverlay(t.actionTimeline[index]);
+            }*/
+        }
+
+    }
+
+    /**
+     * Get URL to action icon.
+     * @param {object} timelineAction 
+     * @param {object} combatant 
+     * @param {object} actionData 
+     * @return {string}
+     */
+    _getTimelineActionIcon(timelineAction, combatant, actionData)
+    {
+        // get log data
+        var sourceName = typeof(timelineAction.logData[0].sourceName) != "undefined" ? timelineAction.logData[0].sourceName : "";
+        var sourceId = typeof(timelineAction.logData[0].sourceId) != "undefined" ? timelineAction.logData[0].sourceId : "";        
+        var actionId = typeof(timelineAction.logData[0].actionId) != "undefined" ? timelineAction.logData[0].actionId : -99;
+        var actionName = typeof(timelineAction.logData[0].actionName) != "undefined" ? timelineAction.logData[0].actionName : "";
+        // get action data
+        if (!actionData && actionId > 0) {
+            actionData = this.actionData.getActionById(actionId);
+        }
+        // get status effect data
+        if (!actionData && actionId == -2 && actionName) {
+            var actionData = this.statusData.getStatusByName(actionName);
+        }
+        // find combatant
+        if (!combatant) {
+            combatant = this._findCombatant([sourceId, sourceName]);
+        }
+        // get icon
+        var iconUrl = ""; // default
+        if (!combatant || combatant == this.enemyCombatant) {
+            iconUrl = "/static/img/enemy.png"; // default npc icon
+        }
+        if (actionData && actionData.icon) {
+            iconUrl = ACTION_DATA_BASE_URL + actionData["icon"];
+            if (actionId == -2) {
+                iconUrl = STATUS_DATA_BASE_URL + actionData["icon"];
             }
-            // add element
-            combatant._timelineElement.appendChild(action.element);
         }
-        // resize all timelines
-        if (endTime > 0) {
-            this._resizeTimeline(endTime);
+        // special cases
+        switch (actionId) {
+            // death
+            case -1:
+            {
+                iconUrl = "/static/img/death.png";
+                break;
+            }
+            // sprint
+            case 3:
+            {
+                iconUrl = "/static/img/sprint.png";
+                break;
+            }
         }
+        // default icon, "attack"
+        if (!iconUrl || (combatant && combatant != this.enemyCombatant && actionName == "Attack")) {
+            iconUrl = "/static/img/attack.png";
+        }
+        return iconUrl;
+    }
+
+    /**
+     * Draw action to canvas.
+     * @param {object} timelineAction 
+     */
+    _addActionToCanvas(timelineAction)
+    {
+        // get current timeline position
+        var timelinePos = null;
+        if (this.timelineSeek) {
+            timelinePos = new Date(this.timelineSeek);
+        }
+        if (!timelinePos) {
+            timelinePos = new Date();
+            if (!this.isActiveEncounter) {
+                timelinePos = this.endTime;
+            }
+        }
+        // get log data
+        var sourceName = typeof(timelineAction.logData[0].sourceName) != "undefined" ? timelineAction.logData[0].sourceName : "";
+        var sourceId = typeof(timelineAction.logData[0].sourceId) != "undefined" ? timelineAction.logData[0].sourceId : "";
+        // action vars
+        var actionTimestamp = timelineAction.time.getTime() - this.startTime.getTime();
+        // action takes place after encounter end, do nothing
+        if (!this.isActiveEncounter && actionTimestamp > this.endTime.getTime() - this.startTime.getTime()) {
+            return;
+        }        
+        // drop if occured more then 10 seconds before pull
+        if (actionTimestamp < -10000) {
+            return;
+        }  
+        // find combatant
+        var combatant = this._findCombatant([sourceId, sourceName]);
+        // get icon
+        var iconUrl = this._getTimelineActionIcon(timelineAction, combatant);
+        // get current position
+        var time = this._getCurrentTime();
+        var offsetPos = (time.getTime() - this.startTime.getTime()) * TIMELINE_PIXELS_PER_MILLISECOND;
+        var pixelPosition = offsetPos - parseInt((actionTimestamp * TIMELINE_PIXELS_PER_MILLISECOND));
+        if (pixelPosition < 0 || pixelPosition > this.timelineCanvas.width) {
+            return;
+        }
+        // get top pos
+        var topPos = 25;
+        if (!combatant) {
+            return;
+        }
+        if (combatant != this.enemyCombatant) {
+            topPos = combatant._parseElement.offsetTop;
+        }
+        // draw icon to canvas
+        if (typeof(this.images[iconUrl]) == "undefined") {
+            var image = new Image(28, 28);
+            var t = this;
+            this.images[iconUrl] = image;
+            image.src = iconUrl;
+        }
+        this.canvasContext.drawImage(
+            this.images[iconUrl],
+            pixelPosition,
+            topPos
+        );
     }
 
     /**
@@ -585,6 +726,9 @@ class WidgetTimelime extends WidgetBase
      */
     _setActionElement(element, timelineAction)
     {
+        if (!element) {
+            return;
+        }
         // get log data
         var sourceName = typeof(timelineAction.logData[0].sourceName) != "undefined" ? timelineAction.logData[0].sourceName : "";
         var sourceId = typeof(timelineAction.logData[0].sourceId) != "undefined" ? timelineAction.logData[0].sourceId : "";

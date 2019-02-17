@@ -4,7 +4,7 @@
     padding: 10px 8px;
     color: #fff;
     position: relative;
-    z-index: 2;
+    z-index: 3;
 }
 #head #logo, #head #webId, #head #zone-info, #head #encounterId {
     display: inline-block;

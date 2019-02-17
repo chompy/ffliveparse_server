@@ -5,6 +5,7 @@
     overflow: hidden;
     border-right: 1px solid #696969;
     background: #2d2d2d;
+    z-index: 1;
 }
 .combatant {
     padding: 10px 8px;

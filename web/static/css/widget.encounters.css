@@ -5,6 +5,8 @@
     font-size: 12px;    
     height: 21px;
     line-height: 21px;
+    position: relative;
+    z-index: 3;
 }
 
 #encounter #encounter-time::before, #encounter #encounter-status::before {

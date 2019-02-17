@@ -15,6 +15,7 @@ You should have received a copy of the GNU General Public License
 along with FFLiveParse.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+var COMBATANT_CONTAINER_ELEMENT_ID = "combatants";
 var COMBATANT_ELEMENT_ID = "playerCombatants";
 
 var PARSE_AVAILABLE_COLUMNS = [

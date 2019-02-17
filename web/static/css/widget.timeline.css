@@ -2,8 +2,6 @@
     width: 80%;
     height: 100%;
     left: 20%;
-    overflow-x: scroll;
-    overflow-y: hidden;
     position: fixed;
     cursor: grab;
 }
@@ -193,7 +191,6 @@
 /** TIMELINE OVERLAY **/
 #timeline-overlay {
     padding-top: 0;
-    overflow-y: scroll;
     z-index: 2;
     top: 0;
 }
