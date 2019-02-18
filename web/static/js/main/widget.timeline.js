@@ -39,6 +39,7 @@ class WidgetTimelime extends WidgetBase
         this.timelineCanvas = document.getElementById(TIMELINE_CANVAS_ELEMENT_ID);
         this.canvasContext = this.timelineCanvas.getContext("2d");
         this.timelineMouseoverElement = document.getElementById(TIMELINE_MOUSEOVER_ELEMENT_ID);
+        this.timelineMouseoverLastAction = null;
         this.timelineOverlayElement = document.getElementById(TIMELINE_OVERLAY_ELEMENT_ID);
         this.timeKeyContainerElement = null;
         this.images = {};
@@ -127,7 +128,7 @@ class WidgetTimelime extends WidgetBase
         setTimeout(function() { t._resizeTimeline(); }, 1000);
         // mouse overlay
         this.timelineCanvas.addEventListener("mousemove", function(e) {
-            
+            t._showMouseOverlay(e);
         });
         // escape close overlay
         this.addEventListener("keyup", function(e) {
@@ -619,6 +620,45 @@ class WidgetTimelime extends WidgetBase
     }
 
     /**
+     * Given a timeline action get it's pixel position.
+     * @param {object} timelineAction
+     * @param {object} combatant
+     * @return {array}
+     */
+    _getTimelineActionPosition(timelineAction, combatant)
+    {
+        // get log data
+        var sourceName = typeof(timelineAction.logData[0].sourceName) != "undefined" ? timelineAction.logData[0].sourceName : "";
+        var sourceId = typeof(timelineAction.logData[0].sourceId) != "undefined" ? timelineAction.logData[0].sourceId : "";
+        var actionType = typeof(timelineAction.logData[0].actionType) != "undefined" ? timelineAction.logData[0].actionType : "action";
+        // find combatant
+        if (!combatant) {
+            combatant = this._findCombatant([sourceId, sourceName]);
+        }
+        // determine width/height
+        var width = 32;
+        var height = 32;
+        if (actionType == "gain-effect" || actionType == "lose-effect") {
+            width = 18;
+            height = 24;
+        }
+        // get combatant timeline height
+        var timelineHeight = 48;
+        if (combatant != this.enemyCombatant) {
+            timelineHeight = combatant._parseElement.offsetHeight;
+        }
+        // y pos
+        var yPos = 25;
+        if (combatant != this.enemyCombatant) {
+            yPos = combatant._parseElement.offsetTop + ((timelineHeight - height) / 2);
+        }
+        // x pos
+        var xPos = parseInt((timelineAction.time.getTime() - this.startTime.getTime()) * TIMELINE_PIXELS_PER_MILLISECOND);
+        xPos -= (width / 2);
+        return [xPos, yPos, width, height];
+    }
+
+    /**
      * Draw action to canvas.
      * @param {object} timelineAction 
      */
@@ -629,7 +669,7 @@ class WidgetTimelime extends WidgetBase
         // get log data
         var sourceName = typeof(timelineAction.logData[0].sourceName) != "undefined" ? timelineAction.logData[0].sourceName : "";
         var sourceId = typeof(timelineAction.logData[0].sourceId) != "undefined" ? timelineAction.logData[0].sourceId : "";
-        var actionType = typeof(timelineAction.logData[0].actionType) != "undefined" ? timelineAction.logData[0].actionType : "action";       
+        var actionType = typeof(timelineAction.logData[0].actionType) != "undefined" ? timelineAction.logData[0].actionType : "action";
         // action vars
         var actionTimestamp = timelineAction.time.getTime() - this.startTime.getTime();
         // action takes place after encounter end, do nothing
@@ -642,31 +682,19 @@ class WidgetTimelime extends WidgetBase
         }  
         // find combatant
         var combatant = this._findCombatant([sourceId, sourceName]);
+        if (!combatant) {
+            return;
+        }
         // get icon
         var iconUrl = this._getTimelineActionIcon(timelineAction, combatant);
         // get current position
         var time = this._getCurrentTime();
+        // get pixel position
+        var pixelPos = this._getTimelineActionPosition(timelineAction, combatant);
         var offsetPos = (time.getTime() - this.startTime.getTime()) * TIMELINE_PIXELS_PER_MILLISECOND;
-        var pixelPosition = offsetPos - parseInt((actionTimestamp * TIMELINE_PIXELS_PER_MILLISECOND));
-        if (pixelPosition < 0 || pixelPosition > this.timelineCanvas.width) {
+        pixelPos[0] = offsetPos - pixelPos[0];
+        if (pixelPos[0] < 0 || pixelPos[0] > this.timelineCanvas.width) {
             return;
-        }
-        // get top pos / height
-        var topPos = 25;
-        var timelineHeight = 48;
-        if (!combatant) {
-            return;
-        }
-        if (combatant != this.enemyCombatant) {
-            topPos = combatant._parseElement.offsetTop;
-            timelineHeight = combatant._parseElement.offsetHeight;
-        }
-        // determine draw width/height
-        var maxImageWidth = 32;
-        var maxImageHeight = 32;
-        if (actionType == "gain-effect" || actionType == "lose-effect") {
-            maxImageWidth = 18;
-            maxImageHeight = 24;
         }
         // draw icon to canvas
         if (typeof(this.images[iconUrl]) == "undefined") {
@@ -681,21 +709,19 @@ class WidgetTimelime extends WidgetBase
             };
             this.canvasContext.fillStyle = "#e7e7e7";
             this.canvasContext.fillRect(
-                pixelPosition - (maxImageWidth / 2),
-                topPos,
-                maxImageWidth,
-                maxImageHeight
+                pixelPos[0],
+                pixelPos[1],
+                pixelPos[2],
+                pixelPos[3]
             );
         }
         if (this.images[iconUrl]._loaded) {
-            var iWidth = this.images[iconUrl].width > maxImageWidth ? maxImageWidth : this.images[iconUrl].width;
-            var iHeight = this.images[iconUrl].height > maxImageHeight ? maxImageHeight : this.images[iconUrl].height;
             this.canvasContext.drawImage(
                 this.images[iconUrl],
-                pixelPosition - (iWidth / 2),
-                topPos + ((timelineHeight - iHeight) / 2),
-                iWidth,
-                iHeight
+                pixelPos[0],
+                pixelPos[1],
+                pixelPos[2],
+                pixelPos[3]
             );
         }
         // draw +/- for gain/lose effect
@@ -710,8 +736,8 @@ class WidgetTimelime extends WidgetBase
             {
                 this.canvasContext.fillText(
                     "+",
-                    pixelPosition - (iWidth / 2) - 4,
-                    topPos + ((timelineHeight - 24) / 2) + 8
+                    pixelPos[0] - 4,
+                    pixelPos[1] + 8
                 );
                 break;
             }
@@ -719,8 +745,8 @@ class WidgetTimelime extends WidgetBase
             {
                 this.canvasContext.fillText(
                     "-",
-                    pixelPosition - (iWidth / 2) - 2,
-                    topPos + ((timelineHeight - 24) / 2) + 10
+                    pixelPos[0] - 2,
+                    pixelPos[1] + 10
                 );
                 break;
             }
@@ -1063,11 +1089,57 @@ class WidgetTimelime extends WidgetBase
      * Display timeline action overlay from mouseover event.
      * @param {Event} event
      */
-    _showOverlay(event)
+    _showMouseOverlay(event)
     {    
+        if (!event) {
+            return;
+        }
+        // get current position
+        var time = this._getCurrentTime();
+        // get offset pos
+        var offsetPos = (time.getTime() - this.startTime.getTime()) * TIMELINE_PIXELS_PER_MILLISECOND;
+        // itterate actions
+        var timelineAction = null;
+        for (var i in this.actionTimeline) {
+            var timelineAction = this.actionTimeline[i];
+            // get log data
+            var actionType = typeof(timelineAction.logData[0].actionType) != "undefined" ? timelineAction.logData[0].actionType : "action";
+            // get pixel positon
+            var pixelPos = this._getTimelineActionPosition(timelineAction);
+            pixelPos[0] = offsetPos - pixelPos[0];
+            if (pixelPos[0] < 0 || pixelPos[0] > this.timelineCanvas.width) {
+                timelineAction = null;
+                continue;
+            }
+            if (
+                event.layerX > pixelPos[0] && event.layerX < pixelPos[0] + pixelPos[2] &&
+                event.layerY > pixelPos[1] && event.layerY < pixelPos[1] + pixelPos[3]
+            ) {
+                break;
+            }
+            timelineAction = null;
+        }
+        // no timeline action found
+        if (!timelineAction) {
+            this.timelineMouseoverElement.style.display = "none";
+            return;
+        }
 
+        // set mouseover element position
+        this.timelineMouseoverElement.style.left = event.pageX + "px";
+        if (event.pageX + this.timelineMouseoverElement.offsetWidth > window.innerWidth) {
+            this.timelineMouseoverElement.style.left = (event.pageX - this.timelineMouseoverElement.offsetWidth) + "px";
+        }
+        this.timelineMouseoverElement.style.top = event.pageY + "px";        
+        this.timelineMouseoverElement.style.display = "block";
+        // render element
+        if (this.timelineMouseoverLastAction == timelineAction) {
+            return;
+        }
+        this.timelineMouseoverLastAction = timelineAction;
+        this._setActionElement(this.timelineMouseoverElement, timelineAction);
 
-
+        /*
         // set elements
         this._setActionElement(this.timelineOverlayElement, timelineAction);
         // find combatant ids
@@ -1144,7 +1216,7 @@ class WidgetTimelime extends WidgetBase
                 this.classList.add("hide");
             }
         };
-
+        */
     }
 
 };
