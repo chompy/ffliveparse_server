@@ -130,6 +130,10 @@ class WidgetTimelime extends WidgetBase
         this.timelineCanvas.addEventListener("mousemove", function(e) {
             t._showMouseOverlay(e);
         });
+        // overlay
+        this.timelineCanvas.addEventListener("click", function(e) {
+            t._showOverlayFromEvent(e);
+        });
         // escape close overlay
         this.addEventListener("keyup", function(e) {
             if (e.keyCode == 27) {
@@ -173,6 +177,9 @@ class WidgetTimelime extends WidgetBase
         if (event.detail.Active && this.encounterId != event.detail.UID) {
             this.encounterId = event.detail.UID;
             this.reset();
+        }
+        if (!event.detail.Active) {
+            this._renderTimeline();
         }
         this.isActiveEncounter = event.detail.Active;
         this.startTime = event.detail.StartTime;
@@ -635,6 +642,9 @@ class WidgetTimelime extends WidgetBase
         if (!combatant) {
             combatant = this._findCombatant([sourceId, sourceName]);
         }
+        if (!combatant) {
+            return [0,0,0,0];
+        }
         // determine width/height
         var width = 32;
         var height = 32;
@@ -648,13 +658,13 @@ class WidgetTimelime extends WidgetBase
             timelineHeight = combatant._parseElement.offsetHeight;
         }
         // y pos
-        var yPos = 25;
+        var yPos = 25 + ((timelineHeight - height) / 2);
         if (combatant != this.enemyCombatant) {
             yPos = combatant._parseElement.offsetTop + ((timelineHeight - height) / 2);
         }
         // x pos
         var xPos = parseInt((timelineAction.time.getTime() - this.startTime.getTime()) * TIMELINE_PIXELS_PER_MILLISECOND);
-        xPos -= (width / 2);
+        xPos += (width / 2);
         return [xPos, yPos, width, height];
     }
 
@@ -1086,20 +1096,20 @@ class WidgetTimelime extends WidgetBase
     }
 
     /**
-     * Display timeline action overlay from mouseover event.
+     * Get timeline action mouse is over (if any)
      * @param {Event} event
+     * @return {object|null}
      */
-    _showMouseOverlay(event)
-    {    
+    _getActionAtMouse(event)
+    {
         if (!event) {
-            return;
+            return null;
         }
         // get current position
         var time = this._getCurrentTime();
         // get offset pos
         var offsetPos = (time.getTime() - this.startTime.getTime()) * TIMELINE_PIXELS_PER_MILLISECOND;
         // itterate actions
-        var timelineAction = null;
         for (var i in this.actionTimeline) {
             var timelineAction = this.actionTimeline[i];
             // get log data
@@ -1108,23 +1118,34 @@ class WidgetTimelime extends WidgetBase
             var pixelPos = this._getTimelineActionPosition(timelineAction);
             pixelPos[0] = offsetPos - pixelPos[0];
             if (pixelPos[0] < 0 || pixelPos[0] > this.timelineCanvas.width) {
-                timelineAction = null;
                 continue;
             }
             if (
                 event.layerX > pixelPos[0] && event.layerX < pixelPos[0] + pixelPos[2] &&
                 event.layerY > pixelPos[1] && event.layerY < pixelPos[1] + pixelPos[3]
             ) {
-                break;
+                return timelineAction;
             }
-            timelineAction = null;
         }
-        // no timeline action found
+        return null;
+    }
+
+    /**
+     * Display timeline action overlay from mouseover event.
+     * @param {Event} event
+     */
+    _showMouseOverlay(event)
+    {    
+        if (!event) {
+            return;
+        }
+        // get action
+        var timelineAction = this._getActionAtMouse(event);
+        // hide overlay if no action
         if (!timelineAction) {
             this.timelineMouseoverElement.style.display = "none";
             return;
         }
-
         // set mouseover element position
         this.timelineMouseoverElement.style.left = event.pageX + "px";
         if (event.pageX + this.timelineMouseoverElement.offsetWidth > window.innerWidth) {
@@ -1138,8 +1159,31 @@ class WidgetTimelime extends WidgetBase
         }
         this.timelineMouseoverLastAction = timelineAction;
         this._setActionElement(this.timelineMouseoverElement, timelineAction);
+    }
 
-        /*
+    /**
+     * Show action overlay.
+     * @param {Event} event 
+     */
+    _showOverlayFromEvent(event)
+    {
+        if (!event) {
+            return;
+        }
+        this._showOverlay(this._getActionAtMouse(event));
+    }
+
+    /**
+     * Show action overlay.
+     * @param {object} timelineAction 
+     */
+    _showOverlay(timelineAction)
+    {
+        if (!timelineAction) {
+            return;
+        }
+        // hide mouse overlay
+        this.timelineMouseoverElement.style.display = "none";
         // set elements
         this._setActionElement(this.timelineOverlayElement, timelineAction);
         // find combatant ids
@@ -1202,10 +1246,8 @@ class WidgetTimelime extends WidgetBase
         if (!hasOtherActions) {
             otherActionsElement.innerText = "(none)";
         }
-
         // show
         this.timelineOverlayElement.classList.remove("hide");
-
         // close
         this.timelineOverlayElement.onclick = function(e) {
             if (
@@ -1216,7 +1258,6 @@ class WidgetTimelime extends WidgetBase
                 this.classList.add("hide");
             }
         };
-        */
     }
 
 };
