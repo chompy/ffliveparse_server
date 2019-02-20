@@ -18,10 +18,14 @@ along with FFLiveParse.  If not, see <https://www.gnu.org/licenses/>.
 package act
 
 import (
+	"bufio"
+	"compress/gzip"
 	"database/sql"
-	"io/ioutil"
+	"fmt"
+	"io"
 	"log"
 	"os"
+	"path"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -35,23 +39,25 @@ import (
 	_ "github.com/mattn/go-sqlite3" // sqlite driver
 )
 
-// lastUpdateInactiveTime - Time in ms between last data updata before data is considered inactive
+// lastUpdateInactiveTime - Time in ms between last data update before data is considered inactive
 const lastUpdateInactiveTime = 1800000 // 30 minutes
 
-// pastEncounterFetchLimit - Max number of past encounters to fetch in one request
+// logLineRetainCount - Number of log lines to retain in memory before dumping to temp file
+const logLineRetainCount = 1000
+
+// PastEncounterFetchLimit - Max number of past encounters to fetch in one request
 const PastEncounterFetchLimit = 10
 
 // Data - data about an ACT session
 type Data struct {
-	Session          Session
-	User             user.Data
-	Encounter        Encounter
-	Combatants       []Combatant
-	LogLines         []LogLine
-	LastLogLineIndex int
-	LastUpdate       time.Time
-	NewTickData      bool
-	HasValidSession  bool
+	Session         Session
+	User            user.Data
+	Encounter       Encounter
+	Combatants      []Combatant
+	LogLineBuffer   []LogLine
+	LastUpdate      time.Time
+	NewTickData     bool
+	HasValidSession bool
 }
 
 // NewData - create new ACT session data
@@ -67,13 +73,12 @@ func NewData(session Session, user user.Data) (Data, error) {
 	database.Close()
 	encounterUIDGenerator := xid.New()
 	return Data{
-		Session:          session,
-		User:             user,
-		Encounter:        Encounter{UID: encounterUIDGenerator.String()},
-		Combatants:       make([]Combatant, 0),
-		LastUpdate:       time.Now(),
-		LastLogLineIndex: 0,
-		HasValidSession:  false,
+		Session:         session,
+		User:            user,
+		Encounter:       Encounter{UID: encounterUIDGenerator.String()},
+		Combatants:      make([]Combatant, 0),
+		LastUpdate:      time.Now(),
+		HasValidSession: false,
 	}, nil
 }
 
@@ -140,7 +145,21 @@ func (d *Data) UpdateCombatant(combatant Combatant) {
 	log.Println("Add combatant", combatant.Name, "(", combatant.ID, ") to encounter", combatant.EncounterUID, "(TotalCombatants:", len(d.Combatants), ")")
 }
 
-// UpdateLogLine - Add log line
+// GetLogTempPath - Get path to temp log lines file
+func (d *Data) GetLogTempPath() string {
+	return path.Join(os.TempDir(), fmt.Sprintf("fflp_LogLine_%s.dat", d.Encounter.UID))
+}
+
+// GetLogPath - Get path to log lines file
+func (d *Data) GetLogPath() string {
+	tempPath := d.GetLogTempPath()
+	if _, err := os.Stat(tempPath); os.IsNotExist(err) {
+		return filepath.Join(app.LogPath, d.Encounter.UID+"_LogLines.dat")
+	}
+	return tempPath
+}
+
+// UpdateLogLine - Add log line to buffer
 func (d *Data) UpdateLogLine(logLine LogLine) {
 	// update log last update flag
 	d.LastUpdate = time.Now()
@@ -151,15 +170,39 @@ func (d *Data) UpdateLogLine(logLine LogLine) {
 	// set encounter UID
 	logLine.EncounterUID = d.Encounter.UID
 	// add to log line list
-	d.LogLines = append(d.LogLines, logLine)
+	d.LogLineBuffer = append(d.LogLineBuffer, logLine)
 	// update names if needed
 	d.SyncNameFromLogLine(logLine)
 }
 
-// ClearLogLines - Clear log line buffer
+// ClearLogLines - Clear log lines from current session
 func (d *Data) ClearLogLines() {
-	d.LastLogLineIndex = 0
-	d.LogLines = make([]LogLine, 0)
+	d.LogLineBuffer = make([]LogLine, 0)
+	if d.Encounter.UID != "" {
+		os.Remove(d.GetLogTempPath())
+	}
+}
+
+// DumpLogLineBuffer - Dump log line buffer to temp file
+func (d *Data) DumpLogLineBuffer() error {
+	logBytes := make([]byte, 0)
+	for _, logLine := range d.LogLineBuffer {
+		logBytes = append(logBytes, EncodeLogLineBytes(&logLine)...)
+	}
+	if len(logBytes) > 0 {
+		f, err := os.OpenFile(d.GetLogTempPath(), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
+		if err != nil {
+			return err
+		}
+		defer f.Close()
+		_, err = f.Write(logBytes)
+		if err != nil {
+			return err
+		}
+	}
+	// clear buffer
+	d.LogLineBuffer = make([]LogLine, 0)
+	return nil
 }
 
 // getDatabase - get encounter database for given user
@@ -293,31 +336,54 @@ func (d *Data) SaveEncounter() error {
 		}
 		stmt.Close()
 	}
-	// store log data to binary file
-	logBytes := make([]byte, 0)
-	for _, logLine := range d.LogLines {
-		logBytes = append(logBytes, EncodeLogLineBytes(&logLine)...)
+	// dump log lines
+	err = d.DumpLogLineBuffer()
+	if err != nil {
+		return err
 	}
-	if len(logBytes) > 0 {
-		compressedLogData, err := CompressBytes(logBytes)
+	// open temp log file
+	tempLogFile, err := os.Open(d.GetLogTempPath())
+	if err != nil {
+		return err
+	}
+	defer tempLogFile.Close()
+	// open output log file
+	logFilePath := filepath.Join(app.LogPath, d.Encounter.UID+"_LogLines.dat")
+	outLogFile, err := os.OpenFile(logFilePath, os.O_WRONLY|os.O_CREATE, 0664)
+	if err != nil {
+		return err
+	}
+	defer outLogFile.Close()
+	// create gzip writer
+	gzOutLogFile := gzip.NewWriter(outLogFile)
+	defer gzOutLogFile.Close()
+	gzFw := bufio.NewWriter(gzOutLogFile)
+	// itterate log lines and write to output
+	var logBuf []byte
+	for {
+		logBuf = make([]byte, 4096)
+		_, err := tempLogFile.Read(logBuf)
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			return err
+		}
+		_, err = gzFw.Write(logBuf)
 		if err != nil {
 			return err
 		}
-		logFilePath := filepath.Join(app.LogPath, d.Encounter.UID+"_LogLines.dat")
-		err = ioutil.WriteFile(logFilePath, compressedLogData, 0644)
-		if err != nil {
-			return err
-		}
 	}
+	gzFw.Flush()
 	return nil
 }
 
 // ClearEncounter - delete all data for current encounter from memory
 func (d *Data) ClearEncounter() {
+	d.ClearLogLines()
 	encounterUIDGenerator := xid.New()
 	d.Encounter = Encounter{UID: encounterUIDGenerator.String()}
 	d.Combatants = make([]Combatant, 0)
-	d.ClearLogLines()
 }
 
 // GetPreviousEncounter - retrieve previous encounter data from database
@@ -392,27 +458,11 @@ func GetPreviousEncounter(user user.Data, encounterUID string, fetchLogs bool) (
 	rows.Close()
 	// fix combatants
 	combatants = SyncCombatants(combatants)
-	// fetch log lines file
-	var logLines []LogLine
-	if fetchLogs {
-		logFilePath := filepath.Join(app.LogPath, encounterUID+"_LogLines.dat")
-		compressedLogBytes, err := ioutil.ReadFile(logFilePath)
-		if err != nil && !os.IsNotExist(err) {
-			return Data{}, err
-		}
-		if err == nil {
-			logLines, _, err = DecodeLogLineBytesFile(compressedLogBytes)
-			if err != nil {
-				return Data{}, err
-			}
-		}
-	}
 	// return data set
 	d := Data{
 		User:       user,
 		Encounter:  encounter,
 		Combatants: combatants,
-		LogLines:   logLines,
 	}
 	return d, nil
 }

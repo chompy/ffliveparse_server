@@ -536,10 +536,6 @@ func sendInitData(ws *websocket.Conn, data *act.Data) {
 		for _, combatant := range data.Combatants {
 			dataBytes = append(dataBytes, act.EncodeCombatantBytes(&combatant)...)
 		}
-		// add logs
-		for _, logLine := range data.LogLines {
-			dataBytes = append(dataBytes, act.EncodeLogLineBytes(&logLine)...)
-		}
 	}
 	// add flag indicating if ACT is active
 	isActiveFlag := act.Flag{
@@ -554,4 +550,22 @@ func sendInitData(ws *websocket.Conn, data *act.Data) {
 		return
 	}
 	websocket.Message.Send(ws, compressData)
+	// send logs
+	if data != nil && data.Encounter.UID != "" {
+		logPath := data.GetLogPath()
+		logBytes, err := ioutil.ReadFile(logPath)
+		if err != nil {
+			log.Println("Error when opening log line file,", err)
+			return
+		}
+		// compress if from temp path
+		if logPath == data.GetLogTempPath() {
+			logBytes, err = act.CompressBytes(logBytes)
+			if err != nil {
+				log.Println("Error when compressing log line data,", err)
+			}
+		}
+		websocket.Message.Send(ws, logBytes)
+	}
+
 }
