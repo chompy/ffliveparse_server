@@ -220,17 +220,15 @@ function parseNextMessage(buffer, pos, count)
     }
     delete data;
     if (length <= 0) {
-        if (hasEncounter) {
-            postMessage({
-                "type"      : "status_ready"
-            });
-        }
+        postMessage({
+            "type"      : "status_ready"
+        });
         return;
     }
     pos += length;
     // every ~200 send status update and use setTimeout to prevent recursion error
     if (count > 200) {
-        if (hasEncounter && reportStatus) {
+        if (reportStatus) {
             postMessage({
                 "type"      : "status_in_progress",
                 "message"   : "Loading (" + ((pos / buffer.byteLength) * 100).toFixed(1) + "%)"

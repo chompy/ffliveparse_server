@@ -55,6 +55,7 @@ class WidgetCombatants extends WidgetBase
         this.encounterDamage = 0;
         this.combatants = [];
         this.combatantsElement = document.getElementById(COMBATANT_ELEMENT_ID);
+        this.streamMode = false;
         if (!("sortBy" in this.userConfig)) {
             this.userConfig["sortBy"] = "damage";
             this._saveUserConfig();
@@ -80,6 +81,18 @@ class WidgetCombatants extends WidgetBase
         var t = this;
         this.addEventListener("act:encounter", function(e) { t._updateEncounter(e); });
         this.addEventListener("app:combatant", function(e) { t._updateCombatants(e); });
+        // window resize
+        function _onResize(e) {
+            var combatantWidth = t.combatantsElement.offsetWidth;
+            for (var i in t.combatants) {
+                var element = t.combatants[i]._parseElement;
+                var nameElement = element.getElementsByClassName("name")[0];
+                nameElement.style.maxWidth = (combatantWidth - 52) + "px"
+            }
+        }
+        this.addEventListener("resize", _onResize);
+        setTimeout(function() { _onResize(); }, 1000);
+        this.streamMode = (window.location.hash == "#stream");
     }
 
     /**
@@ -131,8 +144,8 @@ class WidgetCombatants extends WidgetBase
         var jobUpper = combatant.data.Job.toUpperCase();
         var defaultRoleClass = "combatant-dps";
         var roleClasses = {
-            "combatant-tank"    : ["WAR", "DRK", "PLD"],
-            "combatant-healer"  : ["SCH", "WHM", "AST"]
+            "combatant-tank"    : ["WAR", "DRK", "PLD", "GLA", "MRD"],
+            "combatant-healer"  : ["SCH", "WHM", "AST", "CNJ"]
         };
         var roleClass = defaultRoleClass;
         for (var role in roleClasses) {
@@ -179,15 +192,17 @@ class WidgetCombatants extends WidgetBase
     {
         var t = this;
         // re-sort so all pets are at the bottom
-        this.combatants.sort(function(a, b) {
-            if (a.data.ParentID > 0 && b.data.ParentID == 0) {
-                return 1;
-            }
-            return 0;
-        });
+        if (!this.streamMode) {
+            this.combatants.sort(function(a, b) {
+                if (a.data.ParentID > 0 && b.data.ParentID == 0) {
+                    return 1;
+                }
+                return 0;
+            });
+        }
         this.combatants.sort(function(a, b) {
             // keep pet with their owner
-            if (b.data.ParentID) {
+            if (!t.streamMode && b.data.ParentID) {
                 if (a.data.ParentID && a.data.ParentID == b.data.ParentID) {
                     return a.data.Name.localeCompare(b.data.Name);
                 }                
@@ -196,14 +211,13 @@ class WidgetCombatants extends WidgetBase
                 }
                 return 0;
             }
+
             // sort by user config sort option
             switch (t.userConfig["sortBy"])
             {
                 case "healing":
                 {
-                    var aHps = (a.data.DamageHealed / t.encounterDuration);
-                    var bHps = (b.data.DamageHealed / t.encounterDuration);
-                    return bHps - aHps;
+                    return b.data.DamageHealed - a.Data.DamageHealed;
                 }
                 case "deaths":
                 {
@@ -216,8 +230,8 @@ class WidgetCombatants extends WidgetBase
                 case "job":
                 {
                     var jobCats = [
-                        ["WAR", "DRK", "PLD"],  // tanks
-                        ["SCH", "WHM", "AST"]   // healers
+                        ["WAR", "DRK", "PLD", "GLA", "MRD"],  // tanks
+                        ["SCH", "WHM", "AST", "CNJ"]   // healers
                     ];
                     for (var i in jobCats) {
                         var indexA = jobCats[i].indexOf(a.data.Job.toUpperCase());
@@ -233,9 +247,7 @@ class WidgetCombatants extends WidgetBase
                 default:
                 case "damage":
                 {
-                    var aDps = (a.data.Damage / t.encounterDuration);
-                    var bDps = (b.data.Damage / t.encounterDuration);
-                    return bDps - aDps;
+                    return b.data.Damage - a.data.Damage;
                 }
             }
         });

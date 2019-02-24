@@ -24,3 +24,15 @@ html.mode-stream, .mode-stream body {
     .mode-stream .combatant-info .info-text .name { display: block; }
     .mode-stream .combatant-info .info-text .parse { font-size: 16px; margin-top: 0px; }
 }
+
+@media(max-width: 512px) {
+    .mode-stream #encounter #encounter-status { display: none; }
+    .mode-stream #encounter #encounter-length { display: none; }
+    .mode-stream #encounter #encounter-name {
+        display: inline-block;
+        width: 100%;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;        
+    }
+}

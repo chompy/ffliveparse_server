@@ -344,6 +344,13 @@ func (m *Manager) ClearData(d *Data) {
 	}
 }
 
+// ClearAllData - clear all data from memory
+func (m *Manager) ClearAllData() {
+	for index := range m.data {
+		m.ClearData(&m.data[index])
+	}
+}
+
 // DataCount - get number of data objects
 func (m *Manager) DataCount() int {
 	return len(m.data)

@@ -19,7 +19,6 @@ const ActListenUDPPort uint16 = 31593
 const HTTPListenTCPPort uint16 = 8081
 
 func main() {
-
 	// define+parse flags
 	devModePtr := flag.Bool("dev", false, "Start server in development mode.")
 	httpPort := flag.Int("http-port", int(HTTPListenTCPPort), "Set HTTP listen port.")
@@ -44,6 +43,7 @@ func main() {
 
 	// create act manager
 	actManager := act.NewManager(&events, &userManager, *devModePtr)
+	defer actManager.ClearAllData()
 
 	// start http server
 	go web.HTTPStartServer(uint16(*httpPort), &userManager, &actManager, &events, *devModePtr)

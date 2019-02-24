@@ -81,7 +81,7 @@
 
 @media(max-width: 940px) {
     .combatant, .combatant.pet { padding: 3px 8px; }
-    .combatant-info .info-text span { font-size: 10px; }
+    .combatant-info .info-text span { font-size: 12px; }
     .combatant-info .job-icon { width: 24px; height: 24px; }
     .combatant-info .info-text .parse { font-size: 12px; }
     .combatant.pet .job-icon { margin: 0; }

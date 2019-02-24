@@ -42,8 +42,9 @@ class WidgetTimelime extends WidgetBase
         this.timelineMouseoverLastAction = null;
         this.timelineOverlayElement = document.getElementById(TIMELINE_OVERLAY_ELEMENT_ID);
         this.timeKeyContainerElement = null;
-        this.images = {};
-        this.timelineSeek = null;
+        this.images = {};               // timeline action image storage array
+        this.timelineSeek = null;       // when set timeline will render at given timestamp
+        this.hasUnrendered = false;     // flag to determine if there are currently any unrendered actions
         // encounter data
         this.encounterId = null;
         this.startTime = null;
@@ -97,6 +98,7 @@ class WidgetTimelime extends WidgetBase
         this.timelineElement.addEventListener("DOMMouseScroll", hScrollTimeline);
         // drag scroll timeline
         var isMouseDown = false;
+        var hasDrag = false;
         this.timelineCanvas.addEventListener("mousedown", function(e) {
             isMouseDown = true;
         });
@@ -106,6 +108,9 @@ class WidgetTimelime extends WidgetBase
         this.timelineCanvas.addEventListener("mousemove", function(e) {
             if (!isMouseDown) {
                 return;
+            }
+            if (Math.abs(e.movementX) > 1 || Math.abs(e.movementY) > 1) {
+                hasDrag = true;
             }
             t._addSeek(e.movementX * 15);
             // vertical scroll
@@ -132,6 +137,7 @@ class WidgetTimelime extends WidgetBase
         });
         // overlay
         this.timelineCanvas.addEventListener("click", function(e) {
+            if (hasDrag) { hasDrag = false; return; }
             t._showOverlayFromEvent(e);
         });
         // escape close overlay
@@ -178,8 +184,8 @@ class WidgetTimelime extends WidgetBase
             this.encounterId = event.detail.UID;
             this.reset();
         }
-        if (!event.detail.Active) {
-            this._renderTimeline();
+        if (!event.detail.Active && !this.timelineSeek) {
+            this._setSeek(event.detail.EndTime)
         }
         this.isActiveEncounter = event.detail.Active;
         this.startTime = event.detail.StartTime;
@@ -344,7 +350,7 @@ class WidgetTimelime extends WidgetBase
             clearTimeout(this.tickTimeout);
         }
         // render timeline
-        if (!this.timelineSeek && this.isActiveEncounter) {
+        if ((!this.timelineSeek && this.isActiveEncounter) || this.hasUnrendered) {
             this._renderTimeline();
         }
         // run every half second
@@ -393,10 +399,8 @@ class WidgetTimelime extends WidgetBase
             "element"       : null,
             "encounterUID"  : encounterUID
         });
-        // render timeline when all actions are loaded
-        if (!this.isActiveEncounter && time.getTime() >= this.endTime.getTime()) {
-            this._renderTimeline();
-        }
+        // flag that timeline has unrendered actions
+        this.hasUnrendered = true;
     }
 
     /**
@@ -487,8 +491,8 @@ class WidgetTimelime extends WidgetBase
                 continue;
             }
             this.canvasContext.fillRect(0, this.combatants[i]._parseElement.offsetTop, this.timelineCanvas.width, 1);
+            this.canvasContext.fillRect(0, this.combatants[i]._parseElement.offsetTop + this.combatants[i]._parseElement.offsetHeight, this.timelineCanvas.width, 1);
         }
-
     }
 
     /**
@@ -512,6 +516,9 @@ class WidgetTimelime extends WidgetBase
         }
         if (this.timelineSeek != time) {
             this.timelineSeek = time;
+            if (this.endTime && this.timelineSeek > this.endTime.getTime()) {
+                this.timelineSeek = this.endTime.getTime();
+            }
             this._renderTimeline();
         }
     }
@@ -541,7 +548,7 @@ class WidgetTimelime extends WidgetBase
            return new Date(this.timelineSeek);
         }
         if (this.isActiveEncounter) {
-            return new Date(new Date().getTime() + 5000);
+            return new Date(new Date().getTime());
         }
         return this.endTime;
     }
@@ -562,9 +569,11 @@ class WidgetTimelime extends WidgetBase
         // render time keys
         this._renderTimeKeys(time);
         // render actions
-        for (var i in this.actionTimeline) {
+        for (var i = this.actionTimeline.length; i--; i > 0) {
             this._addActionToCanvas(this.actionTimeline[i]);
         }
+        // no longer should have unrendered actions
+        this.hasUnrendered = false;
     }
 
     /**
@@ -680,6 +689,7 @@ class WidgetTimelime extends WidgetBase
         var sourceName = typeof(timelineAction.logData[0].sourceName) != "undefined" ? timelineAction.logData[0].sourceName : "";
         var sourceId = typeof(timelineAction.logData[0].sourceId) != "undefined" ? timelineAction.logData[0].sourceId : "";
         var actionType = typeof(timelineAction.logData[0].actionType) != "undefined" ? timelineAction.logData[0].actionType : "action";
+        var actionFlags = typeof(timelineAction.logData[0].flags) != "undefined" ? timelineAction.logData[0].flags.toString() : "";
         // action vars
         var actionTimestamp = timelineAction.time.getTime() - this.startTime.getTime();
         // action takes place after encounter end, do nothing
@@ -735,7 +745,7 @@ class WidgetTimelime extends WidgetBase
             );
         }
         // draw +/- for gain/lose effect
-        this.canvasContext.font = "24px sans-serif";
+        this.canvasContext.font = "18px impact";
         this.canvasContext.fillStyle = "#cdff00";
         this.canvasContext.textAlign = "left";        
         this.canvasContext.shadowColor = "#000";
@@ -753,11 +763,24 @@ class WidgetTimelime extends WidgetBase
             }
             case "lose-effect":
             {
+                this.canvasContext.font = "20px impact";
                 this.canvasContext.fillText(
                     "-",
                     pixelPos[0] - 2,
                     pixelPos[1] + 10
                 );
+                break;
+            }
+            default:
+            {
+                if (actionFlags.indexOf("crit") != -1) {
+                    this.canvasContext.font = "14px impact";
+                    this.canvasContext.fillText(
+                        "!",
+                        pixelPos[0] - 2,
+                        pixelPos[1] + 10
+                    );
+                }
                 break;
             }
         }
