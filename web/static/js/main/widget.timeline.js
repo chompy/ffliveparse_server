@@ -19,6 +19,7 @@ var TIMELINE_ELEMENT_ID = "timeline";
 var TIMELINE_CANVAS_ELEMENT_ID = "timeline-canvas";
 var TIMELINE_MOUSEOVER_ELEMENT_ID = "timeline-mouseover";
 var TIMELINE_OVERLAY_ELEMENT_ID = "timeline-overlay";
+var TIMELINE_PROGRESS_ELEMENT_ID = "timeline-progress-slider";
 var TIMELINE_PIXELS_PER_MILLISECOND = 0.07; // how many pixels represents a millisecond in timeline
 var TIMELINE_PIXEL_OFFSET = TIMELINE_PIXELS_PER_MILLISECOND * 1000;
 var GAIN_EFFECT_REGEX = /1A\:([a-zA-Z0-9` ']*) gains the effect of ([a-zA-Z0-9` ']*) from ([a-zA-Z0-9` ']*) for ([0-9]*)\.00 Seconds\./;
@@ -41,6 +42,7 @@ class WidgetTimelime extends WidgetBase
         this.timelineMouseoverElement = document.getElementById(TIMELINE_MOUSEOVER_ELEMENT_ID);
         this.timelineMouseoverLastAction = null;
         this.timelineOverlayElement = document.getElementById(TIMELINE_OVERLAY_ELEMENT_ID);
+        this.timelineProgressElement = document.getElementById(TIMELINE_PROGRESS_ELEMENT_ID);
         this.timeKeyContainerElement = null;
         this.images = {};               // timeline action image storage array
         this.timelineSeek = null;       // when set timeline will render at given timestamp
@@ -145,6 +147,12 @@ class WidgetTimelime extends WidgetBase
             if (e.keyCode == 27) {
                 t.timelineOverlayElement.classList.add("hide");
             }
+        });
+        // set progress slider
+        this.timelineProgressElement.addEventListener("change", function(e) {
+            t._setSeek(
+                (t.startTime ? t.startTime.getTime() : 0) + parseInt(t.timelineProgressElement.value)
+            );            
         });
         // start tick
         this._tick();
@@ -414,8 +422,10 @@ class WidgetTimelime extends WidgetBase
         ) {
             this.timelineCanvas.width = this.timelineElement.offsetWidth;
             this.timelineCanvas.height = this.combatantContainerElement.offsetHeight;
+            this.timelineProgressElement.style.width = this.timelineElement.offsetWidth + "px";
             this._renderTimeline();
         }
+        
     }
 
     /**
@@ -501,26 +511,32 @@ class WidgetTimelime extends WidgetBase
      */
     _setSeek(time)
     {
-        if (!time) {
-            this.timelineSeek = null;
-            this._renderTimeline();
-            return;
-        }
-        if (time instanceof Date) {
+        // set seek
+        if (time && time instanceof Date) {
             time = time.getTime();
         }
-        if (this.isActiveEncounter && time >= new Date().getTime()) {
+        if (!time) {
             this.timelineSeek = null;
-            this._renderTimeline();
-            return;
         }
-        if (this.timelineSeek != time) {
+        if (time && this.isActiveEncounter && time >= new Date().getTime()) {
+            this.timelineSeek = null;
+        } else if (time && this.timelineSeek != time) {
             this.timelineSeek = time;
             if (this.endTime && this.timelineSeek > this.endTime.getTime()) {
                 this.timelineSeek = this.endTime.getTime();
             }
-            this._renderTimeline();
         }
+        // get range, set progress slider
+        var startTime = this.startTime ? this.startTime.getTime() : 0;
+        var endTime = this.endTime ? this.endTime.getTime() : 0;
+        var currentTime = this.timelineSeek ? this.timelineSeek : endTime;
+        if (this.isActiveEncounter) {
+            endTime = new Date().getTime();
+        }
+        this.timelineProgressElement.max = endTime - startTime;
+        this.timelineProgressElement.value = (endTime - startTime) - (endTime - currentTime);
+        // rerender
+        this._renderTimeline();
     }
 
     /**

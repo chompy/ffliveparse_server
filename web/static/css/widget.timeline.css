@@ -355,7 +355,7 @@
     font-size: 18px;
     content: "+";
 }
-#timeline-overlay .other-action.flag-crit .action-icon-container {
+#timeline-overlay .other-action.flag-crit .action-icon-container::after {
     font-size: 14px;
     content: "!";
 }
@@ -371,6 +371,17 @@
     font-size: 31px;
     font-weight: normal;
     cursor: pointer;
+}
+
+#timeline-progress {
+    position: fixed;
+    z-index: 6;
+    width: 100%;
+    height: 32px;
+    bottom: 32px;
+}
+#timeline-progress #timeline-progress-slider {
+    width: 100%;
 }
 
 @media(max-width: 600px) {
