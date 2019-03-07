@@ -19,8 +19,10 @@ package act
 
 import (
 	"fmt"
+	"regexp"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // LogTypeGameLog - Log type identifier, game logs
@@ -121,10 +123,22 @@ type LogLineData struct {
 	Damage          int
 	TargetCurrentHP int
 	TargetMaxHP     int
+	Time            time.Time
+}
+
+// HasFlag - Check if log line data has given flag
+func (l *LogLineData) HasFlag(flag int) bool {
+	for _, lFlag := range l.Flags {
+		if lFlag == flag {
+			return true
+		}
+	}
+	return false
 }
 
 // ParseLogLine - Parse log line in to data structure
-func ParseLogLine(logLineString string) (LogLineData, error) {
+func ParseLogLine(logLine LogLine) (LogLineData, error) {
+	logLineString := logLine.LogLine
 	if len(logLineString) <= 15 {
 		return LogLineData{}, fmt.Errorf("tried to parse log line with too few characters")
 	}
@@ -139,6 +153,7 @@ func ParseLogLine(logLineString string) (LogLineData, error) {
 	data := LogLineData{
 		Type: int(logLineType),
 		Raw:  logLineString,
+		Time: logLine.Time,
 	}
 	// parse remaining
 	switch logLineType {
@@ -220,6 +235,68 @@ func ParseLogLine(logLineString string) (LogLineData, error) {
 			}
 			data.TargetMaxHP = int(targetMaxHP)
 			break
+		}
+	case LogTypeDefeat:
+		{
+			re, err := regexp.Compile("19:(.*) was defeated by (.*)\\.")
+			if err != nil {
+				return data, err
+			}
+			match := re.FindStringSubmatch(logLineString)
+			data.AttackerName = match[2]
+			data.TargetName = match[1]
+		}
+	}
+
+	// flags
+	if len(fields) >= LogFieldFlags {
+		rawFlags := fields[LogFieldFlags]
+		switch rawFlags[len(rawFlags)-2 : len(rawFlags)-1] {
+		case "1":
+			{
+				data.Flags = append(data.Flags, LogFlagDodge)
+				break
+			}
+		case "3":
+			{
+				switch rawFlags[len(rawFlags)-4 : len(rawFlags)-3] {
+				case "1":
+					{
+						data.Flags = append(data.Flags, LogFlagCrit)
+						break
+					}
+				case "2":
+					{
+						data.Flags = append(data.Flags, LogFlagDirectHit)
+						break
+					}
+				case "3":
+					{
+						data.Flags = append(data.Flags, LogFlagCrit)
+						data.Flags = append(data.Flags, LogFlagDirectHit)
+						break
+					}
+				}
+				break
+			}
+		case "4":
+			{
+				data.Flags = append(data.Flags, LogFlagHeal)
+				if len(rawFlags) >= 5 && rawFlags[len(rawFlags)-6:len(rawFlags)-5] == "1" {
+					data.Flags = append(data.Flags, LogFlagCrit)
+				}
+				break
+			}
+		case "5":
+			{
+				data.Flags = append(data.Flags, LogFlagBlock)
+				break
+			}
+		case "6":
+			{
+				data.Flags = append(data.Flags, LogFlagParry)
+				break
+			}
 		}
 	}
 
