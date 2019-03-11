@@ -211,16 +211,16 @@ func (m *Manager) doTick(userID int64) {
 			m.ClearData(data)
 			return
 		}
-		if data.Encounter.UID == "" {
+		if data.EncounterCollector.Encounter.UID == "" {
 			continue
 		}
 		if !data.NewTickData {
 			continue
 		}
 		data.NewTickData = false
-		log.Println("Tick for user", data.User.ID, "send data for encounter", data.Encounter.UID)
+		//log.Println("Tick for user", data.User.ID, "send data for encounter", data.EncounterCollector.Encounter.UID)
 		// gz compress encounter data and emit event
-		compressData, err := CompressBytes(EncodeEncounterBytes(&data.Encounter))
+		compressData, err := CompressBytes(EncodeEncounterBytes(&data.EncounterCollector.Encounter))
 		if err != nil {
 			log.Println("Error while compressing encounter data,", err)
 			continue
@@ -232,7 +232,8 @@ func (m *Manager) doTick(userID int64) {
 		)
 		// emit combatant events
 		sendBytes := make([]byte, 0)
-		for _, combatant := range data.Combatants {
+		for _, combatant := range data.CombatantCollector.GetCombatants() {
+			combatant.EncounterUID = data.EncounterCollector.Encounter.UID
 			sendBytes = append(sendBytes, EncodeCombatantBytes(&combatant)...)
 		}
 		if len(sendBytes) > 0 {
@@ -334,7 +335,7 @@ func (m *Manager) ClearData(d *Data) {
 	for index, data := range m.data {
 		if data.User.ID == d.User.ID {
 			m.data = append(m.data[:index], m.data[index+1:]...)
-			if d.Encounter.ActID != 0 {
+			if d.EncounterCollector.Encounter.Active {
 				d.SaveEncounter()
 				d.ClearEncounter()
 			}

@@ -17,9 +17,22 @@ along with FFLiveParse.  If not, see <https://www.gnu.org/licenses/>.
 
 package act
 
+import (
+	"log"
+	"strings"
+)
+
+// combatantCollectorCombatantTracker - Track combatant data and
+type combatantCollectorCombatantTracker struct {
+	Start Combatant
+	End   Combatant
+	Data  []Combatant
+}
+
 // CombatantCollector - Combatant data collector
 type CombatantCollector struct {
-	Combatants []Combatant
+	CombatantTrackers []combatantCollectorCombatantTracker
+	Combatants        []Combatant
 }
 
 // NewCombatantCollector - create new combatant collector
@@ -31,42 +44,158 @@ func NewCombatantCollector() CombatantCollector {
 
 // Reset - reset combatant collector
 func (c *CombatantCollector) Reset() {
+	for _, combatant := range c.Combatants {
+		log.Println("[ Combatant", combatant.ID, "] Removed")
+	}
 	c.Combatants = make([]Combatant, 0)
+	c.CombatantTrackers = make([]combatantCollectorCombatantTracker, 0)
 }
 
-// getCombatant - Get combatant
-func (c *CombatantCollector) getCombatant(name string) *Combatant {
-	for index := range c.Combatants {
-		if c.Combatants[index].Name == name {
-			return &c.Combatants[index]
+// UpdateCombatantTracker - Sync ACT combatant data
+func (c *CombatantCollector) UpdateCombatantTracker(combatant Combatant) {
+	// update existing
+	for index := range c.CombatantTrackers {
+		if c.CombatantTrackers[index].Start.ID == combatant.ID {
+			for cIndex := range c.CombatantTrackers[index].Data {
+				// update existing encounter combatant
+				if c.CombatantTrackers[index].Data[cIndex].ActEncounterID == combatant.ActEncounterID {
+					c.CombatantTrackers[index].Data[cIndex] = combatant
+					return
+				}
+			}
+			// add new combatant encounter
+			c.CombatantTrackers[index].Data = append(c.CombatantTrackers[index].Data, combatant)
+			return
 		}
 	}
-	newCombatant := Combatant{
-		Name: name,
+	// create new
+	log.Println("[ Combatant", combatant.ID, "] Added", combatant.Name)
+	ct := combatantCollectorCombatantTracker{
+		Start: combatant,
+		End:   combatant,
+		Data:  make([]Combatant, 1),
 	}
-	c.Combatants = append(c.Combatants, newCombatant)
-	return &c.Combatants[len(c.Combatants)-1]
+	ct.Data[0] = combatant
+	c.CombatantTrackers = append(c.CombatantTrackers, ct)
+	c.resolvePets()
 }
 
 // ReadLogLine - Parse log line and update combatant(s)
 func (c *CombatantCollector) ReadLogLine(l *LogLineData) {
 	switch l.Type {
-	case LogTypeSingleTarget:
-	case LogTypeAoe:
+	case LogTypeSingleTarget, LogTypeAoe:
 		{
-			// get combatants involved
-			aCombatant := c.getCombatant(l.AttackerName)
-			tCombatant := c.getCombatant(l.TargetName)
-			// update damage
-			if l.HasFlag(LogFlagDamage) && l.Damage > 0 {
-				aCombatant.Damage += int32(l.Damage)
-				aCombatant.Hits++
-				tCombatant.DamageTaken += int32(l.Damage)
-			} else if l.HasFlag(LogFlagHeal) && l.Damage > 0 {
-				aCombatant.DamageHealed += int32(l.Damage)
-				aCombatant.Heals++
+			// sync name
+			for index := range c.CombatantTrackers {
+				// ignore pets/non job combatants
+				if len(c.CombatantTrackers[index].Start.Job) == 0 || strings.Contains(c.CombatantTrackers[index].Start.Name, " (") {
+					continue
+				}
+				if c.CombatantTrackers[index].Start.ID == int32(l.AttackerID) && c.CombatantTrackers[index].Start.Name != l.AttackerName {
+					c.CombatantTrackers[index].Start.Name = l.AttackerName
+					log.Println("[ Combatant", c.CombatantTrackers[index].Start.ID, "] Set name", l.AttackerName)
+				}
 			}
-
+			break
+		}
+	case LogTypeUseAbilityWorldName:
+		{
+			// sync world
+			for index := range c.CombatantTrackers {
+				if c.CombatantTrackers[index].Start.Name == l.AttackerName {
+					c.CombatantTrackers[index].Start.World = l.TargetName
+					log.Println("[ Combatant", c.CombatantTrackers[index].Start.ID, "] Set world name", l.TargetName)
+					break
+				}
+			}
+			break
 		}
 	}
+}
+
+// resolvePets - Link pets to their owners
+func (c *CombatantCollector) resolvePets() {
+	for index, ct := range c.CombatantTrackers {
+		// > 1000000000 ID seems to be player summoned entities
+		if ct.Start.ID >= 1000000000 && ct.Start.ParentID == 0 {
+			if strings.Contains(ct.Start.Name, " (") {
+				// is pet, fix
+				nameSplit := strings.Split(ct.Start.Name, " (")
+				ownerName := nameSplit[1][:len(nameSplit[1])-1]
+				hasParent := false
+				for _, ownerCt := range c.CombatantTrackers {
+					if ownerCt.Start.ID < 1000000000 && ownerName == ownerCt.Start.Name {
+						hasParent = true
+						c.CombatantTrackers[index].Start.Name = nameSplit[0]
+						c.CombatantTrackers[index].Start.ParentID = ownerCt.Start.ID
+						c.CombatantTrackers[index].Start.Job = "Pet"
+						break
+					}
+				}
+				// cannot find an owner
+				if !hasParent {
+					//c.CombatantTrackers = append(c.CombatantTrackers[:index], c.CombatantTrackers[index+1])
+					return
+				}
+			} else if ct.Start.Name == "Demi-Bahamut" && ct.Start.Job == "Smn" {
+				// demi-bahamut, pair with smn as pet
+				// don't know smn that used it, pair it with first available smn
+				// this will show all demi-bahamuts with a single smn, oh well...
+				c.CombatantTrackers[index].Start.Job = "Pet"
+				hasSmn := false
+				for _, ownerCt := range c.CombatantTrackers {
+					if ownerCt.Start.ID < 1000000000 && ownerCt.Start.Name != "Demi-Bahamut" && ownerCt.Start.Job == "Smn" {
+						hasSmn = true
+						c.CombatantTrackers[index].Start.ParentID = ownerCt.Start.ID
+					}
+				}
+				// no smn to pair with
+				if !hasSmn {
+					//c.CombatantTrackers = append(c.CombatantTrackers[:index], c.CombatantTrackers[index+1])
+					return
+				}
+			} else {
+				// mark parent id for combatants that share the same name as parent
+				for _, ownerCt := range c.CombatantTrackers {
+					if ownerCt.Start.ID < 1000000000 && ((ownerCt.Start.ActName != "" && ownerCt.Start.ActName == ct.Start.Name) || ownerCt.Start.Name == ct.Start.Name) {
+						c.CombatantTrackers[index].Start.ActName = ct.Start.Name
+						c.CombatantTrackers[index].Start.Name = "(Object)"
+						c.CombatantTrackers[index].Start.ParentID = ownerCt.Start.ID
+						c.CombatantTrackers[index].Start.Job = "Pet"
+						// ast summons earthly star as seperate entity
+						if ownerCt.Start.Job == "Ast" {
+							c.CombatantTrackers[index].Start.Name = "Earthly Star"
+						}
+						break
+					}
+				}
+			}
+		}
+	}
+}
+
+// GetCombatants - Compile all combatants
+func (c *CombatantCollector) GetCombatants() []Combatant {
+	combatants := make([]Combatant, 0)
+	for _, ct := range c.CombatantTrackers {
+		combatant := ct.Start
+		for _, ctData := range ct.Data {
+			combatant.Damage += ctData.Damage
+			combatant.DamageHealed += ctData.DamageHealed
+			combatant.DamageTaken += ctData.DamageTaken
+			combatant.Deaths += ctData.Deaths
+			combatant.Heals += ctData.Heals
+			combatant.Hits += ctData.Hits
+			combatant.Kills += ctData.Kills
+		}
+		combatant.Damage -= ct.Start.Damage * 2
+		combatant.DamageHealed -= ct.Start.DamageHealed * 2
+		combatant.DamageTaken -= ct.Start.DamageTaken * 2
+		combatant.Deaths -= ct.Start.Deaths * 2
+		combatant.Heals -= ct.Start.Heals * 2
+		combatant.Hits -= ct.Start.Hits * 2
+		combatant.Kills -= ct.Start.Kills * 2
+		combatants = append(combatants, combatant)
+	}
+	return combatants
 }

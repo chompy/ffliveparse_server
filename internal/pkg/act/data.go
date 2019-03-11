@@ -27,14 +27,10 @@ import (
 	"os"
 	"path"
 	"path/filepath"
-	"strconv"
-	"strings"
 	"time"
 
 	"../app"
 	"../user"
-
-	"github.com/rs/xid"
 
 	_ "github.com/mattn/go-sqlite3" // sqlite driver
 )
@@ -50,14 +46,14 @@ const PastEncounterFetchLimit = 10
 
 // Data - data about an ACT session
 type Data struct {
-	Session         Session
-	User            user.Data
-	Encounter       Encounter
-	Combatants      []Combatant
-	LogLineBuffer   []LogLine
-	LastUpdate      time.Time
-	NewTickData     bool
-	HasValidSession bool
+	Session            Session
+	User               user.Data
+	EncounterCollector EncounterCollector
+	CombatantCollector CombatantCollector
+	LogLineBuffer      []LogLine
+	LastUpdate         time.Time
+	NewTickData        bool
+	HasValidSession    bool
 }
 
 // NewData - create new ACT session data
@@ -71,14 +67,13 @@ func NewData(session Session, user user.Data) (Data, error) {
 		return Data{}, err
 	}
 	database.Close()
-	encounterUIDGenerator := xid.New()
 	return Data{
-		Session:         session,
-		User:            user,
-		Encounter:       Encounter{UID: encounterUIDGenerator.String()},
-		Combatants:      make([]Combatant, 0),
-		LastUpdate:      time.Now(),
-		HasValidSession: false,
+		Session:            session,
+		User:               user,
+		EncounterCollector: NewEncounterCollector(),
+		CombatantCollector: NewCombatantCollector(),
+		LastUpdate:         time.Now(),
+		HasValidSession:    false,
 	}, nil
 }
 
@@ -86,75 +81,31 @@ func NewData(session Session, user user.Data) (Data, error) {
 func (d *Data) UpdateEncounter(encounter Encounter) {
 	d.LastUpdate = time.Now()
 	d.NewTickData = true
-	// check if encounter update is for current counter
-	// update it if so
-	if encounter.ActID == d.Encounter.ActID {
-		encounter.UID = d.Encounter.UID // copy UID
-		d.Encounter = encounter
-		// save encounter if it is no longer active
-		if !d.Encounter.Active {
-			err := d.SaveEncounter()
-			if err != nil {
-				log.Println("Error while saving encounter", d.Encounter.UID, err)
-			}
-		}
-		return
-	}
-	// save + clear current encounter if one exists
-	if d.Encounter.ActID != 0 {
-		err := d.SaveEncounter()
-		if err != nil {
-			log.Println("Error while saving encounter", d.Encounter.UID, err)
-		}
-		d.ClearEncounter()
-	}
-	// create new encounter
-	encounterUIDGenerator := xid.New()
-	encounter.UID = encounterUIDGenerator.String()
-	d.Encounter = encounter
-	log.Println("New active encounter. (UID:", d.Encounter.UID, "ActID:", d.Encounter.ActID, "UserID:", d.User.ID, ")")
+	d.EncounterCollector.UpdateEncounter(encounter)
 }
 
 // UpdateCombatant - Add or update combatant data
 func (d *Data) UpdateCombatant(combatant Combatant) {
-	d.LastUpdate = time.Now()
-	d.NewTickData = true
-	// ensure there is a current encounter and that data is for it
-	if combatant.ActEncounterID == 0 || d.Encounter.ActID == 0 || d.Encounter.UID == "" || combatant.ActEncounterID != d.Encounter.ActID {
+	// ensure there is an active encounter
+	if !d.EncounterCollector.Encounter.Active {
 		return
 	}
-	// set encounter UID
-	combatant.EncounterUID = d.Encounter.UID
-	// look for existing, update if found
-	for index, storedCombatant := range d.Combatants {
-		if storedCombatant.ID == combatant.ID {
-			// don't update name or parent id
-			combatant.Name = storedCombatant.Name
-			combatant.ParentID = storedCombatant.ParentID
-			if storedCombatant.ParentID > 0 {
-				combatant.Job = storedCombatant.Job
-			}
-			d.Combatants[index] = combatant
-			return
-		}
-	}
-	// add new
-	d.Combatants = append(d.Combatants, combatant)
-	// fix combatants
-	d.Combatants = SyncCombatants(d.Combatants)
-	log.Println("Add combatant", combatant.Name, "(", combatant.ID, ") to encounter", combatant.EncounterUID, "(TotalCombatants:", len(d.Combatants), ")")
+	d.LastUpdate = time.Now()
+	d.NewTickData = true
+	// update combatant collector
+	d.CombatantCollector.UpdateCombatantTracker(combatant)
 }
 
 // GetLogTempPath - Get path to temp log lines file
 func (d *Data) GetLogTempPath() string {
-	return path.Join(os.TempDir(), fmt.Sprintf("fflp_LogLine_%s.dat", d.Encounter.UID))
+	return path.Join(os.TempDir(), fmt.Sprintf("fflp_LogLine_%s.dat", d.EncounterCollector.Encounter.UID))
 }
 
 // GetLogPath - Get path to log lines file
 func (d *Data) GetLogPath() string {
 	tempPath := d.GetLogTempPath()
 	if _, err := os.Stat(tempPath); os.IsNotExist(err) {
-		return filepath.Join(app.LogPath, d.Encounter.UID+"_LogLines.dat")
+		return filepath.Join(app.LogPath, d.EncounterCollector.Encounter.UID+"_LogLines.dat")
 	}
 	return tempPath
 }
@@ -163,24 +114,35 @@ func (d *Data) GetLogPath() string {
 func (d *Data) UpdateLogLine(logLine LogLine) {
 	// update log last update flag
 	d.LastUpdate = time.Now()
-	// ensure there is a current encounter and that data is for it
-	if logLine.ActEncounterID == 0 || d.Encounter.ActID == 0 || d.Encounter.UID == "" || logLine.ActEncounterID != d.Encounter.ActID {
+	// parse out log line details
+	logLineParse, err := ParseLogLine(logLine)
+	if err != nil {
+		log.Println("Error reading log line,", err)
+		return
+	}
+	// save and reset encounter
+	if d.EncounterCollector.IsNewEncounter(&logLineParse) {
+		d.SaveEncounter()
+		d.EncounterCollector.Reset()
+		d.CombatantCollector.Reset()
+	}
+	// update encounter collector
+	d.EncounterCollector.ReadLogLine(&logLineParse)
+	d.CombatantCollector.ReadLogLine(&logLineParse)
+	// add log line to buffer if active encounter
+	if !d.EncounterCollector.Encounter.Active {
 		return
 	}
 	// set encounter UID
-	logLine.EncounterUID = d.Encounter.UID
+	logLine.EncounterUID = d.EncounterCollector.Encounter.UID
 	// add to log line list
 	d.LogLineBuffer = append(d.LogLineBuffer, logLine)
-	// update names if needed
-	d.SyncNameFromLogLine(logLine)
 }
 
 // ClearLogLines - Clear log lines from current session
 func (d *Data) ClearLogLines() {
 	d.LogLineBuffer = make([]LogLine, 0)
-	if d.Encounter.UID != "" {
-		os.Remove(d.GetLogTempPath())
-	}
+	os.Remove(d.GetLogTempPath())
 }
 
 // DumpLogLineBuffer - Dump log line buffer to temp file
@@ -273,7 +235,7 @@ func initDatabase(database *sql.DB) error {
 // SaveEncounter - save all data related to current encounter
 func (d *Data) SaveEncounter() error {
 	// no encounter
-	if d.Encounter.UID == "" {
+	if d.EncounterCollector.Encounter.UID == "" {
 		return nil
 	}
 	// get database
@@ -292,21 +254,21 @@ func (d *Data) SaveEncounter() error {
 		return err
 	}
 	_, err = stmt.Exec(
-		d.Encounter.UID,
-		d.Encounter.ActID,
+		d.EncounterCollector.Encounter.UID,
+		d.EncounterCollector.Encounter.ActID,
 		d.User.ID,
-		d.Encounter.StartTime,
-		d.Encounter.EndTime,
-		d.Encounter.Zone,
-		d.Encounter.Damage,
-		d.Encounter.SuccessLevel,
+		d.EncounterCollector.Encounter.StartTime,
+		d.EncounterCollector.Encounter.EndTime,
+		d.EncounterCollector.Encounter.Zone,
+		d.EncounterCollector.Encounter.Damage,
+		d.EncounterCollector.Encounter.SuccessLevel,
 	)
 	if err != nil {
 		return err
 	}
 	stmt.Close()
 	// insert in to combatant table
-	for _, combatant := range d.Combatants {
+	for _, combatant := range d.CombatantCollector.GetCombatants() {
 		stmt, err := database.Prepare(`
 			REPLACE INTO combatant
 			(id, parent_id, encounter_uid, user_id, name, act_name, job, damage, damage_taken, damage_healed, deaths, hits, heals, kills) VALUES
@@ -318,7 +280,7 @@ func (d *Data) SaveEncounter() error {
 		_, err = stmt.Exec(
 			combatant.ID,
 			combatant.ParentID,
-			combatant.EncounterUID,
+			d.EncounterCollector.Encounter.UID,
 			d.User.ID,
 			combatant.Name,
 			combatant.ActName,
@@ -348,7 +310,7 @@ func (d *Data) SaveEncounter() error {
 	}
 	defer tempLogFile.Close()
 	// open output log file
-	logFilePath := filepath.Join(app.LogPath, d.Encounter.UID+"_LogLines.dat")
+	logFilePath := filepath.Join(app.LogPath, d.EncounterCollector.Encounter.UID+"_LogLines.dat")
 	outLogFile, err := os.OpenFile(logFilePath, os.O_WRONLY|os.O_CREATE, 0664)
 	if err != nil {
 		return err
@@ -381,9 +343,8 @@ func (d *Data) SaveEncounter() error {
 // ClearEncounter - delete all data for current encounter from memory
 func (d *Data) ClearEncounter() {
 	d.ClearLogLines()
-	encounterUIDGenerator := xid.New()
-	d.Encounter = Encounter{UID: encounterUIDGenerator.String()}
-	d.Combatants = make([]Combatant, 0)
+	d.EncounterCollector.Reset()
+	d.CombatantCollector.Reset()
 }
 
 // GetPreviousEncounter - retrieve previous encounter data from database
@@ -429,7 +390,7 @@ func GetPreviousEncounter(user user.Data, encounterUID string, fetchLogs bool) (
 	if err != nil {
 		return Data{}, err
 	}
-	combatants := make([]Combatant, 0)
+	combatantCollector := NewCombatantCollector()
 	var parentID sql.NullInt64
 	for rows.Next() {
 		combatant := Combatant{}
@@ -453,16 +414,17 @@ func GetPreviousEncounter(user user.Data, encounterUID string, fetchLogs bool) (
 		if err != nil {
 			return Data{}, err
 		}
-		combatants = append(combatants, combatant)
+		combatantCollector.UpdateCombatantTracker(combatant)
 	}
 	rows.Close()
-	// fix combatants
-	combatants = SyncCombatants(combatants)
+	// build encounter collector
+	encounterCollector := NewEncounterCollector()
+	encounterCollector.Encounter = encounter
 	// return data set
 	d := Data{
-		User:       user,
-		Encounter:  encounter,
-		Combatants: combatants,
+		User:               user,
+		EncounterCollector: encounterCollector,
+		CombatantCollector: combatantCollector,
 	}
 	return d, nil
 }
@@ -544,99 +506,4 @@ func GetPreviousEncounterCount(user user.Data) (int, error) {
 func (d *Data) IsActive() bool {
 	dur := time.Now().Sub(d.LastUpdate)
 	return int64(dur/time.Millisecond) < lastUpdateInactiveTime
-}
-
-// SyncNameFromLogLine - Given a log line, try to fetch combatant name and update with it
-func (d *Data) SyncNameFromLogLine(logLine LogLine) (bool, error) {
-	if len(logLine.LogLine) <= 15 {
-		return false, nil
-	}
-	logSplit := strings.Split(logLine.LogLine[15:], ":")
-	// needs to be specific type of log line
-	if logSplit[0] != "15" || len(logSplit) <= 2 {
-		return false, nil
-	}
-	// parse id
-	actorID, err := strconv.ParseInt(logSplit[1], 16, 32)
-	if err != nil {
-		return false, err
-	}
-	// itterate combatants, update as needed
-	hasUpdate := false
-	for index, combatant := range d.Combatants {
-		// ignore pets/non job combatants
-		if len(combatant.Job) == 0 || strings.Contains(combatant.Name, " (") {
-			continue
-		}
-		if int32(actorID) == combatant.ID {
-			if combatant.Name != logSplit[2] {
-				d.Combatants[index].Name = logSplit[2]
-				hasUpdate = true
-			}
-		}
-	}
-	return hasUpdate, nil
-}
-
-// SyncCombatants - Perform fixes to combatant data (pet fix, etc)
-func SyncCombatants(combatants []Combatant) []Combatant {
-	for index, combatant := range combatants {
-		// > 1000000000 ID seems to be player summoned entities
-		if combatant.ID >= 1000000000 && combatant.ParentID == 0 {
-			if strings.Contains(combatant.Name, " (") {
-				// is pet, fix
-				nameSplit := strings.Split(combatant.Name, " (")
-				ownerName := nameSplit[1][:len(nameSplit[1])-1]
-				hasParent := false
-				for _, ownerCombatant := range combatants {
-					if ownerCombatant.ID < 1000000000 && ownerName == ownerCombatant.Name {
-						hasParent = true
-						combatants[index].Name = nameSplit[0]
-						combatants[index].ParentID = ownerCombatant.ID
-						combatants[index].Job = "Pet"
-						break
-					}
-				}
-				// cannot find an owner, not valid, delete
-				if !hasParent {
-					combatants = append(combatants[:index], combatants[index+1:]...)
-					return SyncCombatants(combatants)
-				}
-
-			} else if combatant.Name == "Demi-Bahamut" && combatant.Job == "Smn" {
-				// demi-bahamut, pair with smn as pet
-				// don't know smn that used it, pair it with first available smn
-				// this will show all demi-bahamuts with a single smn, oh well...
-				combatants[index].Job = "Pet"
-				hasSmn := false
-				for _, ownerCombatant := range combatants {
-					if ownerCombatant.ID < 1000000000 && ownerCombatant.Name != "Demi-Bahamut" && ownerCombatant.Job == "Smn" {
-						hasSmn = true
-						combatants[index].ParentID = ownerCombatant.ID
-					}
-				}
-				// no smn to pair with, delete
-				if !hasSmn {
-					combatants = append(combatants[:index], combatants[index+1:]...)
-					return SyncCombatants(combatants)
-				}
-			} else {
-				// mark parent id for combatants that share the same name as parent
-				for _, ownerCombatant := range combatants {
-					if ownerCombatant.ID < 1000000000 && ((ownerCombatant.ActName != "" && ownerCombatant.ActName == combatant.Name) || ownerCombatant.Name == combatant.Name) {
-						combatants[index].ActName = combatant.Name
-						combatants[index].Name = "(Object)"
-						combatants[index].ParentID = ownerCombatant.ID
-						combatants[index].Job = "Pet"
-						// ast summons earthly star as seperate entity
-						if ownerCombatant.Job == "Ast" {
-							combatants[index].Name = "Earthly Star"
-						}
-						break
-					}
-				}
-			}
-		}
-	}
-	return combatants
 }

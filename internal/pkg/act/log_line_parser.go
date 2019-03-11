@@ -19,6 +19,7 @@ package act
 
 import (
 	"fmt"
+	"log"
 	"regexp"
 	"strconv"
 	"strings"
@@ -30,6 +31,9 @@ const LogTypeGameLog = 0x00
 
 // LogTypeZoneChange - Log type identifier, zone change
 const LogTypeZoneChange = 0x01
+
+// LogTypeRemoveCombatant - Log type identifier, remove combatant
+const LogTypeRemoveCombatant = 0x04
 
 // LogTypeSingleTarget - Log type identifier, single target action
 const LogTypeSingleTarget = 0x15
@@ -48,6 +52,12 @@ const LogTypeGainEffect = 0x1A
 
 // LogTypeLoseEffect - Log type identifier, lose effect
 const LogTypeLoseEffect = 0x1E
+
+// LogTypeUseAbilityWorldName - Log type identifier, use ability message that contains player world name
+const LogTypeUseAbilityWorldName = 0x102B
+
+// LogTypeHPPercent - Log type identifier, HP percent of combatant
+const LogTypeHPPercent = 0x1D
 
 // LogFieldType - Log field indentifier, message type
 const LogFieldType = 0
@@ -107,7 +117,7 @@ const LogFlagParry = 7
 const LogFlagInstantDeath = 8
 
 // logShiftValues
-var logShiftValues = [...]int64{0x3E, 0x113, 0x213, 0x313}
+var logShiftValues = [...]int{0x3E, 0x113, 0x213, 0x313}
 
 // LogLineData - Data retrieved by parsing a log line
 type LogLineData struct {
@@ -136,17 +146,30 @@ func (l *LogLineData) HasFlag(flag int) bool {
 	return false
 }
 
+// hexToInt - convert hex string to int
+func hexToInt(hexString string) (int, error) {
+	if hexString == "" {
+		return 0, nil
+	}
+	output, err := strconv.ParseInt(hexString, 16, 64)
+	return int(output), err
+}
+
 // ParseLogLine - Parse log line in to data structure
 func ParseLogLine(logLine LogLine) (LogLineData, error) {
 	logLineString := logLine.LogLine
 	if len(logLineString) <= 15 {
 		return LogLineData{}, fmt.Errorf("tried to parse log line with too few characters")
 	}
+	// hack, fix SAM "Hissatsu:" move as it breaks ":" delimiter
+	logLineString = strings.Replace(logLineString, "Hissatsu:", "Hissatsu--", -1)
+	//logLineString = strings.Replace(logLineString, )
 	// split fields
 	fields := strings.Split(logLineString[15:], ":")
 	// get field type
-	logLineType, err := strconv.ParseInt(fields[0], 16, 8)
+	logLineType, err := hexToInt(fields[0])
 	if err != nil {
+		log.Print(logLineString)
 		return LogLineData{}, err
 	}
 	// create data object
@@ -157,8 +180,7 @@ func ParseLogLine(logLine LogLine) (LogLineData, error) {
 	}
 	// parse remaining
 	switch logLineType {
-	case LogTypeSingleTarget:
-	case LogTypeAoe:
+	case LogTypeSingleTarget, LogTypeAoe:
 		{
 			// ensure there are enough fields
 			if len(fields) < 24 {
@@ -167,8 +189,9 @@ func ParseLogLine(logLine LogLine) (LogLineData, error) {
 			// Shift damage and flags forward for mysterious spurious :3E:0:.
 			// Plenary Indulgence also appears to prepend confession stacks.
 			// UNKNOWN: Can these two happen at the same time?
-			flagsInt, err := strconv.ParseInt(fields[LogFieldFlags], 16, 64)
+			flagsInt, err := hexToInt(fields[LogFieldFlags])
 			if err != nil {
+				log.Println("1", logLineString)
 				return data, err
 			}
 			for _, shiftValue := range logShiftValues {
@@ -180,57 +203,66 @@ func ParseLogLine(logLine LogLine) (LogLineData, error) {
 			}
 			// fetch damage value
 			damageFieldLength := len(fields[LogFieldDamage])
-			if damageFieldLength <= 4 {
-				return data, fmt.Errorf("could not parse damage value")
-			}
-			// Get the left two bytes as damage.
-			damage, err := strconv.ParseInt(fields[LogFieldDamage][0:4], 16, 16)
-			if err != nil {
-				return data, err
+			damage := 0
+			if damageFieldLength >= 4 {
+				// Get the left two bytes as damage.
+				damage, err = hexToInt(fields[LogFieldDamage][0:4])
+				if err != nil {
+					log.Println("2", logLineString)
+					return data, err
+				}
 			}
 			// Check for third byte == 0x40.
-			if fields[LogFieldDamage][damageFieldLength-4] == '4' {
+			if damageFieldLength >= 4 && fields[LogFieldDamage][damageFieldLength-4] == '4' {
 				// Wrap in the 4th byte as extra damage.  See notes above.
-				rightDamage, err := strconv.ParseInt(fields[LogFieldDamage][damageFieldLength-2:damageFieldLength], 16, 32)
+				rightDamage, err := hexToInt(fields[LogFieldDamage][damageFieldLength-2 : damageFieldLength])
 				if err != nil {
+					log.Println("3", logLineString)
 					return data, err
 				}
 				damage = damage - rightDamage + (rightDamage << 16)
 			}
 			data.Damage = int(damage)
 			// attacker id
-			attackerID, err := strconv.ParseInt(fields[LogFieldAttackerID], 16, 32)
+			attackerID, err := hexToInt(fields[LogFieldAttackerID])
 			if err != nil {
+				log.Println("4", logLineString)
 				return data, err
 			}
 			data.AttackerID = int(attackerID)
 			// attacker name
 			data.AttackerName = fields[LogFieldAttackerName]
 			// ability id
-			abilityID, err := strconv.ParseInt(fields[LogFieldAbilityID], 16, 32)
+			abilityID, err := hexToInt(fields[LogFieldAbilityID])
 			if err != nil {
+				log.Println("5", logLineString)
 				return data, err
 			}
 			data.AbilityID = int(abilityID)
 			// ability name
 			data.AbilityName = fields[LogFieldAbilityName]
+			// hack, restore 'Hissatsu:'
+			data.AbilityName = strings.Replace(data.AbilityName, "Hissatsu--", "Hissatsu:", -1)
 			// target id
-			targetID, err := strconv.ParseInt(fields[LogFieldTargetID], 16, 32)
+			targetID, err := hexToInt(fields[LogFieldTargetID])
 			if err != nil {
+				log.Println("6", logLineString)
 				return data, err
 			}
 			data.TargetID = int(targetID)
 			// target name
 			data.TargetName = fields[LogFieldTargetName]
 			// target current hp
-			targetCurrentHP, err := strconv.ParseInt(fields[LogFieldTargetCurrentHP], 16, 32)
+			targetCurrentHP, err := hexToInt(fields[LogFieldTargetCurrentHP])
 			if err != nil {
+				log.Println("7", logLineString)
 				return data, err
 			}
 			data.TargetCurrentHP = int(targetCurrentHP)
 			// target max hp
-			targetMaxHP, err := strconv.ParseInt(fields[LogFieldTargetMaxHP], 16, 32)
+			targetMaxHP, err := hexToInt(fields[LogFieldTargetMaxHP])
 			if err != nil {
+				log.Println("8", logLineString)
 				return data, err
 			}
 			data.TargetMaxHP = int(targetMaxHP)
@@ -238,20 +270,84 @@ func ParseLogLine(logLine LogLine) (LogLineData, error) {
 		}
 	case LogTypeDefeat:
 		{
-			re, err := regexp.Compile("19:(.*) was defeated by (.*)\\.")
+			re, err := regexp.Compile(" 19:([a-zA-Z0-9'\\- ]*) was defeated by ([a-zA-Z0-9'\\- ]*)")
 			if err != nil {
+				log.Println("9", logLineString)
 				return data, err
 			}
 			match := re.FindStringSubmatch(logLineString)
 			data.AttackerName = match[2]
 			data.TargetName = match[1]
+			log.Println("DEFEAT", match[1])
+			break
+		}
+	case LogTypeUseAbilityWorldName:
+		{
+			re, err := regexp.Compile(" 102b:([a-zA-Z'\\-]*) ([A-Z'])([a-z'\\-]*)([A-Z])([a-z]*)")
+			if err != nil {
+				log.Println("10", logLineString)
+				return data, err
+			}
+			match := re.FindStringSubmatch(logLineString)
+			attackerName := fmt.Sprintf("%s %s%s", match[1], match[2], match[3])
+			worldName := fmt.Sprintf("%s%s", match[4], match[5])
+			data.AttackerName = attackerName
+			// special case, target name is world name
+			data.TargetName = worldName
+			log.Println("WORLD", attackerName, worldName)
+			break
+		}
+	case LogTypeZoneChange:
+		{
+			re, err := regexp.Compile(" 01:Changed Zone to (.*)\\.")
+			if err != nil {
+				log.Println("11", logLineString)
+				return data, err
+			}
+			match := re.FindStringSubmatch(logLineString)
+			// special case, target name is zone name
+			data.TargetName = match[1]
+			break
+		}
+	case LogTypeRemoveCombatant:
+		{
+			re, err := regexp.Compile(" 04:Removing combatant ([a-zA-Z0-9'\\- ]*)")
+			if err != nil {
+				log.Println("12", logLineString)
+				return data, err
+			}
+			match := re.FindStringSubmatch(logLineString)
+			data.TargetName = match[1]
+			log.Println("REMOVE COMBATANT", match[1])
+			break
+		}
+	case LogTypeHPPercent:
+		{
+			re, err := regexp.Compile(" 0D:([A-Za-z\\-' ]*) HP at ([0-9]*)%")
+			if err != nil {
+				log.Println("13", logLineString)
+				return data, err
+			}
+			match := re.FindStringSubmatch(logLineString)
+			if len(match) > 2 {
+				data.TargetName = match[1]
+				damage, err := strconv.ParseInt(match[2], 10, 64)
+				if err != nil {
+					return data, err
+				}
+				data.Damage = int(damage)
+				if damage == 0 {
+					log.Println("HP 0%", match[1])
+				}
+			}
+			break
 		}
 	}
 
 	// flags
-	if len(fields) >= LogFieldFlags {
+	if len(fields) >= LogFieldFlags+1 {
 		rawFlags := fields[LogFieldFlags]
-		switch rawFlags[len(rawFlags)-2 : len(rawFlags)-1] {
+		switch rawFlags[len(rawFlags)-1:] {
 		case "1":
 			{
 				data.Flags = append(data.Flags, LogFlagDodge)
@@ -259,22 +355,36 @@ func ParseLogLine(logLine LogLine) (LogLineData, error) {
 			}
 		case "3":
 			{
-				switch rawFlags[len(rawFlags)-4 : len(rawFlags)-3] {
-				case "1":
-					{
-						data.Flags = append(data.Flags, LogFlagCrit)
-						break
-					}
-				case "2":
-					{
-						data.Flags = append(data.Flags, LogFlagDirectHit)
-						break
-					}
-				case "3":
-					{
-						data.Flags = append(data.Flags, LogFlagCrit)
-						data.Flags = append(data.Flags, LogFlagDirectHit)
-						break
+				if len(rawFlags) >= 4 {
+					switch rawFlags[len(rawFlags)-3 : len(rawFlags)-2] {
+					case "3":
+						{
+							data.Flags = append(data.Flags, LogFlagInstantDeath)
+							break
+						}
+					default:
+						{
+							data.Flags = append(data.Flags, LogFlagDamage)
+							switch rawFlags[len(rawFlags)-4 : len(rawFlags)-3] {
+							case "1":
+								{
+									data.Flags = append(data.Flags, LogFlagCrit)
+									break
+								}
+							case "2":
+								{
+									data.Flags = append(data.Flags, LogFlagDirectHit)
+									break
+								}
+							case "3":
+								{
+									data.Flags = append(data.Flags, LogFlagCrit)
+									data.Flags = append(data.Flags, LogFlagDirectHit)
+									break
+								}
+							}
+							break
+						}
 					}
 				}
 				break
@@ -282,7 +392,7 @@ func ParseLogLine(logLine LogLine) (LogLineData, error) {
 		case "4":
 			{
 				data.Flags = append(data.Flags, LogFlagHeal)
-				if len(rawFlags) >= 5 && rawFlags[len(rawFlags)-6:len(rawFlags)-5] == "1" {
+				if len(rawFlags) >= 6 && rawFlags[len(rawFlags)-6:len(rawFlags)-5] == "1" {
 					data.Flags = append(data.Flags, LogFlagCrit)
 				}
 				break

@@ -161,7 +161,7 @@ func HTTPStartServer(port uint16, userManager *user.Manager, actManager *act.Man
 			return
 		}
 		// relay previous encounter data if encounter id was provided
-		if encounterUID != "" && (actData == nil || encounterUID != actData.Encounter.UID) {
+		if encounterUID != "" && (actData == nil || encounterUID != actData.EncounterCollector.Encounter.UID) {
 			log.Println("Load previous encounter data (EncounterUID:", encounterUID, ", UserID:", userData.ID, ")")
 			previousEncounter, err := act.GetPreviousEncounter(userData, encounterUID, true)
 			if err != nil {
@@ -203,7 +203,7 @@ func HTTPStartServer(port uint16, userManager *user.Manager, actManager *act.Man
 	}))
 	http.HandleFunc("/new", func(w http.ResponseWriter, r *http.Request) {
 		// inc page load count
-		pageLoads += 1
+		pageLoads++
 		// create a new user
 		userData, err := userManager.New()
 		if err != nil {
@@ -237,7 +237,7 @@ func HTTPStartServer(port uint16, userManager *user.Manager, actManager *act.Man
 	// display past encounters
 	http.HandleFunc("/history/", func(w http.ResponseWriter, r *http.Request) {
 		// inc page load count
-		pageLoads += 1
+		pageLoads++
 		// set resposne headers
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		// build template data
@@ -245,11 +245,11 @@ func HTTPStartServer(port uint16, userManager *user.Manager, actManager *act.Man
 		// split url path in to parts
 		urlPathParts := strings.Split(strings.TrimLeft(r.URL.Path, "/"), "/")
 		// get web id from url path
-		webUid := ""
+		webUID := ""
 		if len(urlPathParts) > 1 {
-			webUid = urlPathParts[1]
+			webUID = urlPathParts[1]
 		}
-		if webUid == "" {
+		if webUID == "" {
 			displayError(
 				w,
 				"User was not provided.",
@@ -258,18 +258,18 @@ func HTTPStartServer(port uint16, userManager *user.Manager, actManager *act.Man
 			return
 		}
 		// get user data
-		userData, err := userManager.LoadFromWebIDString(webUid)
+		userData, err := userManager.LoadFromWebIDString(webUID)
 		if err != nil {
 			displayError(
 				w,
-				"Unable to find session for user \""+webUid+".\"",
+				"Unable to find session for user \""+webUID+".\"",
 				http.StatusNotFound,
 			)
-			log.Println("Error when attempting to retreive user", webUid, ",", err)
+			log.Println("Error when attempting to retreive user", webUID, ",", err)
 			return
 		}
 		addUserToTemplateData(&td, userData)
-		td.WebIDString = webUid
+		td.WebIDString = webUID
 		// get offset
 		offsetString := r.URL.Query().Get("offset")
 		offset := int(0)
@@ -308,7 +308,7 @@ func HTTPStartServer(port uint16, userManager *user.Manager, actManager *act.Man
 				"Unable to fetch past encounters.",
 				http.StatusInternalServerError,
 			)
-			log.Println("Error when fetching patch encounter for", webUid, ",", err)
+			log.Println("Error when fetching patch encounter for", webUID, ",", err)
 			return
 		}
 		// render encounters template
@@ -317,7 +317,7 @@ func HTTPStartServer(port uint16, userManager *user.Manager, actManager *act.Man
 	// setup main page/index
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		// inc page load count
-		pageLoads += 1
+		pageLoads++
 		// split url path in to parts
 		urlPathParts := strings.Split(strings.TrimLeft(r.URL.Path, "/"), "/")
 		// get web id from url path
@@ -527,13 +527,13 @@ func sendInitData(ws *websocket.Conn, data *act.Data) {
 	// prepare data
 	dataBytes := make([]byte, 0)
 	// send encounter
-	if data != nil && data.Encounter.UID != "" {
-		encounterUID := data.Encounter.UID
-		log.Println("Send encounter data for", encounterUID, "(TotalCombatants:", len(data.Combatants), ")")
+	if data != nil && data.EncounterCollector.Encounter.UID != "" {
+		encounterUID := data.EncounterCollector.Encounter.UID
+		log.Println("Send encounter data for", encounterUID, "(TotalCombatants:", len(data.CombatantCollector.GetCombatants()), ")")
 		// add encounter
-		dataBytes = append(dataBytes, act.EncodeEncounterBytes(&data.Encounter)...)
+		dataBytes = append(dataBytes, act.EncodeEncounterBytes(&data.EncounterCollector.Encounter)...)
 		// add combatants
-		for _, combatant := range data.Combatants {
+		for _, combatant := range data.CombatantCollector.GetCombatants() {
 			dataBytes = append(dataBytes, act.EncodeCombatantBytes(&combatant)...)
 		}
 	}
@@ -551,7 +551,7 @@ func sendInitData(ws *websocket.Conn, data *act.Data) {
 	}
 	websocket.Message.Send(ws, compressData)
 	// send logs
-	if data != nil && data.Encounter.UID != "" {
+	if data != nil && data.EncounterCollector.Encounter.UID != "" {
 		logPath := data.GetLogPath()
 		logBytes, err := ioutil.ReadFile(logPath)
 		if err != nil {
