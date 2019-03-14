@@ -21,12 +21,12 @@
         </div>
 
         {{ range $val := .Encounters }}
-        <div class="encounterItem{{ if eq $val.Encounter.SuccessLevel 1 }} encounterSuccess{{ end }}">
-            <div class="encounterTime" data-timestamp="{{ $val.Encounter.StartTime.Unix }}"><a href="/{{ $val.User.GetWebIDString }}/{{ $val.Encounter.UID }}">1</a></div>
-            <div class="encounterZone">{{ $val.Encounter.Zone }}</div>
-            <div class="encounterLength">{{ $val.Encounter.EndTime.Sub $val.Encounter.StartTime }}</div>
+        <div class="encounterItem{{ if eq $val.EncounterCollector.Encounter.SuccessLevel 1 }} encounterSuccess{{ end }}">
+            <div class="encounterTime" data-timestamp="{{ $val.EncounterCollector.Encounter.StartTime.Unix }}"><a href="/{{ $val.User.GetWebIDString }}/{{ $val.EncounterCollector.Encounter.UID }}">1</a></div>
+            <div class="encounterZone">{{ $val.EncounterCollector.Encounter.Zone }}</div>
+            <div class="encounterLength">{{ $val.EncounterCollector.Encounter.EndTime.Sub $val.EncounterCollector.Encounter.StartTime }}</div>
             <div class="encounterCombatants">
-            {{ range $combatant := $val.Combatants }}
+            {{ range $combatant := $val.CombatantCollector.GetCombatants }}
             {{ if ne $combatant.Job ""}}
             <span class="encounterCombatant">{{ $combatant.Name }}</span>
             {{ end }}

@@ -25,14 +25,12 @@ import (
 // combatantCollectorCombatantTracker - Track combatant data and
 type combatantCollectorCombatantTracker struct {
 	Start Combatant
-	End   Combatant
 	Data  []Combatant
 }
 
 // CombatantCollector - Combatant data collector
 type CombatantCollector struct {
 	CombatantTrackers []combatantCollectorCombatantTracker
-	Combatants        []Combatant
 }
 
 // NewCombatantCollector - create new combatant collector
@@ -44,10 +42,6 @@ func NewCombatantCollector() CombatantCollector {
 
 // Reset - reset combatant collector
 func (c *CombatantCollector) Reset() {
-	for _, combatant := range c.Combatants {
-		log.Println("[ Combatant", combatant.ID, "] Removed")
-	}
-	c.Combatants = make([]Combatant, 0)
 	c.CombatantTrackers = make([]combatantCollectorCombatantTracker, 0)
 }
 
@@ -72,7 +66,6 @@ func (c *CombatantCollector) UpdateCombatantTracker(combatant Combatant) {
 	log.Println("[ Combatant", combatant.ID, "] Added", combatant.Name)
 	ct := combatantCollectorCombatantTracker{
 		Start: combatant,
-		End:   combatant,
 		Data:  make([]Combatant, 1),
 	}
 	ct.Data[0] = combatant

@@ -25,6 +25,9 @@ import (
 	"github.com/rs/xid"
 )
 
+// encounterInactiveTime - Time before last combat action before encounter should go inactive
+const encounterInactiveTime = 5000
+
 // encounterCollectorCombatantTracker - Track combatants in encounter to determine active status
 type encounterCollectorCombatantTracker struct {
 	Name           string
@@ -36,6 +39,7 @@ type encounterCollectorCombatantTracker struct {
 // EncounterCollector - Encounter data collector
 type EncounterCollector struct {
 	Encounter        Encounter
+	LastActionTime   time.Time
 	CombatantTracker []encounterCollectorCombatantTracker
 }
 
@@ -106,10 +110,8 @@ func (ec *EncounterCollector) endEncounter() {
 		} else {
 			log.Println("DEAD", ct.Name, ct.Team)
 		}
-		if ec.Encounter.EndTime.Before(ct.LastActionTime) {
-			ec.Encounter.EndTime = ct.LastActionTime
-		}
 	}
+	ec.Encounter.EndTime = ec.LastActionTime
 }
 
 // ReadLogLine - Parse log line and determine encounter status
@@ -119,7 +121,7 @@ func (ec *EncounterCollector) ReadLogLine(l *LogLineData) {
 		{
 			// must be damage action
 			if !l.HasFlag(LogFlagDamage) {
-				return
+				break
 			}
 			// start encounter
 			if len(ec.CombatantTracker) == 0 && !ec.Encounter.Active {
@@ -134,15 +136,15 @@ func (ec *EncounterCollector) ReadLogLine(l *LogLineData) {
 			// gather combatant tracker data
 			ctAttacker := ec.getCombatantTracker(l.AttackerName)
 			if ctAttacker == nil {
-				return
+				break
 			}
 			ctTarget := ec.getCombatantTracker(l.TargetName)
 			if ctTarget == nil {
-				return
+				break
 			}
 			// ignore log line if last action happened after this one
 			if ctAttacker.LastActionTime.After(l.Time) || ctTarget.LastActionTime.After(l.Time) {
-				return
+				break
 			}
 			// update combatant tracker data
 			if !ctAttacker.IsAlive {
@@ -155,6 +157,7 @@ func (ec *EncounterCollector) ReadLogLine(l *LogLineData) {
 			}
 			ctAttacker.LastActionTime = l.Time
 			ctTarget.LastActionTime = l.Time
+			ec.LastActionTime = l.Time
 			// set teams if needed
 			if ctAttacker.Team == 0 && ctTarget.Team == 0 {
 				ctAttacker.Team = 1
@@ -184,25 +187,24 @@ func (ec *EncounterCollector) ReadLogLine(l *LogLineData) {
 			}
 			// if hp percent then it must be 0
 			if l.Type == LogTypeHPPercent && l.Damage != 0 {
-				return
+				break
 			}
 			// get combatant tracker data
 			ctTarget := ec.getCombatantTracker(l.TargetName)
 			if ctTarget == nil {
-				return
+				break
 			}
 			// ignore log line if last action happened after this one
 			if ctTarget.LastActionTime.After(l.Time) {
-				return
+				break
 			}
 			// update target
 			ctTarget.LastActionTime = l.Time
+			ec.LastActionTime = l.Time
 			if ctTarget.IsAlive {
 				ctTarget.IsAlive = false
 				log.Println("[ Encounter", ec.Encounter.UID, "] Combatant", ctTarget.Name, "was defeated/removed")
 			}
-			// check if all combatants on a team are now dead
-			ec.checkInactive()
 			break
 		}
 	case LogTypeZoneChange:
@@ -233,14 +235,24 @@ func (ec *EncounterCollector) IsNewEncounter(l *LogLineData) bool {
 	return false
 }
 
-// checkInactive - Check if encounter should be made inactive
-func (ec *EncounterCollector) checkInactive() {
+// CheckInactive - Check if encounter should be made inactive
+func (ec *EncounterCollector) CheckInactive() {
 	// encounter already not active
 	if !ec.Encounter.Active {
 		return
 	}
+	// time should have passed since last combat action
+	if time.Now().Add(time.Duration(-encounterInactiveTime) * time.Millisecond).Before(ec.LastActionTime) {
+		return
+	}
 	// should be at least two combatants tracked
-	if len(ec.CombatantTracker) < 2 {
+	combatantCount := 0
+	for _, ct := range ec.CombatantTracker {
+		if ct.Team != 0 {
+			combatantCount++
+		}
+	}
+	if combatantCount < 2 {
 		return
 	}
 	// check to see if a team is dead, if so encounter should be considered inactive

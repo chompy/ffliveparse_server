@@ -283,7 +283,7 @@ func ParseLogLine(logLine LogLine) (LogLineData, error) {
 		}
 	case LogTypeUseAbilityWorldName:
 		{
-			re, err := regexp.Compile(" 102b:([a-zA-Z'\\-]*) ([A-Z'])([a-z'\\-]*)([A-Z])([a-z]*)")
+			re, err := regexp.Compile("102b:([a-zA-Z'\\-]*) ([A-Z'])([a-z'\\-]*)([A-Z])([a-z]*)")
 			if err != nil {
 				log.Println("10", logLineString)
 				return data, err
@@ -307,6 +307,7 @@ func ParseLogLine(logLine LogLine) (LogLineData, error) {
 			match := re.FindStringSubmatch(logLineString)
 			// special case, target name is zone name
 			data.TargetName = match[1]
+			log.Println("ZONE CHANGE", match[1])
 			break
 		}
 	case LogTypeRemoveCombatant:

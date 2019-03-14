@@ -214,6 +214,14 @@ func (m *Manager) doTick(userID int64) {
 		if data.EncounterCollector.Encounter.UID == "" {
 			continue
 		}
+		// check if encounter should be made inactive
+		if data.EncounterCollector.Encounter.Active {
+			data.EncounterCollector.CheckInactive()
+			if !data.EncounterCollector.Encounter.Active {
+				data.NewTickData = true
+			}
+		}
+		// ensure there is new data to send
 		if !data.NewTickData {
 			continue
 		}
