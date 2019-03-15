@@ -20,6 +20,8 @@ package act
 import (
 	"log"
 	"strings"
+
+	"../user"
 )
 
 // combatantCollectorCombatantTracker - Track combatant data and
@@ -31,11 +33,15 @@ type combatantCollectorCombatantTracker struct {
 // CombatantCollector - Combatant data collector
 type CombatantCollector struct {
 	CombatantTrackers []combatantCollectorCombatantTracker
+	userIDHash        string
 }
 
 // NewCombatantCollector - create new combatant collector
-func NewCombatantCollector() CombatantCollector {
-	cc := CombatantCollector{}
+func NewCombatantCollector(user *user.Data) CombatantCollector {
+	userIDHash, _ := user.GetWebIDString()
+	cc := CombatantCollector{
+		userIDHash: userIDHash,
+	}
 	cc.Reset()
 	return cc
 }
@@ -63,7 +69,7 @@ func (c *CombatantCollector) UpdateCombatantTracker(combatant Combatant) {
 		}
 	}
 	// create new
-	log.Println("[ Combatant", combatant.ID, "] Added", combatant.Name)
+	log.Println("[", c.userIDHash, "][ Combatant", combatant.ID, "] Added", combatant.Name)
 	ct := combatantCollectorCombatantTracker{
 		Start: combatant,
 		Data:  make([]Combatant, 1),
@@ -86,19 +92,21 @@ func (c *CombatantCollector) ReadLogLine(l *LogLineData) {
 				}
 				if c.CombatantTrackers[index].Start.ID == int32(l.AttackerID) && c.CombatantTrackers[index].Start.Name != l.AttackerName {
 					c.CombatantTrackers[index].Start.Name = l.AttackerName
-					log.Println("[ Combatant", c.CombatantTrackers[index].Start.ID, "] Set name", l.AttackerName)
+					log.Println("[", c.userIDHash, "][ Combatant", c.CombatantTrackers[index].Start.ID, "] Set name", l.AttackerName)
 				}
 			}
 			break
 		}
-	case LogTypeUseAbilityWorldName:
+	case LogTypeGameLog:
 		{
-			// sync world
-			for index := range c.CombatantTrackers {
-				if c.CombatantTrackers[index].Start.Name == l.AttackerName {
-					c.CombatantTrackers[index].Start.World = l.TargetName
-					log.Println("[ Combatant", c.CombatantTrackers[index].Start.ID, "] Set world name", l.TargetName)
-					break
+			if l.TargetName != "" && l.AttackerName != "" {
+				// sync world
+				for index := range c.CombatantTrackers {
+					if c.CombatantTrackers[index].Start.Name == l.AttackerName && c.CombatantTrackers[index].Start.World != l.TargetName {
+						c.CombatantTrackers[index].Start.World = l.TargetName
+						log.Println("[", c.userIDHash, "][ Combatant", c.CombatantTrackers[index].Start.ID, "] Set world name", l.TargetName)
+						break
+					}
 				}
 			}
 			break

@@ -70,8 +70,8 @@ func NewData(session Session, user user.Data) (Data, error) {
 	return Data{
 		Session:            session,
 		User:               user,
-		EncounterCollector: NewEncounterCollector(),
-		CombatantCollector: NewCombatantCollector(),
+		EncounterCollector: NewEncounterCollector(&user),
+		CombatantCollector: NewCombatantCollector(&user),
 		LastUpdate:         time.Now(),
 		HasValidSession:    false,
 	}, nil
@@ -120,9 +120,8 @@ func (d *Data) UpdateLogLine(logLine LogLine) {
 		log.Println("Error reading log line,", err)
 		return
 	}
-	// save and reset encounter
+	// reset encounter
 	if d.EncounterCollector.IsNewEncounter(&logLineParse) {
-		d.SaveEncounter()
 		d.EncounterCollector.Reset()
 		d.CombatantCollector.Reset()
 	}
@@ -390,7 +389,7 @@ func GetPreviousEncounter(user user.Data, encounterUID string, fetchLogs bool) (
 	if err != nil {
 		return Data{}, err
 	}
-	combatantCollector := NewCombatantCollector()
+	combatantCollector := NewCombatantCollector(&user)
 	var parentID sql.NullInt64
 	for rows.Next() {
 		combatant := Combatant{}
@@ -418,7 +417,7 @@ func GetPreviousEncounter(user user.Data, encounterUID string, fetchLogs bool) (
 	}
 	rows.Close()
 	// build encounter collector
-	encounterCollector := NewEncounterCollector()
+	encounterCollector := NewEncounterCollector(&user)
 	encounterCollector.Encounter = encounter
 	// return data set
 	d := Data{

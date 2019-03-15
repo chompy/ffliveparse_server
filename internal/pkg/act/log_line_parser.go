@@ -53,9 +53,6 @@ const LogTypeGainEffect = 0x1A
 // LogTypeLoseEffect - Log type identifier, lose effect
 const LogTypeLoseEffect = 0x1E
 
-// LogTypeUseAbilityWorldName - Log type identifier, use ability message that contains player world name
-const LogTypeUseAbilityWorldName = 0x102B
-
 // LogTypeHPPercent - Log type identifier, HP percent of combatant
 const LogTypeHPPercent = 0x1D
 
@@ -278,23 +275,6 @@ func ParseLogLine(logLine LogLine) (LogLineData, error) {
 			match := re.FindStringSubmatch(logLineString)
 			data.AttackerName = match[2]
 			data.TargetName = match[1]
-			log.Println("DEFEAT", match[1])
-			break
-		}
-	case LogTypeUseAbilityWorldName:
-		{
-			re, err := regexp.Compile("102b:([a-zA-Z'\\-]*) ([A-Z'])([a-z'\\-]*)([A-Z])([a-z]*)")
-			if err != nil {
-				log.Println("10", logLineString)
-				return data, err
-			}
-			match := re.FindStringSubmatch(logLineString)
-			attackerName := fmt.Sprintf("%s %s%s", match[1], match[2], match[3])
-			worldName := fmt.Sprintf("%s%s", match[4], match[5])
-			data.AttackerName = attackerName
-			// special case, target name is world name
-			data.TargetName = worldName
-			log.Println("WORLD", attackerName, worldName)
 			break
 		}
 	case LogTypeZoneChange:
@@ -307,7 +287,6 @@ func ParseLogLine(logLine LogLine) (LogLineData, error) {
 			match := re.FindStringSubmatch(logLineString)
 			// special case, target name is zone name
 			data.TargetName = match[1]
-			log.Println("ZONE CHANGE", match[1])
 			break
 		}
 	case LogTypeRemoveCombatant:
@@ -319,7 +298,6 @@ func ParseLogLine(logLine LogLine) (LogLineData, error) {
 			}
 			match := re.FindStringSubmatch(logLineString)
 			data.TargetName = match[1]
-			log.Println("REMOVE COMBATANT", match[1])
 			break
 		}
 	case LogTypeHPPercent:
@@ -337,12 +315,31 @@ func ParseLogLine(logLine LogLine) (LogLineData, error) {
 					return data, err
 				}
 				data.Damage = int(damage)
-				if damage == 0 {
-					log.Println("HP 0%", match[1])
-				}
 			}
 			break
 		}
+	case LogTypeGameLog:
+		{
+			// get world name from game log
+			if len(fields) > 2 && fields[1] == "102b" {
+				re, err := regexp.Compile("102b:([a-zA-Z'\\-]*) ([A-Z'])([a-z'\\-]*)([A-Z])([a-z]*)")
+				if err != nil {
+					log.Println("10", logLineString)
+					return data, err
+				}
+				match := re.FindStringSubmatch(logLineString)
+				if len(match) < 6 {
+					break
+				}
+				attackerName := fmt.Sprintf("%s %s%s", match[1], match[2], match[3])
+				worldName := fmt.Sprintf("%s%s", match[4], match[5])
+				data.AttackerName = attackerName
+				// special case, target name is world name
+				data.TargetName = worldName
+			}
+			break
+		}
+
 	}
 
 	// flags

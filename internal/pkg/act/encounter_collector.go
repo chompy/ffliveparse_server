@@ -22,6 +22,7 @@ import (
 	"strings"
 	"time"
 
+	"../user"
 	"github.com/rs/xid"
 )
 
@@ -41,11 +42,17 @@ type EncounterCollector struct {
 	Encounter        Encounter
 	LastActionTime   time.Time
 	CombatantTracker []encounterCollectorCombatantTracker
+	userIDHash       string
+	PlayerTeam       uint8
 }
 
 // NewEncounterCollector - Create new encounter collector
-func NewEncounterCollector() EncounterCollector {
-	ec := EncounterCollector{}
+func NewEncounterCollector(user *user.Data) EncounterCollector {
+	userIDHash, _ := user.GetWebIDString()
+	ec := EncounterCollector{
+		userIDHash: userIDHash,
+		PlayerTeam: 0,
+	}
 	ec.Reset()
 	return ec
 }
@@ -59,7 +66,7 @@ func (ec *EncounterCollector) Reset() {
 		EndTime:      time.Now(),
 		UID:          encounterUIDGenerator.String(),
 		Zone:         "",
-		SuccessLevel: 1,
+		SuccessLevel: 2,
 		Damage:       0, // not currently tracked
 	}
 	ec.CombatantTracker = make([]encounterCollectorCombatantTracker, 0)
@@ -88,7 +95,7 @@ func (ec *EncounterCollector) getCombatantTracker(name string) *encounterCollect
 			return &ec.CombatantTracker[index]
 		}
 	}
-	log.Println("[ Encounter", ec.Encounter.UID, "] New combatant", name)
+	log.Println("[", ec.userIDHash, "][ Encounter", ec.Encounter.UID, "] New combatant", name)
 	newCt := encounterCollectorCombatantTracker{
 		Name:           name,
 		Team:           0,
@@ -101,16 +108,22 @@ func (ec *EncounterCollector) getCombatantTracker(name string) *encounterCollect
 
 // endEncounter - Flag encounter as inactive and set end time to last action time
 func (ec *EncounterCollector) endEncounter() {
-	log.Println("[ Encounter", ec.Encounter.UID, "] Ended")
-	ec.Encounter.Active = false
-	ec.Encounter.EndTime = time.Time{}
-	for _, ct := range ec.CombatantTracker {
-		if ct.IsAlive {
-			log.Println("ALIVE", ct.Name, ct.Team)
-		} else {
-			log.Println("DEAD", ct.Name, ct.Team)
+	switch ec.Encounter.SuccessLevel {
+	case 1:
+		{
+			log.Println("[", ec.userIDHash, "][ Encounter", ec.Encounter.UID, "] Clear")
+		}
+	case 2, 3:
+		{
+			log.Println("[", ec.userIDHash, "][ Encounter", ec.Encounter.UID, "] Wipe")
+		}
+	default:
+		{
+			log.Println("[", ec.userIDHash, "][ Encounter", ec.Encounter.UID, "] Ended")
 		}
 	}
+	ec.Encounter.Active = false
+	ec.Encounter.EndTime = time.Time{}
 	ec.Encounter.EndTime = ec.LastActionTime
 }
 
@@ -125,7 +138,7 @@ func (ec *EncounterCollector) ReadLogLine(l *LogLineData) {
 			}
 			// start encounter
 			if len(ec.CombatantTracker) == 0 && !ec.Encounter.Active {
-				log.Println("[ Encounter", ec.Encounter.UID, "] Started")
+				log.Println("[", ec.userIDHash, "][ Encounter", ec.Encounter.UID, "] Started")
 				ec.Encounter.Active = true
 				ec.Encounter.StartTime = l.Time
 			}
@@ -149,11 +162,11 @@ func (ec *EncounterCollector) ReadLogLine(l *LogLineData) {
 			// update combatant tracker data
 			if !ctAttacker.IsAlive {
 				ctAttacker.IsAlive = true
-				log.Println("[ Encounter", ec.Encounter.UID, "] Combatant", ctAttacker.Name, "is alive")
+				log.Println("[", ec.userIDHash, "][ Encounter", ec.Encounter.UID, "] Combatant", ctAttacker.Name, "is alive")
 			}
 			if !ctTarget.IsAlive {
 				ctTarget.IsAlive = true
-				log.Println("[ Encounter", ec.Encounter.UID, "] Combatant", ctTarget.Name, "is alive")
+				log.Println("[", ec.userIDHash, "][ Encounter", ec.Encounter.UID, "] Combatant", ctTarget.Name, "is alive")
 			}
 			ctAttacker.LastActionTime = l.Time
 			ctTarget.LastActionTime = l.Time
@@ -162,20 +175,20 @@ func (ec *EncounterCollector) ReadLogLine(l *LogLineData) {
 			if ctAttacker.Team == 0 && ctTarget.Team == 0 {
 				ctAttacker.Team = 1
 				ctTarget.Team = 2
-				log.Println("[ Encounter", ec.Encounter.UID, "] Combatant", ctAttacker.Name, "is on team 1")
-				log.Println("[ Encounter", ec.Encounter.UID, "] Combatant", ctTarget.Name, "is on team 2")
+				log.Println("[", ec.userIDHash, "][ Encounter", ec.Encounter.UID, "] Combatant", ctAttacker.Name, "is on team 1")
+				log.Println("[", ec.userIDHash, "][ Encounter", ec.Encounter.UID, "] Combatant", ctTarget.Name, "is on team 2")
 			} else if ctAttacker.Team == 0 && ctTarget.Team != 0 {
 				ctAttacker.Team = 1
 				if ctTarget.Team == 1 {
 					ctAttacker.Team = 2
 				}
-				log.Println("[ Encounter", ec.Encounter.UID, "] Combatant", ctAttacker.Name, "is on team", ctAttacker.Team)
+				log.Println("[", ec.userIDHash, "][ Encounter", ec.Encounter.UID, "] Combatant", ctAttacker.Name, "is on team", ctAttacker.Team)
 			} else if ctAttacker.Team != 0 && ctTarget.Team == 0 {
 				ctTarget.Team = 1
 				if ctAttacker.Team == 1 {
 					ctTarget.Team = 2
 				}
-				log.Println("[ Encounter", ec.Encounter.UID, "] Combatant", ctTarget.Name, "is on team", ctTarget.Team)
+				log.Println("[", ec.userIDHash, "][ Encounter", ec.Encounter.UID, "] Combatant", ctTarget.Name, "is on team", ctTarget.Team)
 			}
 			break
 		}
@@ -203,12 +216,13 @@ func (ec *EncounterCollector) ReadLogLine(l *LogLineData) {
 			ec.LastActionTime = l.Time
 			if ctTarget.IsAlive {
 				ctTarget.IsAlive = false
-				log.Println("[ Encounter", ec.Encounter.UID, "] Combatant", ctTarget.Name, "was defeated/removed")
+				log.Println("[", ec.userIDHash, "][ Encounter", ec.Encounter.UID, "] Combatant", ctTarget.Name, "was defeated/removed")
 			}
 			break
 		}
 	case LogTypeZoneChange:
 		{
+			log.Println("[", ec.userIDHash, "] Zone changed to", l.TargetName)
 			if !ec.Encounter.Active {
 				return
 			}
@@ -219,7 +233,24 @@ func (ec *EncounterCollector) ReadLogLine(l *LogLineData) {
 			}
 			break
 		}
+	case LogTypeGameLog:
+		{
+			if ec.PlayerTeam > 0 {
+				break
+			}
+			if l.TargetName != "" && l.AttackerName != "" {
+				playerName := strings.TrimSpace(strings.ToUpper(l.AttackerName))
+				for _, ct := range ec.CombatantTracker {
+					if ct.Name == playerName {
+						ec.PlayerTeam = ct.Team
+						break
+					}
+				}
+			}
+			break
+		}
 	}
+
 }
 
 // IsNewEncounter - Check if log data is for new encounter
@@ -265,6 +296,13 @@ func (ec *EncounterCollector) CheckInactive() {
 			}
 		}
 		if teamDead {
+			// set success level
+			// clear
+			ec.Encounter.SuccessLevel = 1
+			if uint8(team) == ec.PlayerTeam {
+				// wipe
+				ec.Encounter.SuccessLevel = 2
+			}
 			ec.endEncounter()
 			return
 		}

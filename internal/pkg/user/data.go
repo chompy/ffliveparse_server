@@ -34,6 +34,7 @@ type Data struct {
 	Accessed  time.Time
 	UploadKey string // key used to push data from ACT
 	WebKey    string // key used to access creds via homepage (stored in cookie)
+	webIDHash string
 }
 
 // NewData - create new user data
@@ -50,6 +51,9 @@ func NewData() Data {
 
 // GetWebIDString - get web id string used to access data
 func (d *Data) GetWebIDString() (string, error) {
+	if d.webIDHash != "" {
+		return d.webIDHash, nil
+	}
 	hd := hashids.NewData()
 	hd.Salt = webIDSalt
 	hd.MinLength = 5
@@ -61,6 +65,7 @@ func (d *Data) GetWebIDString() (string, error) {
 	if err != nil {
 		return "", err
 	}
+	d.webIDHash = idStr
 	return idStr, nil
 }
 

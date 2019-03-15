@@ -218,6 +218,7 @@ func (m *Manager) doTick(userID int64) {
 		if data.EncounterCollector.Encounter.Active {
 			data.EncounterCollector.CheckInactive()
 			if !data.EncounterCollector.Encounter.Active {
+				data.SaveEncounter()
 				data.NewTickData = true
 			}
 		}
