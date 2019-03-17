@@ -7,6 +7,9 @@
     background: #2d2d2d;
     z-index: 1;
 }
+#combatant-col-names {
+    display: none;
+}
 .combatant {
     padding: 10px 8px;
     white-space: nowrap;
@@ -58,14 +61,18 @@
 .combatant-info .info-text span {
     font-size: 12px;
     line-height: 15px;
+    display: none;
+}
+.combatant-info .info-text .name, .combatant-info .info-text .damage {
     display: block;
 }
+
 .combatant-info .info-text .name {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
 }
-.combatant-info .info-text .parse {
+.combatant-info .info-text .damage {
     font-weight: bold;
     font-size: 16px;
 }
@@ -75,7 +82,7 @@
     margin-left: 7px;
     margin-right: 7px;
 }
-.combatant.pet .info-text .parse {
+.combatant.pet .info-text .damage {
     font-size: 12px;
 }
 
@@ -83,7 +90,7 @@
     .combatant, .combatant.pet { padding: 3px 8px; }
     .combatant-info .info-text span { font-size: 12px; }
     .combatant-info .job-icon { width: 24px; height: 24px; }
-    .combatant-info .info-text .parse { font-size: 12px; }
+    .combatant-info .info-text .damage { font-size: 12px; }
     .combatant.pet .job-icon { margin: 0; }
 }
 @media(max-width: 720px) {
@@ -91,5 +98,56 @@
     .combatant-info { text-align:  center; }
     .combatant-info .info-text { margin-left: 0; display: block; }
     .combatant-info .info-text .name { display: none; }
-    .combatant-info .info-text .parse { margin-top: 2px; }
+    .combatant-info .info-text .damage { margin-top: 2px; }
+}
+
+/* table mode */
+.mode-table #combatants {
+    width: 100%;
+}
+.mode-table #combatant-col-names { 
+    display: block;
+}
+.mode-table #combatants .combatant.combatant-npc {
+    display: none;
+}
+.mode-table #combatants .combatant.pet {
+    padding: 10px 8px;
+    min-height: 0;
+}
+.mode-table #combatants .info-text {
+    width: 100%;
+    display: inline-block;
+    text-align: left;
+}
+.mode-table #combatants .info-text span, #combatant-col-names span {
+    display: inline-block;
+    vertical-align: middle;
+    max-width: 9999px !important;
+    margin-left: 30px;
+}
+.mode-table #combatants .info-text .damage {
+    font-size: 12px;
+}
+#combatant-col-names {
+    border-bottom: 1px solid #fff;
+    padding: 10px 10px;
+    font-size: 16px;
+    padding-left: 52px;
+}
+
+@media(max-width: 940px) {
+    .mode-table #combatant-col-names {
+        padding: 5px;
+        padding-left: 36px;
+        font-size: 14px;
+    }
+}
+@media(max-width: 720px) {
+    .mode-table #combatant-col-names {
+        padding-left: 32px;
+    }
+    .mode-table #combatants span.job {
+        display: none;
+    }
 }

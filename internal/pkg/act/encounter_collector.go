@@ -122,6 +122,16 @@ func (ec *EncounterCollector) endEncounter() {
 			log.Println("[", ec.userIDHash, "][ Encounter", ec.Encounter.UID, "] Ended")
 		}
 	}
+	// display who is still alive on both teams
+	for team := 1; team <= 2; team++ {
+		teamAlive := make([]string, 0)
+		for _, ct := range ec.CombatantTracker {
+			if ct.Team == uint8(team) && ct.IsAlive {
+				teamAlive = append(teamAlive, ct.Name)
+			}
+		}
+		log.Println("[", ec.userIDHash, "][ Encounter", ec.Encounter.UID, "] Team", team, "has", len(teamAlive), "combatant(s) alive. (", strings.Join(teamAlive, ","), ")")
+	}
 	ec.Encounter.Active = false
 	ec.Encounter.EndTime = time.Time{}
 	ec.Encounter.EndTime = ec.LastActionTime

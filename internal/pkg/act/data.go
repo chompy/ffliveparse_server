@@ -126,10 +126,14 @@ func (d *Data) UpdateLogLine(logLine LogLine) {
 		d.CombatantCollector.Reset()
 	}
 	// update encounter collector
+	wasActiveEncounter := d.EncounterCollector.Encounter.Active
 	d.EncounterCollector.ReadLogLine(&logLineParse)
 	d.CombatantCollector.ReadLogLine(&logLineParse)
 	// add log line to buffer if active encounter
 	if !d.EncounterCollector.Encounter.Active {
+		if wasActiveEncounter {
+			d.NewTickData = true
+		}
 		return
 	}
 	// set encounter UID
@@ -210,6 +214,7 @@ func initDatabase(database *sql.DB) error {
 			encounter_uid VARCHAR(32),
 			name VARCHAR(256),
 			act_name VARCHAR(256),
+			world_name VARCHAR(256),
 			job VARCHAR(3),
 			damage INTEGER,
 			damage_taken INTEGER,
@@ -270,8 +275,8 @@ func (d *Data) SaveEncounter() error {
 	for _, combatant := range d.CombatantCollector.GetCombatants() {
 		stmt, err := database.Prepare(`
 			REPLACE INTO combatant
-			(id, parent_id, encounter_uid, user_id, name, act_name, job, damage, damage_taken, damage_healed, deaths, hits, heals, kills) VALUES
-			(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			(id, parent_id, encounter_uid, user_id, name, act_name, world_name, job, damage, damage_taken, damage_healed, deaths, hits, heals, kills) VALUES
+			(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		`)
 		if err != nil {
 			return err
@@ -283,6 +288,7 @@ func (d *Data) SaveEncounter() error {
 			d.User.ID,
 			combatant.Name,
 			combatant.ActName,
+			combatant.World,
 			combatant.Job,
 			combatant.Damage,
 			combatant.DamageTaken,
@@ -382,7 +388,7 @@ func GetPreviousEncounter(user user.Data, encounterUID string, fetchLogs bool) (
 	rows.Close()
 	// fetch combatants
 	rows, err = database.Query(
-		"SELECT id, parent_id, encounter_uid, name, job, damage, damage_taken, damage_healed, deaths, hits, heals, kills FROM combatant WHERE user_id = ? AND encounter_uid = ?",
+		"SELECT id, parent_id, encounter_uid, name, act_name, world_name, job, damage, damage_taken, damage_healed, deaths, hits, heals, kills FROM combatant WHERE user_id = ? AND encounter_uid = ?",
 		user.ID,
 		encounterUID,
 	)
@@ -391,6 +397,7 @@ func GetPreviousEncounter(user user.Data, encounterUID string, fetchLogs bool) (
 	}
 	combatantCollector := NewCombatantCollector(&user)
 	var parentID sql.NullInt64
+	var worldName sql.NullString
 	for rows.Next() {
 		combatant := Combatant{}
 		err := rows.Scan(
@@ -398,6 +405,8 @@ func GetPreviousEncounter(user user.Data, encounterUID string, fetchLogs bool) (
 			&parentID,
 			&combatant.EncounterUID,
 			&combatant.Name,
+			&combatant.ActName,
+			&worldName,
 			&combatant.Job,
 			&combatant.Damage,
 			&combatant.DamageTaken,
@@ -409,6 +418,9 @@ func GetPreviousEncounter(user user.Data, encounterUID string, fetchLogs bool) (
 		)
 		if parentID.Valid {
 			combatant.ParentID = int32(parentID.Int64)
+		}
+		if worldName.Valid {
+			combatant.World = worldName.String
 		}
 		if err != nil {
 			return Data{}, err

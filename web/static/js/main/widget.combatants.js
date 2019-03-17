@@ -17,6 +17,7 @@ along with FFLiveParse.  If not, see <https://www.gnu.org/licenses/>.
 
 var COMBATANT_CONTAINER_ELEMENT_ID = "combatants";
 var COMBATANT_ELEMENT_ID = "playerCombatants";
+var COMBATANT_COL_NAME_ELEMENT_ID = "combatant-col-names";
 
 var PARSE_AVAILABLE_COLUMNS = [
     [
@@ -55,6 +56,8 @@ class WidgetCombatants extends WidgetBase
         this.encounterDamage = 0;
         this.combatants = [];
         this.combatantsElement = document.getElementById(COMBATANT_ELEMENT_ID);
+        this.combatantsContainerElement = document.getElementById(COMBATANT_CONTAINER_ELEMENT_ID);
+        this.combatantsColNamesElement = document.getElementById(COMBATANT_COL_NAME_ELEMENT_ID);
         this.streamMode = false;
         if (!("sortBy" in this.userConfig)) {
             this.userConfig["sortBy"] = "damage";
@@ -82,6 +85,7 @@ class WidgetCombatants extends WidgetBase
         this.addEventListener("act:encounter", function(e) { t._updateEncounter(e); });
         this.addEventListener("app:combatant", function(e) { t._updateCombatants(e); });
         // window resize
+        var t = this;
         function _onResize(e) {
             var combatantWidth = t.combatantsElement.offsetWidth;
             for (var i in t.combatants) {
@@ -93,6 +97,13 @@ class WidgetCombatants extends WidgetBase
         this.addEventListener("resize", _onResize);
         setTimeout(function() { _onResize(); }, 1000);
         this.streamMode = (window.location.hash == "#stream");
+        // build col names
+        for (var i in PARSE_AVAILABLE_COLUMNS) {
+            var colNameElement = document.createElement("span");
+            colNameElement.classList.add("combatant-column-name", PARSE_AVAILABLE_COLUMNS[i][1]);
+            colNameElement.innerText = PARSE_AVAILABLE_COLUMNS[i][0];
+            this.combatantsColNamesElement.append(colNameElement);
+        }
     }
 
     /**
@@ -124,10 +135,11 @@ class WidgetCombatants extends WidgetBase
         // combatant info
         var infoTextElement = document.createElement("div");
         infoTextElement.classList.add("info-text");
-        for (var infoSubElementName of ["name", "parse"]) { 
+        for (var i in PARSE_AVAILABLE_COLUMNS) {
             var infoSubElement = document.createElement("span");
-            infoSubElement.classList.add(infoSubElementName);
+            infoSubElement.classList.add(PARSE_AVAILABLE_COLUMNS[i][1]);
             infoTextElement.appendChild(infoSubElement);
+
         }
         element.appendChild(infoTextElement);
         return element;
@@ -169,20 +181,52 @@ class WidgetCombatants extends WidgetBase
             jobIconElement.title = combatant.data.Job.toUpperCase() + " - " + combatant.getDisplayName();
             jobIconElement.alt = combatant.data.Job.toUpperCase() + " - " + combatant.getDisplayName();
         }
-        // name
-        var nameElement = element.getElementsByClassName("name")[0];
-        if (nameElement.innerText != combatant.getDisplayName()) {
-            nameElement.innerText = combatant.getDisplayName();
-            element.setAttribute("data-name", combatant.getDisplayName());
-            element.title = combatant.getDisplayName();
+
+        // info elements
+        for (var i in PARSE_AVAILABLE_COLUMNS) {
+            var infoSubElement = element.getElementsByClassName(PARSE_AVAILABLE_COLUMNS[i][1])[0];
+            var infoValue = null;
+            switch (PARSE_AVAILABLE_COLUMNS[i][1]) {
+                case "job": {
+                    infoValue = combatant.data.Job.toUpperCase();
+                    break;
+                }
+                case "name": {
+                    infoValue = combatant.getDisplayName();
+                    if (infoSubElement.innerText != infoValue) {
+                        element.setAttribute("data-name", combatant.getDisplayName());
+                        element.title = combatant.getDisplayName();
+                    }
+                    break
+                }
+                case "damage": {
+                    infoValue = (combatant.data.Damage / this.encounterDuration);
+                    if (!this._isValidParseNumber(infoValue)) {
+                        infoValue = 0;
+                    }
+                    infoValue = infoValue.toFixed(2);
+                    break;
+                }
+                case "healing": {
+                    infoValue = (combatant.data.DamageHealed / this.encounterDuration);
+                    if (!this._isValidParseNumber(infoValue)) {
+                        infoValue = 0;
+                    }
+                    infoValue = infoValue.toFixed(2);
+                    break
+                }
+                case "deaths": {
+                    infoValue = combatant.data.Deaths;
+                    if (!infoValue) {
+                        infoValue = "0";
+                    }
+                    break
+                }
+            }
+            if (infoValue && infoSubElement.innerText != infoValue)  {
+                infoSubElement.innerText = infoValue;
+            }
         }
-        // dps
-        var dpsElement = element.getElementsByClassName("parse")[0];
-        var dps = (combatant.data.Damage / this.encounterDuration);
-        if (!this._isValidParseNumber(dps)) {
-            dps = 0;
-        }
-        dpsElement.innerText = dps.toFixed(2);
     }
 
     /**
@@ -251,9 +295,27 @@ class WidgetCombatants extends WidgetBase
                 }
             }
         });
+
+        var combatantInfoTextWidth = 0;
         for (var i = 0; i < this.combatants.length; i++) {
             this.combatantsElement.appendChild(this.combatants[i]._parseElement);
+            combatantInfoTextWidth = this.combatants[i]._parseElement.offsetWidth;
         }
+
+        // set table spacing
+        for (var i in PARSE_AVAILABLE_COLUMNS) {
+            var colElements = this.combatantsContainerElement.getElementsByClassName(PARSE_AVAILABLE_COLUMNS[i][1]);
+            var maxWidth = 0;
+            for (var j = 0; j < colElements.length; j++) {
+                if (colElements[j].offsetWidth > maxWidth) {
+                    maxWidth = colElements[j].offsetWidth;
+                }
+            }
+            for (var j = 0; j < colElements.length; j++) {
+                colElements[j].style.minWidth = maxWidth + "px";
+            }
+        }
+
         // trigger custom event
         window.dispatchEvent(
             new CustomEvent("widget-combatants:display", {"detail" : this.combatants})
