@@ -104,23 +104,29 @@ class WidgetTimelime extends WidgetBase
         this.timelineCanvas.addEventListener("mousedown", function(e) {
             isMouseDown = true;
         });
+        this.timelineCanvas.addEventListener("touchstart", function(e) {
+            isMouseDown = true;
+        });
         window.addEventListener("mouseup", function(e) {
             isMouseDown = false;
         });
-        this.timelineCanvas.addEventListener("mousemove", function(e) {
+        window.addEventListener("touchend", function(e) {
+            isMouseDown = false;
+        });
+        var scrollTimeline = function(movement) {
             if (!isMouseDown) {
                 return;
             }
-            if (Math.abs(e.movementX) > 1 || Math.abs(e.movementY) > 1) {
+            if (Math.abs(movement[0]) > 1 || Math.abs(movement[1]) > 1) {
                 hasDrag = true;
             }
-            t._addSeek(e.movementX * 15);
+            t._addSeek(movement[0] * 15);
             // vertical scroll
             var combatantOffset = parseInt(t.combatantContainerElement.style.marginTop);
             if (!combatantOffset) {
                 combatantOffset = 0;
             }
-            combatantOffset = combatantOffset + (e.movementY * 2);
+            combatantOffset = combatantOffset + (movement[1] * 2);
             if (combatantOffset > 0) {
                 combatantOffset = 0;
             } else if (combatantOffset < -(t.combatantContainerElement.offsetHeight - (window.innerHeight - t.timelineVOffset))) {
@@ -129,6 +135,18 @@ class WidgetTimelime extends WidgetBase
             
             t.combatantContainerElement.style.marginTop = combatantOffset + "px";
             t.timelineElement.style.marginTop = combatantOffset + "px";
+        };
+        this.timelineCanvas.addEventListener("mousemove", function(e) {
+            scrollTimeline([e.movementX, e.movementY]);
+        });
+        var lastTouchPos = null;
+        this.timelineCanvas.addEventListener("touchmove", function(e) {
+            if (!lastTouchPos) {
+                lastTouchPos = [e.touches[0].clientX, e.touches[0].clientY];
+                return;
+            }
+            scrollTimeline([e.touches[0].clientX - lastTouchPos[0], e.touches[0].clientY - lastTouchPos[1]]);
+            lastTouchPos = null;
         });
         // window resize
         this.addEventListener("resize", function(e) { t._resizeTimeline(); });
@@ -461,7 +479,7 @@ class WidgetTimelime extends WidgetBase
      */
     _renderTimeKeys(time)
     {
-        if (!time) {
+        if (!time || !this.startTime) {
             return;
         }
         // draw rectangle bg
@@ -548,7 +566,7 @@ class WidgetTimelime extends WidgetBase
         if (!this.timelineSeek) {
             this.timelineSeek = new Date().getTime();
             if (!this.isActiveEncounter) {
-                this.timelineSeek = this.endTime.getTime();
+                this.timelineSeek = this.endTime ? this.endTime.getTime() : 0;
             }
         }
         this._setSeek(this.timelineSeek + timeAdd);
@@ -580,6 +598,9 @@ class WidgetTimelime extends WidgetBase
         }
         // get current position
         var time = this._getCurrentTime();
+        if (!time) {
+            return;
+        }
         // clear canvas
         this.canvasContext.clearRect(0, 0, this.timelineCanvas.width, this.timelineCanvas.height);
         // render time keys
@@ -725,6 +746,9 @@ class WidgetTimelime extends WidgetBase
         var iconUrl = this._getTimelineActionIcon(timelineAction, combatant);
         // get current position
         var time = this._getCurrentTime();
+        if (!time || !this.startTime) {
+            return;
+        }
         // get pixel position
         var pixelPos = this._getTimelineActionPosition(timelineAction, combatant);
         var offsetPos = (time.getTime() - this.startTime.getTime()) * TIMELINE_PIXELS_PER_MILLISECOND;
@@ -1146,6 +1170,9 @@ class WidgetTimelime extends WidgetBase
         }
         // get current position
         var time = this._getCurrentTime();
+        if (!time || !this.startTime) {
+            return;
+        }
         // get offset pos
         var offsetPos = (time.getTime() - this.startTime.getTime()) * TIMELINE_PIXELS_PER_MILLISECOND;
         // itterate actions

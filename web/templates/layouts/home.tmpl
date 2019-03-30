@@ -1,5 +1,4 @@
 {{ define "headerLeft" }}
-<div id="logo"><a href="/">{{.AppName}}</a></div>
 {{ end }}
 
 {{ define "headerRight" }}
@@ -10,6 +9,10 @@
 <div id="homeContent">
 
     <div class="homeSection">
+        <div class="homeSectionName">About</div>
+        <p class="textCenter">
+            <img src="/static/img/home_gang.png" alt="The Gang" />
+        </p>        
         <p>
             {{.AppName}} is a tool for sharing your Final Fantasy XIV log and parse data from
             <a href="https://advancedcombattracker.com/">Advanced Combat Tracker (ACT)</a> on the
@@ -18,6 +21,7 @@
     </div>
 
     <div class="homeSection">
+        <div class="homeSectionName">Download &amp; Instructions</div>
         <p class="textCenter">
             <a href="https://github.com/chompy/ffliveparse_act_plugin/archive/v{{ .ActVersionString }}.zip">Download ACT Plugin (v{{ .ActVersionString }})</a>
         </p>
@@ -29,6 +33,7 @@
 
 
     <div class="homeSection">
+        <div class="homeSectionName">My Info</div>
         {{ if (gt .User.ID 0) }}
         <p class="textCenter">
             Your ACT "upload key" is...
@@ -47,8 +52,8 @@
         </p>
         {{ end }}
     </div>
-
     <div class="homeSection">
+        <div class="homeSectionName">Discord</div>
         <p class="textCenter">
             Check out the FFLiveParse Discord server!
         </p>
@@ -56,10 +61,29 @@
         <p class="textCenter">
             <a href="https://discord.gg/Rt34mav">https://discord.gg/Rt34mav</a>
         </p>
+    </div>
+    <div class="homeSection">
+        <div class="homeSectionName">Developer Corner</div>
+        <p class="textCenter">
+            <img src="/static/img/home_minda.png" alt="Minda Silva @ Sargatanas" />
+        </p>
+        <p class="textLeft">
+            I would like to use this space to shameless plug myself! My FFXIV character is
+            <a href="https://na.finalfantasyxiv.com/lodestone/character/1034047/">Minda Silva @ Sargatanas</a>,
+            I'm looking for people to help me solo heal savage! If you think that is something you'd be interested in
+            join my solo heal Discord! We'll also be looking to do other forms of challenge runs as well.
+        </p>
+        <p>
+            <strong>Solo Heal Discord:</strong><br/><a href="https://discord.gg/SaxPDDR">https://discord.gg/SaxPDDR</a>
+        </p>
+        <p>
+            <strong>My FFLogs:</strong><br/><a href="https://www.fflogs.com/character/id/132739">https://www.fflogs.com/character/id/132739</a>
+        </p>
 
     </div>
 
     <div class="homeSection">
+        <div class="homeSectionName">Contact &amp; Donate</div>
         <p>
             You can contact me via email at
             <strong><a href="mailto:&#110;&#097;&#116;&#104;&#097;&#110;&#064;&#111;&#103;&#100;&#101;&#110;&#046;&#116;&#101;&#099;&#104;">&#110;&#097;&#116;&#104;&#097;&#110;&#064;&#111;&#103;&#100;&#101;&#110;&#046;&#116;&#101;&#099;&#104;</a></strong>
@@ -90,14 +114,25 @@
         <div class="spacer"></div>
     </div>
     <div class="homeSection">
-        <h3>Version Notes 1.14</h3>
+        <div class="homeSectionName">Version Notes</div>
+        <h3>Version 1.15</h3>
         <p>
             <strong>Enhancements</strong>
             <ul>
-                <li>Rebuilt timeline renderer, now uses HTML5 canvas. Hopefully it'll be smoother and use less CPU.</li>
-                <li>Log lines are now dumped to temporary files instead of being stored in server memory, should reduce out of memory crashes.</li>
+                <li>Encounter 'table' view.</li>
+                <li>Hamburger menu with view selector and resource links</li>
+                <li>No longer relies on ACT to determine when an encounter starts and ends.</li>
+                <li>Encounter data is now saved when an encounter ends. It used to save when the next encounter began.</li>
             </ul>
         </p>
+        <p>
+            <strong>Bug Fixes</strong>
+            <ul>
+                <li>Fixed timeline scrolling on touch devices.</li>
+                
+            </ul>
+        </p>
+
     </div>
     
 </div>

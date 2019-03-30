@@ -29,11 +29,11 @@ var PARSE_AVAILABLE_COLUMNS = [
         "name"
     ],
     [
-        "DPS (%)",
+        "DPS",
         "damage",
     ],
     [
-        "HPS (%)",
+        "HPS",
         "healing"
     ],
     [

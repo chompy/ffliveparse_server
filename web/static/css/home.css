@@ -9,6 +9,17 @@
     margin-bottom: 15px;
 }
 
+.homeSection img {
+    max-width: 100%;
+}
+
+.homeSection .homeSectionName {
+    position: absolute;
+    margin-top: -14px;
+    font-weight: bold;
+    font-style: italic;
+}
+
 .homeSection p {
     padding: 0;
 }

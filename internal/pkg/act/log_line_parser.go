@@ -291,13 +291,19 @@ func ParseLogLine(logLine LogLine) (LogLineData, error) {
 		}
 	case LogTypeRemoveCombatant:
 		{
-			re, err := regexp.Compile(" 04:Removing combatant ([a-zA-Z0-9'\\- ]*)")
+			re, err := regexp.Compile(" 04:Removing combatant ([a-zA-Z0-9'\\- ]*)\\.  Max HP: ([0-9]*)\\.")
 			if err != nil {
 				log.Println("12", logLineString)
 				return data, err
 			}
 			match := re.FindStringSubmatch(logLineString)
 			data.TargetName = match[1]
+			maxHP, err := strconv.ParseInt(match[2], 10, 64)
+			if err != nil {
+				log.Println("12", logLineString)
+				return data, err
+			}
+			data.TargetMaxHP = int(maxHP)
 			break
 		}
 	case LogTypeHPPercent:

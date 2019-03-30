@@ -1,3 +1,9 @@
+1.15
+- Server now tracks encounters to determine accurately when encounters start and end, independent of ACT.
+- Added hamburger menu with view changer.
+- Added 'table' view.
+- Fixed timeline scroll on touch devices.
+
 1.14
 - Rebuilt timeline renderer, now uses HTML5 canvas.
 - Log lines are now dumped to temporary files instead of being stored in server memory, should reduce out of memory crashes.

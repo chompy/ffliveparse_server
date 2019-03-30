@@ -40,11 +40,11 @@
         <div id="container">
             <div id="head">
                 <div class="left-side">
+                    <div id="logo"><a href="/">{{.AppName}}</a> <span class="app-version">(v{{.VersionString}})</span></div>
                     {{ template "headerLeft" . }}
                 </div>
                 <div class="right-side">
                     {{ template "headerRight" . }}
-                    <span id="appVersion">v{{.VersionString}}</span>
                 </div>
                 <div class="clear"></div>
             </div>
@@ -66,8 +66,7 @@
                 ;
                 var footerElement = document.getElementById("footer");
                 footerElement.style.position = "";
-                if (window.screen.height < height) {
-                    var footerElement = document.getElementById("footer");
+                if (window.innerHeight < height) {
                     footerElement.style.position = "relative";
                 }
             }

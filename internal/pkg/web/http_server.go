@@ -533,9 +533,9 @@ func sendInitData(ws *websocket.Conn, data *act.Data) {
 		// add encounter
 		dataBytes = append(dataBytes, act.EncodeEncounterBytes(&data.EncounterCollector.Encounter)...)
 		// add combatants
-		for _, ct := range data.CombatantCollector.CombatantTrackers {
-			ct.Start.EncounterUID = encounterUID
-			dataBytes = append(dataBytes, act.EncodeCombatantBytes(&ct.Start)...)
+		for _, combatant := range data.CombatantCollector.GetCombatants() {
+			combatant.EncounterUID = encounterUID
+			dataBytes = append(dataBytes, act.EncodeCombatantBytes(&combatant)...)
 		}
 	}
 	// add flag indicating if ACT is active

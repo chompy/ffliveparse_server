@@ -17,12 +17,16 @@
 #head #logo {
     font-weight: bold;
 }
+#head #logo .app-version {
+    font-size: 14px;
+}
 #head #zone-info .time {
     font-weight: bold;
 }
 
 #head .left-side {
     float: left;
+    vertical-align: middle;
 }
 
 #head .right-side {
@@ -33,10 +37,13 @@
     display: inline-block;
 }
 
-#head .right-side #appHeaderRight a::after {
+/*#head .right-side #appHeaderRight a::after {
     margin-left: 5px;
     content: "|";
     display: inline-block;
+}*/
+#head .right-side .hamburger-open img {
+    max-width: 18px;
 }
 
 @media (max-width: 940px) {

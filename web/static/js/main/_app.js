@@ -43,6 +43,8 @@ class Application
         this.userConfig = {};
         // list of combatants
         this.combatants = [];
+        // current view mode
+        this.currentView = "";
     }
 
     /**
@@ -54,14 +56,54 @@ class Application
             new WidgetEncounter(),
             new WidgetCombatants(),
         ];
+        // set view on hash change
+        var t = this;
+        this.setView(window.location.hash);
+        window.addEventListener("hashchange", function(e) {
+            t.setView(window.location.hash);
+        });
         // don't load timeline for 'stream' mode
-        if (window.location.hash != "#stream") {
+        if (this.currentView != "stream") {
             availableWidgets.push(new WidgetTimelime());
+        }
+        if (this.currentView == "stream") {
+            document.getElementById("head").style.display = "none";
         }
         for (var i = 0; i < availableWidgets.length; i++) {
             this.widgets[availableWidgets[i].getName()] = availableWidgets[i];
             availableWidgets[i].init();
         }
+    }
+
+    /**
+     * Set view mode.
+     * @param {string} view 
+     */
+    setView(view)
+    {
+        if (!view) {
+            view = "timeline";
+        }
+        if (view[0] == "#") {
+            view = view.substr(1);
+        }
+        document.getElementById("head").style.display = "";
+        var bodyElement = document.getElementsByTagName("html")[0];
+        bodyElement.classList.remove("mode-" + this.currentView);
+        // unselect mode buttons
+        var buttons = document.getElementsByClassName("btn-mode-" + this.currentView);
+        for (var i = 0; i < buttons.length; i++) {
+            buttons[i].classList.remove("active");
+        }
+        // set mode
+        this.currentView = view
+        // select mode buttons
+        buttons = document.getElementsByClassName("btn-mode-" + this.currentView);
+        for (var i = 0; i < buttons.length; i++) {
+            buttons[i].classList.add("active");
+        }
+        bodyElement.classList.add("mode-" + this.currentView);
+
     }
 
     /**

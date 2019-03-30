@@ -4,7 +4,6 @@
 {{ end }}
 
 {{ define "headerLeft" }}
-<div id="logo"><a href="/">{{.AppName}}</a></div>
 <div id="webId"><a href="/{{ .WebIDString }}">{{ .WebIDString }}</a></div>
 {{ end }}
 
@@ -12,8 +11,8 @@
 <div id="appHeaderRight">
     <!-- <a href="#">Triggers</a> -->
     <!-- <a href="#">Extensions</a> -->
-    <!-- <a href="#" class="hamburger-open"><img src="/static/img/hamburger.png" /></a> -->
-    <a href="/history/{{ .WebIDString }}">History</a>
+    <a href="#" class="hamburger-open"><img src="/static/img/hamburger.png" /></a>
+    <!-- <a href="/history/{{ .WebIDString }}">History</a> -->
 </div>
 {{ end }}
 
@@ -50,17 +49,21 @@
 <div id="loadingMessage">Loading...</div>
 <div id="side-menu" class="hide">
     <div class="side-menu-section">
+        <div class="side-menu-section-title">View</div>
         <ul>
-            <li><a href="/history/{{ .WebIDString }}">History</a></li>
-        </ul>
-    </div>
-    <div class="side-menu-section">
-        <ul>
-            <li><a href="#">Full</a></li>
-            <li><a href="#">Parse</a></li>
-            <li><a href="#">Table</a></li>
+            <li><a href="#timeline" class="btn-mode-timeline">Timeline</a></li>
+            <li><a href="#table" class="btn-mode-table">Table</a></li>
+            <li><a href="#stream" class="btn-mode-stream">Stream</a></li>
         </ul>
     </div>   
+    <div class="side-menu-section">
+        <div class="side-menu-section-title">Resources</div>
+        <ul>
+            <li><a href="/history/{{ .WebIDString }}">History</a></li>
+            <li><a href="/stats/{{ .WebIDString }}" onclick="alert('Player stats, coming...eventually!'); return false;">Stats</a></li>
+        </ul>
+    </div>
+
 </div>
 <div id="encounter">
     <span id="encounter-name"></span>

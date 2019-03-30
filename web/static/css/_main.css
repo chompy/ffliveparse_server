@@ -65,7 +65,3 @@ img.loading {
 #mainBody {
     padding: 20px;
 }
-
-@media(max-width: 940px) {
-    #head .right-side { display: none; }
-}

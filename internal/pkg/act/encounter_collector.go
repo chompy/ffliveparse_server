@@ -44,6 +44,7 @@ type EncounterCollector struct {
 	CombatantTracker []encounterCollectorCombatantTracker
 	userIDHash       string
 	PlayerTeam       uint8
+	CurrentZone      string
 }
 
 // NewEncounterCollector - Create new encounter collector
@@ -79,8 +80,9 @@ func (ec *EncounterCollector) UpdateEncounter(encounter Encounter) {
 	}
 	if ec.Encounter.Zone == "" {
 		ec.Encounter.Zone = encounter.Zone
+		ec.CurrentZone = encounter.Zone
 	} else if ec.Encounter.Zone != encounter.Zone {
-		ec.endEncounter()
+		ec.CurrentZone = encounter.Zone
 	}
 }
 
@@ -169,6 +171,10 @@ func (ec *EncounterCollector) ReadLogLine(l *LogLineData) {
 			if ctAttacker.LastActionTime.After(l.Time) || ctTarget.LastActionTime.After(l.Time) {
 				break
 			}
+			// ignore if max hp 57250....
+			if l.TargetMaxHP == 57250 || l.TargetMaxHP == 572500 || l.TargetMaxHP == 5725000 || l.TargetMaxHP == 57250000 {
+				break
+			}
 			// update combatant tracker data
 			if !ctAttacker.IsAlive {
 				ctAttacker.IsAlive = true
@@ -221,6 +227,10 @@ func (ec *EncounterCollector) ReadLogLine(l *LogLineData) {
 			if ctTarget.LastActionTime.After(l.Time) {
 				break
 			}
+			// ignore if max hp 57250....
+			if l.TargetMaxHP == 57250 || l.TargetMaxHP == 572500 || l.TargetMaxHP == 5725000 || l.TargetMaxHP == 57250000 {
+				break
+			}
 			// update target
 			ctTarget.LastActionTime = l.Time
 			ec.LastActionTime = l.Time
@@ -233,13 +243,8 @@ func (ec *EncounterCollector) ReadLogLine(l *LogLineData) {
 	case LogTypeZoneChange:
 		{
 			log.Println("[", ec.userIDHash, "] Zone changed to", l.TargetName)
-			if !ec.Encounter.Active {
-				return
-			}
-			if ec.Encounter.Zone == "" {
-				ec.Encounter.Zone = l.TargetName
-			} else if ec.Encounter.Zone != l.TargetName {
-				ec.endEncounter()
+			if ec.CurrentZone != l.TargetName {
+				ec.CurrentZone = l.TargetName
 			}
 			break
 		}
@@ -280,6 +285,11 @@ func (ec *EncounterCollector) IsNewEncounter(l *LogLineData) bool {
 func (ec *EncounterCollector) CheckInactive() {
 	// encounter already not active
 	if !ec.Encounter.Active {
+		return
+	}
+	// check if new zone
+	if ec.CurrentZone != ec.Encounter.Zone {
+		ec.endEncounter()
 		return
 	}
 	// time should have passed since last combat action
