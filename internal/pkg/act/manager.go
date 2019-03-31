@@ -356,8 +356,8 @@ func (m *Manager) ClearData(d *Data) {
 
 // ClearAllData - clear all data from memory
 func (m *Manager) ClearAllData() {
-	for index := range m.data {
-		m.ClearData(&m.data[index])
+	for len(m.data) > 0 {
+		m.ClearData(&m.data[0])
 	}
 }
 
