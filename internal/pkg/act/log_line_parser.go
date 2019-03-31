@@ -297,6 +297,9 @@ func ParseLogLine(logLine LogLine) (LogLineData, error) {
 				return data, err
 			}
 			match := re.FindStringSubmatch(logLineString)
+			if len(match) < 3 {
+				break
+			}
 			data.TargetName = match[1]
 			maxHP, err := strconv.ParseInt(match[2], 10, 64)
 			if err != nil {
