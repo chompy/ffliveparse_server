@@ -273,7 +273,7 @@ func ParseLogLine(logLine LogLine) (LogLineData, error) {
 				return data, err
 			}
 			match := re.FindStringSubmatch(logLineString)
-			if len(match) <  {
+			if len(match) < 3 {
 				break
 			}
 			data.AttackerName = match[2]
