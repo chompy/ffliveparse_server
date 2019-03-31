@@ -273,6 +273,9 @@ func ParseLogLine(logLine LogLine) (LogLineData, error) {
 				return data, err
 			}
 			match := re.FindStringSubmatch(logLineString)
+			if len(match) <  {
+				break
+			}
 			data.AttackerName = match[2]
 			data.TargetName = match[1]
 			break
@@ -285,6 +288,9 @@ func ParseLogLine(logLine LogLine) (LogLineData, error) {
 				return data, err
 			}
 			match := re.FindStringSubmatch(logLineString)
+			if len(match) < 2 {
+				break
+			}
 			// special case, target name is zone name
 			data.TargetName = match[1]
 			break
