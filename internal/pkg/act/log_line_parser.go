@@ -360,65 +360,67 @@ func ParseLogLine(logLine LogLine) (LogLineData, error) {
 	// flags
 	if len(fields) >= LogFieldFlags+1 {
 		rawFlags := fields[LogFieldFlags]
-		switch rawFlags[len(rawFlags)-1:] {
-		case "1":
-			{
-				data.Flags = append(data.Flags, LogFlagDodge)
-				break
-			}
-		case "3":
-			{
-				if len(rawFlags) >= 4 {
-					switch rawFlags[len(rawFlags)-3 : len(rawFlags)-2] {
-					case "3":
-						{
-							data.Flags = append(data.Flags, LogFlagInstantDeath)
-							break
-						}
-					default:
-						{
-							data.Flags = append(data.Flags, LogFlagDamage)
-							switch rawFlags[len(rawFlags)-4 : len(rawFlags)-3] {
-							case "1":
-								{
-									data.Flags = append(data.Flags, LogFlagCrit)
-									break
-								}
-							case "2":
-								{
-									data.Flags = append(data.Flags, LogFlagDirectHit)
-									break
-								}
-							case "3":
-								{
-									data.Flags = append(data.Flags, LogFlagCrit)
-									data.Flags = append(data.Flags, LogFlagDirectHit)
-									break
-								}
+		if len(rawFlags) > 0 {
+			switch rawFlags[len(rawFlags)-1:] {
+			case "1":
+				{
+					data.Flags = append(data.Flags, LogFlagDodge)
+					break
+				}
+			case "3":
+				{
+					if len(rawFlags) >= 4 {
+						switch rawFlags[len(rawFlags)-3 : len(rawFlags)-2] {
+						case "3":
+							{
+								data.Flags = append(data.Flags, LogFlagInstantDeath)
+								break
 							}
-							break
+						default:
+							{
+								data.Flags = append(data.Flags, LogFlagDamage)
+								switch rawFlags[len(rawFlags)-4 : len(rawFlags)-3] {
+								case "1":
+									{
+										data.Flags = append(data.Flags, LogFlagCrit)
+										break
+									}
+								case "2":
+									{
+										data.Flags = append(data.Flags, LogFlagDirectHit)
+										break
+									}
+								case "3":
+									{
+										data.Flags = append(data.Flags, LogFlagCrit)
+										data.Flags = append(data.Flags, LogFlagDirectHit)
+										break
+									}
+								}
+								break
+							}
 						}
 					}
+					break
 				}
-				break
-			}
-		case "4":
-			{
-				data.Flags = append(data.Flags, LogFlagHeal)
-				if len(rawFlags) >= 6 && rawFlags[len(rawFlags)-6:len(rawFlags)-5] == "1" {
-					data.Flags = append(data.Flags, LogFlagCrit)
+			case "4":
+				{
+					data.Flags = append(data.Flags, LogFlagHeal)
+					if len(rawFlags) >= 6 && rawFlags[len(rawFlags)-6:len(rawFlags)-5] == "1" {
+						data.Flags = append(data.Flags, LogFlagCrit)
+					}
+					break
 				}
-				break
-			}
-		case "5":
-			{
-				data.Flags = append(data.Flags, LogFlagBlock)
-				break
-			}
-		case "6":
-			{
-				data.Flags = append(data.Flags, LogFlagParry)
-				break
+			case "5":
+				{
+					data.Flags = append(data.Flags, LogFlagBlock)
+					break
+				}
+			case "6":
+				{
+					data.Flags = append(data.Flags, LogFlagParry)
+					break
+				}
 			}
 		}
 	}
