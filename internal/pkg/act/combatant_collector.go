@@ -72,9 +72,8 @@ func (c *CombatantCollector) UpdateCombatantTracker(combatant Combatant) {
 	log.Println("[", c.userIDHash, "][ Combatant", combatant.ID, "] Added", combatant.Name)
 	ct := combatantCollectorCombatantTracker{
 		Start: combatant,
-		Data:  make([]Combatant, 1),
+		Data:  make([]Combatant, 0),
 	}
-	ct.Data[0] = combatant
 	c.CombatantTrackers = append(c.CombatantTrackers, ct)
 	c.resolvePets()
 }
@@ -189,13 +188,15 @@ func (c *CombatantCollector) GetCombatants() []Combatant {
 			combatant.Hits += ctData.Hits
 			combatant.Kills += ctData.Kills
 		}
-		combatant.Damage -= ct.Start.Damage * 2
-		combatant.DamageHealed -= ct.Start.DamageHealed * 2
-		combatant.DamageTaken -= ct.Start.DamageTaken * 2
-		combatant.Deaths -= ct.Start.Deaths * 2
-		combatant.Heals -= ct.Start.Heals * 2
-		combatant.Hits -= ct.Start.Hits * 2
-		combatant.Kills -= ct.Start.Kills * 2
+		if len(ct.Data) > 0 {
+			combatant.Damage -= ct.Start.Damage
+			combatant.DamageHealed -= ct.Start.DamageHealed
+			combatant.DamageTaken -= ct.Start.DamageTaken
+			combatant.Deaths -= ct.Start.Deaths
+			combatant.Heals -= ct.Start.Heals
+			combatant.Hits -= ct.Start.Hits
+			combatant.Kills -= ct.Start.Kills
+		}
 		combatants = append(combatants, combatant)
 	}
 	return combatants

@@ -135,7 +135,6 @@ func (ec *EncounterCollector) endEncounter() {
 		log.Println("[", ec.userIDHash, "][ Encounter", ec.Encounter.UID, "] Team", team, "has", len(teamAlive), "combatant(s) alive. (", strings.Join(teamAlive, ","), ")")
 	}
 	ec.Encounter.Active = false
-	ec.Encounter.EndTime = time.Time{}
 	ec.Encounter.EndTime = ec.LastActionTime
 }
 
@@ -150,6 +149,10 @@ func (ec *EncounterCollector) ReadLogLine(l *LogLineData) {
 			}
 			// start encounter
 			if len(ec.CombatantTracker) == 0 && !ec.Encounter.Active {
+				// time should have passed since last encounter
+				if time.Now().Add(time.Duration(-encounterInactiveTime) * time.Millisecond).Before(ec.LastActionTime) {
+					return
+				}
 				log.Println("[", ec.userIDHash, "][ Encounter", ec.Encounter.UID, "] Started")
 				ec.Encounter.Active = true
 				ec.Encounter.StartTime = l.Time

@@ -103,7 +103,9 @@ class Application
             buttons[i].classList.add("active");
         }
         bodyElement.classList.add("mode-" + this.currentView);
-
+        if (typeof(this.widgets.parse) != "undefined") {
+            this.widgets.parse.displayCombatants();
+        }
     }
 
     /**

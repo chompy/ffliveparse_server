@@ -114,7 +114,7 @@ class WidgetCombatants extends WidgetBase
         this.combatantsElement.innerHTML = "";
         this.combatants = [];
         this.encounterDuration = 0;
-        this._displayCombatants();
+        this.displayCombatants();
     }
 
     /**
@@ -232,7 +232,7 @@ class WidgetCombatants extends WidgetBase
     /**
      * Update main combatant container.
      */
-    _displayCombatants()
+    displayCombatants()
     {
         var t = this;
         // re-sort so all pets are at the bottom
@@ -342,7 +342,7 @@ class WidgetCombatants extends WidgetBase
             )
         }
         // display combatants
-        this._displayCombatants();
+        this.displayCombatants();
     }
 
     _updateCombatants(event)
@@ -362,7 +362,7 @@ class WidgetCombatants extends WidgetBase
                 this.combatants[i].compare(combatant)
             ) {
                 this._updateCombatantElement(this.combatants[i]);
-                this._displayCombatants();
+                this.displayCombatants();
                 return;
             }
         }
@@ -375,7 +375,7 @@ class WidgetCombatants extends WidgetBase
             this.combatants[this.combatants.length - 1]
         );
         // display
-        this._displayCombatants();
+        this.displayCombatants();
     }
 
 }

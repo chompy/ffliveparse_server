@@ -1,3 +1,9 @@
+1.16
+- Tweaks and hotfixes to server side log parsing.
+- Imposed a delay before a new encounter can begin.
+- Fixed table view when swapping to it from another view.
+- Fixed combatant data when viewing past encounters.
+
 1.15
 - Server now tracks encounters to determine accurately when encounters start and end, independent of ACT.
 - Added hamburger menu with view changer.
