@@ -56,38 +56,44 @@ const LogTypeLoseEffect = 0x1E
 // LogTypeHPPercent - Log type identifier, HP percent of combatant
 const LogTypeHPPercent = 0x1D
 
-// LogFieldType - Log field indentifier, message type
+// LogFieldType - Log field identifier, message type
 const LogFieldType = 0
 
-// LogFieldAttackerID - Log field indentifier, attacker id
+// LogFieldAttackerID - Log field identifier, attacker id
 const LogFieldAttackerID = 1
 
-// LogFieldAttackerName - Log field indentifier, attacker name
+// LogFieldAttackerName - Log field identifier, attacker name
 const LogFieldAttackerName = 2
 
-// LogFieldAbilityID - Log field indentifier, ability id
+// LogFieldAbilityID - Log field identifier, ability id
 const LogFieldAbilityID = 3
 
-// LogFieldAbilityName - Log field indentifier, ability name
+// LogFieldAbilityName - Log field identifier, ability name
 const LogFieldAbilityName = 4
 
-// LogFieldTargetID - Log field indentifier, target id
+// LogFieldTargetID - Log field identifier, target id
 const LogFieldTargetID = 5
 
-// LogFieldTargetName - Log field indentifier, target name
+// LogFieldTargetName - Log field identifier, target name
 const LogFieldTargetName = 6
 
-// LogFieldFlags - Log field indentifier, flags
+// LogFieldFlags - Log field identifier, flags
 const LogFieldFlags = 7
 
-// LogFieldDamage - Log field indentifier, damage
+// LogFieldDamage - Log field identifier, damage
 const LogFieldDamage = 8
 
-// LogFieldTargetCurrentHP - Log field indentifier, target current hp
+// LogFieldTargetCurrentHP - Log field identifier, target current hp
 const LogFieldTargetCurrentHP = 23
 
-// LogFieldTargetMaxHP - Log field indentifier, target max hp
+// LogFieldTargetMaxHP - Log field identifier, target max hp
 const LogFieldTargetMaxHP = 24
+
+// LogFieldAttackerCurrentHP - Log field identifier, attacker current hp
+const LogFieldAttackerCurrentHP = 32
+
+// LogFieldAttackerMaxHP - Log field identifier, attacker max hp
+const LogFieldAttackerMaxHP = 33
 
 // LogFlagDamage - Log flag, damage
 const LogFlagDamage = 1
@@ -118,19 +124,21 @@ var logShiftValues = [...]int{0x3E, 0x113, 0x213, 0x313}
 
 // LogLineData - Data retrieved by parsing a log line
 type LogLineData struct {
-	Type            int
-	Raw             string
-	AttackerID      int
-	AttackerName    string
-	AbilityID       int
-	AbilityName     string
-	TargetID        int
-	TargetName      string
-	Flags           []int
-	Damage          int
-	TargetCurrentHP int
-	TargetMaxHP     int
-	Time            time.Time
+	Type              int
+	Raw               string
+	AttackerID        int
+	AttackerName      string
+	AbilityID         int
+	AbilityName       string
+	TargetID          int
+	TargetName        string
+	Flags             []int
+	Damage            int
+	AttackerCurrentHP int
+	AttackerMaxHP     int
+	TargetCurrentHP   int
+	TargetMaxHP       int
+	Time              time.Time
 }
 
 // HasFlag - Check if log line data has given flag
@@ -250,19 +258,41 @@ func ParseLogLine(logLine LogLine) (LogLineData, error) {
 			// target name
 			data.TargetName = fields[LogFieldTargetName]
 			// target current hp
-			targetCurrentHP, err := hexToInt(fields[LogFieldTargetCurrentHP])
-			if err != nil {
-				log.Println("7", logLineString)
-				return data, err
+			if fields[LogFieldTargetCurrentHP] != "" {
+				targetCurrentHP, err := strconv.ParseInt(fields[LogFieldTargetCurrentHP], 10, 64)
+				if err != nil {
+					log.Println("7", logLineString)
+					return data, err
+				}
+				data.TargetCurrentHP = int(targetCurrentHP)
 			}
-			data.TargetCurrentHP = int(targetCurrentHP)
 			// target max hp
-			targetMaxHP, err := hexToInt(fields[LogFieldTargetMaxHP])
-			if err != nil {
-				log.Println("8", logLineString)
-				return data, err
+			if fields[LogFieldTargetMaxHP] != "" {
+				targetMaxHP, err := strconv.ParseInt(fields[LogFieldTargetMaxHP], 10, 64)
+				if err != nil {
+					log.Println("8", logLineString)
+					return data, err
+				}
+				data.TargetMaxHP = int(targetMaxHP)
 			}
-			data.TargetMaxHP = int(targetMaxHP)
+			// attacker current hp
+			if fields[LogFieldAttackerCurrentHP] != "" {
+				attackerCurrentHP, err := strconv.ParseInt(fields[LogFieldAttackerCurrentHP], 10, 64)
+				if err != nil {
+					log.Println("7B", logLineString)
+					return data, err
+				}
+				data.AttackerCurrentHP = int(attackerCurrentHP)
+			}
+			// target max hp
+			if fields[LogFieldAttackerMaxHP] != "" {
+				attackerMaxHP, err := strconv.ParseInt(fields[LogFieldAttackerMaxHP], 10, 64)
+				if err != nil {
+					log.Println("8B", logLineString)
+					return data, err
+				}
+				data.AttackerMaxHP = int(attackerMaxHP)
+			}
 			break
 		}
 	case LogTypeDefeat:

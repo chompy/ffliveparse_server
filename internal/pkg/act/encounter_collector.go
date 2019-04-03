@@ -32,6 +32,7 @@ const encounterInactiveTime = 5000
 // encounterCollectorCombatantTracker - Track combatants in encounter to determine active status
 type encounterCollectorCombatantTracker struct {
 	Name           string
+	MaxHP          int
 	Team           uint8
 	IsAlive        bool
 	LastActionTime time.Time
@@ -87,19 +88,20 @@ func (ec *EncounterCollector) UpdateEncounter(encounter Encounter) {
 }
 
 // getCombatantTracker - Get combatant to track
-func (ec *EncounterCollector) getCombatantTracker(name string) *encounterCollectorCombatantTracker {
+func (ec *EncounterCollector) getCombatantTracker(name string, maxHP int) *encounterCollectorCombatantTracker {
 	name = strings.TrimSpace(strings.ToUpper(name))
 	if name == "" {
 		return nil
 	}
 	for index, ct := range ec.CombatantTracker {
-		if ct.Name == name {
+		if ct.Name == name && (maxHP == 0 || ct.MaxHP == maxHP) {
 			return &ec.CombatantTracker[index]
 		}
 	}
-	log.Println("[", ec.userIDHash, "][ Encounter", ec.Encounter.UID, "] New combatant", name)
+	log.Println("[", ec.userIDHash, "][ Encounter", ec.Encounter.UID, "] New combatant", name, "(", maxHP, ")")
 	newCt := encounterCollectorCombatantTracker{
 		Name:           name,
+		MaxHP:          maxHP,
 		Team:           0,
 		IsAlive:        true,
 		LastActionTime: time.Time{},
@@ -162,11 +164,11 @@ func (ec *EncounterCollector) ReadLogLine(l *LogLineData) {
 				ec.Encounter.EndTime = l.Time
 			}
 			// gather combatant tracker data
-			ctAttacker := ec.getCombatantTracker(l.AttackerName)
+			ctAttacker := ec.getCombatantTracker(l.AttackerName, l.AttackerMaxHP)
 			if ctAttacker == nil {
 				break
 			}
-			ctTarget := ec.getCombatantTracker(l.TargetName)
+			ctTarget := ec.getCombatantTracker(l.TargetName, l.TargetMaxHP)
 			if ctTarget == nil {
 				break
 			}
@@ -174,18 +176,14 @@ func (ec *EncounterCollector) ReadLogLine(l *LogLineData) {
 			if ctAttacker.LastActionTime.After(l.Time) || ctTarget.LastActionTime.After(l.Time) {
 				break
 			}
-			// ignore if max hp 57250....
-			if l.TargetMaxHP == 57250 || l.TargetMaxHP == 572500 || l.TargetMaxHP == 5725000 || l.TargetMaxHP == 57250000 {
-				break
-			}
 			// update combatant tracker data
 			if !ctAttacker.IsAlive {
 				ctAttacker.IsAlive = true
-				log.Println("[", ec.userIDHash, "][ Encounter", ec.Encounter.UID, "] Combatant", ctAttacker.Name, "is alive")
+				log.Println("[", ec.userIDHash, "][ Encounter", ec.Encounter.UID, "] Combatant", ctAttacker.Name, "(", ctAttacker.MaxHP, ")", "is alive")
 			}
 			if !ctTarget.IsAlive {
 				ctTarget.IsAlive = true
-				log.Println("[", ec.userIDHash, "][ Encounter", ec.Encounter.UID, "] Combatant", ctTarget.Name, "is alive")
+				log.Println("[", ec.userIDHash, "][ Encounter", ec.Encounter.UID, "] Combatant", ctTarget.Name, "(", ctTarget.MaxHP, ")", "is alive")
 			}
 			ctAttacker.LastActionTime = l.Time
 			ctTarget.LastActionTime = l.Time
@@ -194,20 +192,20 @@ func (ec *EncounterCollector) ReadLogLine(l *LogLineData) {
 			if ctAttacker.Team == 0 && ctTarget.Team == 0 {
 				ctAttacker.Team = 1
 				ctTarget.Team = 2
-				log.Println("[", ec.userIDHash, "][ Encounter", ec.Encounter.UID, "] Combatant", ctAttacker.Name, "is on team 1")
-				log.Println("[", ec.userIDHash, "][ Encounter", ec.Encounter.UID, "] Combatant", ctTarget.Name, "is on team 2")
+				log.Println("[", ec.userIDHash, "][ Encounter", ec.Encounter.UID, "] Combatant", ctAttacker.Name, "(", ctAttacker.MaxHP, ")", "is on team 1")
+				log.Println("[", ec.userIDHash, "][ Encounter", ec.Encounter.UID, "] Combatant", ctTarget.Name, "(", ctTarget.MaxHP, ")", "is on team 2")
 			} else if ctAttacker.Team == 0 && ctTarget.Team != 0 {
 				ctAttacker.Team = 1
 				if ctTarget.Team == 1 {
 					ctAttacker.Team = 2
 				}
-				log.Println("[", ec.userIDHash, "][ Encounter", ec.Encounter.UID, "] Combatant", ctAttacker.Name, "is on team", ctAttacker.Team)
+				log.Println("[", ec.userIDHash, "][ Encounter", ec.Encounter.UID, "] Combatant", ctAttacker.Name, "(", ctAttacker.MaxHP, ")", "is on team", ctAttacker.Team)
 			} else if ctAttacker.Team != 0 && ctTarget.Team == 0 {
 				ctTarget.Team = 1
 				if ctAttacker.Team == 1 {
 					ctTarget.Team = 2
 				}
-				log.Println("[", ec.userIDHash, "][ Encounter", ec.Encounter.UID, "] Combatant", ctTarget.Name, "is on team", ctTarget.Team)
+				log.Println("[", ec.userIDHash, "][ Encounter", ec.Encounter.UID, "] Combatant", ctTarget.Name, "(", ctTarget.MaxHP, ")", "is on team", ctTarget.Team)
 			}
 			break
 		}
@@ -222,7 +220,7 @@ func (ec *EncounterCollector) ReadLogLine(l *LogLineData) {
 				break
 			}
 			// get combatant tracker data
-			ctTarget := ec.getCombatantTracker(l.TargetName)
+			ctTarget := ec.getCombatantTracker(l.TargetName, l.TargetMaxHP)
 			if ctTarget == nil {
 				break
 			}
@@ -230,16 +228,12 @@ func (ec *EncounterCollector) ReadLogLine(l *LogLineData) {
 			if ctTarget.LastActionTime.After(l.Time) {
 				break
 			}
-			// ignore if max hp 57250....
-			if l.TargetMaxHP == 57250 || l.TargetMaxHP == 572500 || l.TargetMaxHP == 5725000 || l.TargetMaxHP == 57250000 {
-				break
-			}
 			// update target
 			ctTarget.LastActionTime = l.Time
 			ec.LastActionTime = l.Time
 			if ctTarget.IsAlive {
 				ctTarget.IsAlive = false
-				log.Println("[", ec.userIDHash, "][ Encounter", ec.Encounter.UID, "] Combatant", ctTarget.Name, "was defeated/removed")
+				log.Println("[", ec.userIDHash, "][ Encounter", ec.Encounter.UID, "] Combatant", ctTarget.Name, "(", ctTarget.MaxHP, ")", "was defeated/removed")
 			}
 			break
 		}
