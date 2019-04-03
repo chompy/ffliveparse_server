@@ -258,7 +258,7 @@ func ParseLogLine(logLine LogLine) (LogLineData, error) {
 			// target name
 			data.TargetName = fields[LogFieldTargetName]
 			// target current hp
-			if fields[LogFieldTargetCurrentHP] != "" {
+			if len(fields)-1 >= LogFieldTargetCurrentHP && fields[LogFieldTargetCurrentHP] != "" {
 				targetCurrentHP, err := strconv.ParseInt(fields[LogFieldTargetCurrentHP], 10, 64)
 				if err != nil {
 					log.Println("7", logLineString)
@@ -267,7 +267,7 @@ func ParseLogLine(logLine LogLine) (LogLineData, error) {
 				data.TargetCurrentHP = int(targetCurrentHP)
 			}
 			// target max hp
-			if fields[LogFieldTargetMaxHP] != "" {
+			if len(fields)-1 >= LogFieldTargetMaxHP && fields[LogFieldTargetMaxHP] != "" {
 				targetMaxHP, err := strconv.ParseInt(fields[LogFieldTargetMaxHP], 10, 64)
 				if err != nil {
 					log.Println("8", logLineString)
@@ -276,7 +276,7 @@ func ParseLogLine(logLine LogLine) (LogLineData, error) {
 				data.TargetMaxHP = int(targetMaxHP)
 			}
 			// attacker current hp
-			if fields[LogFieldAttackerCurrentHP] != "" {
+			if len(fields)-1 >= LogFieldAttackerCurrentHP && fields[LogFieldAttackerCurrentHP] != "" {
 				attackerCurrentHP, err := strconv.ParseInt(fields[LogFieldAttackerCurrentHP], 10, 64)
 				if err != nil {
 					log.Println("7B", logLineString)
@@ -285,7 +285,7 @@ func ParseLogLine(logLine LogLine) (LogLineData, error) {
 				data.AttackerCurrentHP = int(attackerCurrentHP)
 			}
 			// target max hp
-			if fields[LogFieldAttackerMaxHP] != "" {
+			if len(fields)-1 >= LogFieldAttackerMaxHP && fields[LogFieldAttackerMaxHP] != "" {
 				attackerMaxHP, err := strconv.ParseInt(fields[LogFieldAttackerMaxHP], 10, 64)
 				if err != nil {
 					log.Println("8B", logLineString)
