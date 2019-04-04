@@ -230,8 +230,10 @@ func (ec *EncounterCollector) ReadLogLine(l *LogLineData) {
 				break
 			}
 			// update target
-			ctTarget.LastActionTime = l.Time
-			ec.LastActionTime = l.Time
+			if l.Type == LogTypeDefeat {
+				ctTarget.LastActionTime = l.Time
+				ec.LastActionTime = l.Time
+			}
 			if ctTarget.IsAlive {
 				ctTarget.IsAlive = false
 				log.Println("[", ec.userIDHash, "][ Encounter", ec.Encounter.UID, "] Combatant", ctTarget.Name, "(", ctTarget.MaxHP, ")", "was defeated/removed")

@@ -43,7 +43,8 @@ func Listen(port uint16, manager *Manager) {
 		}
 		_, err = manager.ParseDataString(buf[0:n], addr)
 		if err != nil {
-			log.Println("Error when parsing data string from", addr, ",", err)
+			// too much noise in log
+			//log.Println("Error when parsing data string from", addr, ",", err)
 		}
 	}
 }

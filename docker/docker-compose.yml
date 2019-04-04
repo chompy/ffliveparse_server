@@ -30,7 +30,4 @@ services:
 
 volumes:
     "ffliveparse-data": 
-        external:
-            name: "ffliveparse-data"
-    
     "ffliveparse-logging":
