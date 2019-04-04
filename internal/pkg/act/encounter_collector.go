@@ -72,6 +72,7 @@ func (ec *EncounterCollector) Reset() {
 		Damage:       0, // not currently tracked
 	}
 	ec.CombatantTracker = make([]encounterCollectorCombatantTracker, 0)
+	ec.PlayerTeam = 0
 }
 
 // UpdateEncounter - Sync encounter data from ACT
@@ -94,7 +95,7 @@ func (ec *EncounterCollector) getCombatantTracker(name string, maxHP int) *encou
 		return nil
 	}
 	for index, ct := range ec.CombatantTracker {
-		if ct.Name == name && (maxHP == 0 || ct.MaxHP == maxHP) {
+		if ct.Name == name && (maxHP == 0 || ct.MaxHP == maxHP || ec.PlayerTeam == ct.Team) {
 			return &ec.CombatantTracker[index]
 		}
 	}
@@ -247,7 +248,7 @@ func (ec *EncounterCollector) ReadLogLine(l *LogLineData) {
 		}
 	case LogTypeGameLog:
 		{
-			if ec.PlayerTeam > 0 {
+			if ec.PlayerTeam > 0 || ct.Team == 0 {
 				break
 			}
 			if l.TargetName != "" && l.AttackerName != "" {
@@ -255,6 +256,7 @@ func (ec *EncounterCollector) ReadLogLine(l *LogLineData) {
 				for _, ct := range ec.CombatantTracker {
 					if ct.Name == playerName {
 						ec.PlayerTeam = ct.Team
+						log.Println("[", ec.userIDHash, "][ Encounter", ec.Encounter.UID, "] Player team set to", ct.Team)
 						break
 					}
 				}
