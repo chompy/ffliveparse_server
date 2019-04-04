@@ -248,13 +248,13 @@ func (ec *EncounterCollector) ReadLogLine(l *LogLineData) {
 		}
 	case LogTypeGameLog:
 		{
-			if ec.PlayerTeam > 0 || ct.Team == 0 {
+			if ec.PlayerTeam > 0 {
 				break
 			}
 			if l.TargetName != "" && l.AttackerName != "" {
 				playerName := strings.TrimSpace(strings.ToUpper(l.AttackerName))
 				for _, ct := range ec.CombatantTracker {
-					if ct.Name == playerName {
+					if ct.Name == playerName && ct.Team != 0 {
 						ec.PlayerTeam = ct.Team
 						log.Println("[", ec.userIDHash, "][ Encounter", ec.Encounter.UID, "] Player team set to", ct.Team)
 						break
