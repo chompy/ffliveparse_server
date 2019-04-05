@@ -17,6 +17,7 @@ along with FFLiveParse.  If not, see <https://www.gnu.org/licenses/>.
 
 var SIDE_MENU_ID = "side-menu"
 var SIDE_MENU_BTN_CLASS = "hamburger-open";
+var SIDE_MENU_VIEWS_ID = "side-menu-views";
 
 function initSideMenu()
 {
@@ -42,4 +43,26 @@ function initSideMenu()
             return false;
         });
     }
+}
+
+function sideMenuAddView(view)
+{
+    var element = document.getElementById(SIDE_MENU_VIEWS_ID);
+    var viewBtnElement = document.createElement("li");
+    viewBtnElement.setAttribute("id", "view-btn-" + view.getName());
+    var viewBtnLinkElement = document.createElement("a");
+    viewBtnLinkElement.setAttribute("href", "#" + view.getName());
+    viewBtnLinkElement.innerText = view.getTitle();
+    viewBtnElement.appendChild(viewBtnLinkElement);
+    element.appendChild(viewBtnElement);
+}
+
+function sideMenuSetActiveView(view)
+{
+    var element = document.getElementById(SIDE_MENU_VIEWS_ID);
+    var viewBtnElements = element.getElementsByTagName("li");
+    for (var i = 0; i < viewBtnElements.length; i++) {
+        viewBtnElements[i].classList.remove("active");
+    }
+    document.getElementById("view-btn-" + view.getName()).classList.add("active");
 }

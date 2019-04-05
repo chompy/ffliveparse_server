@@ -43,10 +43,10 @@ class ActionCollector
 
     /**
      * Add action from log line data.
-     * @param {object} action 
+     * @param {object} logLineEventDetail 
      * @return {Action|null}
      */
-    add(action)
+    add(logLineEventDetail)
     {
         var action = new Action();
         action.time = logLineEventDetail.Time;

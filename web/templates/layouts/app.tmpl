@@ -9,10 +9,7 @@
 
 {{ define "headerRight" }}
 <div id="app-header-right">
-    <!-- <a href="#">Triggers</a> -->
-    <!-- <a href="#">Extensions</a> -->
     <a href="#" class="hamburger-open"><img src="/static/img/hamburger.png" /></a>
-    <!-- <a href="/history/{{ .WebIDString }}">History</a> -->
 </div>
 {{ end }}
 
@@ -20,10 +17,7 @@
 <div id="side-menu" class="hide">
     <div class="side-menu-section">
         <div class="side-menu-section-title">View</div>
-        <ul>
-            <li><a href="#timeline" class="btn-mode-timeline">Timeline</a></li>
-            <li><a href="#table" class="btn-mode-table">Table</a></li>
-            <li><a href="#stream" class="btn-mode-stream">Stream</a></li>
+        <ul id="side-menu-views">
         </ul>
     </div>   
     <div class="side-menu-section">

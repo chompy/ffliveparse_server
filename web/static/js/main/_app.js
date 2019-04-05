@@ -54,61 +54,67 @@ class Application
     }
 
     /**
-     * Initalize widgets.
+     * Initalize views.
      */
-    initWidgets()
+    initViews()
     {
-        var views = [];
-
+        // load views, statically for now, eventually views should be 
+        // loaded dynamically and user should be able to load their own views in
+        this.views = [
+            new ViewTest(this.combatantCollector, this.actionCollector)
+        ];
+        // init all views
+        for (var i in this.views) {
+            this.views[i].init();
+            sideMenuAddView(this.views[i]);
+        }
         // set view on hash change
-        /*var t = this;
+        var t = this;
         this.setView(window.location.hash);
         window.addEventListener("hashchange", function(e) {
             t.setView(window.location.hash);
         });
-        // don't load timeline for 'stream' mode
-        if (this.currentView != "stream") {
-            availableWidgets.push(new WidgetTimelime());
-        }
-        if (this.currentView == "stream") {
-            document.getElementById("head").style.display = "none";
-        }
-        for (var i = 0; i < availableWidgets.length; i++) {
-            this.widgets[availableWidgets[i].getName()] = availableWidgets[i];
-            availableWidgets[i].init();
-        }*/
     }
 
     /**
      * Set view mode.
-     * @param {string} view 
+     * @param {string} viewName 
      */
-    setView(view)
+    setView(viewName)
     {
-        if (!view) {
-            view = "timeline";
+        // no views loaded, do nothing
+        if (this.views.length == 0) {
+            return;
         }
-        if (view[0] == "#") {
-            view = view.substr(1);
+        // view name not set, use first available view
+        if (!viewName) {
+            viewName = this.views[0].getName();
         }
+        // strip "#" off of view
+        if (viewName[0] == "#") {
+            viewName = viewName.substr(1);
+        }
+        // add a global class name
         document.getElementById("head").style.display = "";
         var bodyElement = document.getElementsByTagName("html")[0];
-        bodyElement.classList.remove("mode-" + this.currentView);
-        // unselect mode buttons
-        var buttons = document.getElementsByClassName("btn-mode-" + this.currentView);
-        for (var i = 0; i < buttons.length; i++) {
-            buttons[i].classList.remove("active");
+        bodyElement.classList.remove("view-" + this.currentView);
+        // make old view inactive
+        if (this.currentView) {
+            for (var i in this.views) {
+                if (this.views[i].getName() == this.currentView) {
+                    this.views[i].onInactive();
+                    break;
+                }
+            }            
         }
-        // set mode
-        this.currentView = view
-        // select mode buttons
-        buttons = document.getElementsByClassName("btn-mode-" + this.currentView);
-        for (var i = 0; i < buttons.length; i++) {
-            buttons[i].classList.add("active");
-        }
-        bodyElement.classList.add("mode-" + this.currentView);
-        if (typeof(this.widgets.parse) != "undefined") {
-            this.widgets.parse.displayCombatants();
+        // set view
+        this.currentView = viewName
+        // make view button active and set view active
+        for (var i in this.views) {
+            if (this.views[i].getName() == this.currentView) {
+                sideMenuSetActiveView(this.views[i]);
+                this.views[i].onActive();
+            }
         }
     }
 
@@ -149,18 +155,18 @@ class Application
                     case "status_in_progress":
                     {
                         // update status message
-                        document.getElementById("loading-message").classList.remove("hide");
-                        document.getElementById("loading-message").innerText = e.data.message;
+                        t.loadingMessageElement.classList.remove("hide");
+                        t.loadingMessageElement.innerText = e.data.message;
                         break;
                     }
                     case "status_ready":
                     {
-                        document.getElementById("loading-message").classList.add("hide");
+                        t.loadingMessageElement.classList.add("hide");
                         break;
                     }
                     case "error":
                     {
-                        document.getElementById("error-overlay").classList.remove("hide");
+                        t.errorOverlayElement.classList.remove("hide");
                         break;
                     }
                     case "act:encounter": 
@@ -186,11 +192,11 @@ class Application
         socket.onopen = function(e) {
             t.connected = true;
             t.initUserConfig();
-            t.initWidgets();
+            t.initViews();
             fetchActionData();
             fetchStatusData();
             console.log(">> Connected to server.");
-            document.getElementById("loading-message").innerText = "Connected. Waiting for encounter data...";
+            t.loadingMessageElement.innerText = "Connected. Waiting for encounter data...";
         };
         var workerIndex = 0;    
         socket.onmessage = function(e) {
@@ -207,11 +213,11 @@ class Application
             }
         };
         socket.onclose = function(event) {
-            document.getElementById("errorOverlay").classList.remove("hide");
+            t.errorOverlayElement.classList.remove("hide");
             console.log(">> Connection closed,", event);
         };
         socket.onerror = function(event) {
-            document.getElementById("errorOverlay").classList.remove("hide");
+            t.errorOverlayElement.classList.remove("hide");
             console.log(">> An error has occured,", event);
         };    
         // log incoming data
@@ -222,6 +228,10 @@ class Application
                 lastEncounterUid = e.detail.UID;
                 t.combatantCollector.reset();
                 t.actionCollector.reset();
+                // forward encoutner to all views
+                for (var i in t.views) {
+                    t.views[i].onEncounter(e.detail);
+                }
             }
         });
         // add/update combatant
@@ -231,16 +241,41 @@ class Application
                 window.dispatchEvent(
                     new CustomEvent("app:combatant", {"detail" : combatant})
                 );
+                // forward combatant to all views
+                for (var i in t.views) {
+                    t.views[i].onCombatant(combatant);
+                }
             }
         });
         // add action
         window.addEventListener("act:logLine", function(e) {
-            var logLineData = parseLogLine(event.detail.LogLine);
-            var action = t.actionCollector.add(logLineData);
+            // create action if log line is valid action
+            var action = t.actionCollector.add(event.detail);
             if (action) {
                 window.dispatchEvent(
                     new CustomEvent("app:action", {"detail" : action})
                 );
+            }
+            // forward action and log line event to all views
+            for (var i in t.views) {
+                t.views[i].onLogLine(e.detail);
+                if (action) {
+                    t.views[i].onAction(action);
+                }
+            }
+        });
+        // action data has been downloaded
+        window.addEventListener("app:action-data", function(e) {
+            // forward action data to all views
+            for (var i in t.views) {
+                t.views[i].actionData = e.detail;
+            }
+        });
+        // status data has been downloaded
+        window.addEventListener("app:status-data", function(e) {
+            // forward status data to all views
+            for (var i in t.views) {
+                t.views[i].statusData = e.detail;
             }
         });
         // flags
@@ -250,11 +285,10 @@ class Application
             {
                 case "active":
                 {
-                    var element = document.getElementById("loading-message");
-                    element.classList.add("hide");
+                    t.loadingMessageElement.classList.add("hide");
                     if (!e.detail.Value) {
-                        document.getElementById("loading-message").classList.remove("hide");
-                        document.getElementById("loading-message").innerHTML = "Waiting for connection from ACT...<br/></br><sub>(Please make sure you are using the correct version of the ACT Plugin.)</sub>";
+                        t.loadingMessageElement.classList.remove("hide");
+                        t.loadingMessageElement.innerHTML = "Waiting for connection from ACT...<br/></br><sub>(Please make sure you are using the correct version of the ACT Plugin.)</sub>";
                     }
                     break;
                 }
