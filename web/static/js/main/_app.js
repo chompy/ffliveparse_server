@@ -33,18 +33,24 @@ class Application
         // encounter uid, when provided ignore all data not
         // related to encounter
         this.encounterUid = encounterUid;
-        // list widgets
-        this.widgets = {};
+        // views
+        this.views = {};
         // connection flag
         this.connected = false;
         // workers
         this.workers = [];
         // user config
         this.userConfig = {};
-        // list of combatants
-        this.combatants = [];
+        // combatant collector
+        this.combatantCollector = new CombatantCollector();        
+        // action collector
+        this.actionCollector = new ActionCollector(this.combatantCollector);
         // current view mode
         this.currentView = "";
+        // loading message element
+        this.loadingMessageElement = document.getElementById("loading-message");
+        // error overlay element
+        this.errorOverlayElement = document.getElementById("error-overlay")
     }
 
     /**
@@ -52,12 +58,10 @@ class Application
      */
     initWidgets()
     {
-        var availableWidgets = [
-            new WidgetEncounter(),
-            new WidgetCombatants(),
-        ];
+        var views = [];
+
         // set view on hash change
-        var t = this;
+        /*var t = this;
         this.setView(window.location.hash);
         window.addEventListener("hashchange", function(e) {
             t.setView(window.location.hash);
@@ -72,7 +76,7 @@ class Application
         for (var i = 0; i < availableWidgets.length; i++) {
             this.widgets[availableWidgets[i].getName()] = availableWidgets[i];
             availableWidgets[i].init();
-        }
+        }*/
     }
 
     /**
@@ -145,18 +149,18 @@ class Application
                     case "status_in_progress":
                     {
                         // update status message
-                        document.getElementById("loadingMessage").classList.remove("hide");
-                        document.getElementById("loadingMessage").innerText = e.data.message;
+                        document.getElementById("loading-message").classList.remove("hide");
+                        document.getElementById("loading-message").innerText = e.data.message;
                         break;
                     }
                     case "status_ready":
                     {
-                        document.getElementById("loadingMessage").classList.add("hide");
+                        document.getElementById("loading-message").classList.add("hide");
                         break;
                     }
                     case "error":
                     {
-                        document.getElementById("errorOverlay").classList.remove("hide");
+                        document.getElementById("error-overlay").classList.remove("hide");
                         break;
                     }
                     case "act:encounter": 
@@ -186,7 +190,7 @@ class Application
             fetchActionData();
             fetchStatusData();
             console.log(">> Connected to server.");
-            document.getElementById("loadingMessage").innerText = "Connected. Waiting for encounter data...";
+            document.getElementById("loading-message").innerText = "Connected. Waiting for encounter data...";
         };
         var workerIndex = 0;    
         socket.onmessage = function(e) {
@@ -216,34 +220,28 @@ class Application
             if (e.detail.UID != lastEncounterUid) {
                 console.log(">> Receieved new encounter, ", e.detail);
                 lastEncounterUid = e.detail.UID;
-                t.combatants = [];
+                t.combatantCollector.reset();
+                t.actionCollector.reset();
             }
         });
+        // add/update combatant
         window.addEventListener("act:combatant", function(e) {
-            // must have a name
-            if (!e.detail.Name) {
-                return;
+            var combatant = t.combatantCollector.update(e.detail);
+            if (combatant) {
+                window.dispatchEvent(
+                    new CustomEvent("app:combatant", {"detail" : combatant})
+                );
             }
-            // update combatant list
-            var combatant = null;
-            for (var i in t.combatants) {
-                if (t.combatants[i].compare(e.detail)) {
-                    t.combatants[i].update(e.detail);
-                    combatant = t.combatants[i]
-                    break;
-                }
+        });
+        // add action
+        window.addEventListener("act:logLine", function(e) {
+            var logLineData = parseLogLine(event.detail.LogLine);
+            var action = t.actionCollector.add(logLineData);
+            if (action) {
+                window.dispatchEvent(
+                    new CustomEvent("app:action", {"detail" : action})
+                );
             }
-            // add new combatant
-            if (!combatant) {
-                console.log(">> Receieved new combatant, ", e.detail);
-                combatant = new Combatant();
-                combatant.update(e.detail);
-                t.combatants.push(combatant);
-            }
-            // push event with combatant
-            window.dispatchEvent(
-                new CustomEvent("app:combatant", {"detail" : combatant})
-            );
         });
         // flags
         window.addEventListener("onFlag", function(e) {
@@ -252,11 +250,11 @@ class Application
             {
                 case "active":
                 {
-                    var element = document.getElementById("loadingMessage");
+                    var element = document.getElementById("loading-message");
                     element.classList.add("hide");
                     if (!e.detail.Value) {
-                        document.getElementById("loadingMessage").classList.remove("hide");
-                        document.getElementById("loadingMessage").innerHTML = "Waiting for connection from ACT...<br/></br><sub>(Please make sure you are using the correct version of the ACT Plugin.)</sub>";
+                        document.getElementById("loading-message").classList.remove("hide");
+                        document.getElementById("loading-message").innerHTML = "Waiting for connection from ACT...<br/></br><sub>(Please make sure you are using the correct version of the ACT Plugin.)</sub>";
                     }
                     break;
                 }

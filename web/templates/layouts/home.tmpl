@@ -6,11 +6,11 @@
 
 {{ define "content" }}
 
-<div id="homeContent">
+<div id="home-content">
 
-    <div class="homeSection">
-        <div class="homeSectionName">About</div>
-        <p class="textCenter">
+    <div class="home-section">
+        <div class="home-section-name">About</div>
+        <p class="text-center">
             <img src="/static/img/home_gang.png" alt="The Gang" />
         </p>        
         <p>
@@ -20,57 +20,57 @@
         </p>
     </div>
 
-    <div class="homeSection">
-        <div class="homeSectionName">Download &amp; Instructions</div>
-        <p class="textCenter">
+    <div class="home-section">
+        <div class="home-section-name">Download &amp; Instructions</div>
+        <p class="text-center">
             <img src="/static/img/home_kynda_tomestone.png" alt="On Your Tomestone" />
         </p>               
-        <p class="textCenter">
+        <p class="text-center">
             <a href="https://github.com/chompy/ffliveparse_act_plugin/archive/v{{ .ActVersionString }}.zip">Download ACT Plugin (v{{ .ActVersionString }})</a>
         </p>
-        <p class="textCenter">
+        <p class="text-center">
             <a href="https://github.com/chompy/ffliveparse_act_plugin/blob/master/README.md">Install Guide</a> &bullet;
             <a href="https://github.com/chompy/ffliveparse_server/blob/master/README.md#web-site-how-to">Web Site Usage Instructions</a>
         </p>
     </div>
 
 
-    <div class="homeSection">
-        <div class="homeSectionName">My Info</div>
+    <div class="home-section">
+        <div class="home-section-name">My Info</div>
         {{ if (gt .User.ID 0) }}
-        <p class="textCenter">
+        <p class="text-center">
             Your ACT "upload key" is...
         </p>
-        <code class="well textCenter">{{ .User.UploadKey }}</code>
-        <p class="textCenter">
+        <code class="well text-center">{{ .User.UploadKey }}</code>
+        <p class="text-center">
             Your parse page is...
         </p>
-        <div class="well textCenter">
+        <div class="well text-center">
             <a id="parsePageUrl" data-web-id="{{ .WebIDString }}" href="/{{ .WebIDString }}"></a>
         </div>
 
         {{ else }}
-        <p class="textCenter textBody">
+        <p class="text-center textBody">
             <a href="/new">Click here to generate your upload key.</a>
         </p>
         {{ end }}
     </div>
-    <div class="homeSection">
-        <div class="homeSectionName">Discord</div>
-        <p class="textCenter">
+    <div class="home-section">
+        <div class="home-section-name">Discord</div>
+        <p class="text-center">
             <img src="/static/img/home_mememal.png" alt="Come hangout with Mememal!" />
         </p>                       
-        <p class="textCenter">
+        <p class="text-center">
             Check out the FFLiveParse Discord server!
         </p>
 
-        <p class="textCenter">
+        <p class="text-center">
             <a href="https://discord.gg/Rt34mav">https://discord.gg/Rt34mav</a>
         </p>
     </div>
-    <div class="homeSection">
-        <div class="homeSectionName">Developer Corner</div>
-        <p class="textCenter">
+    <div class="home-section">
+        <div class="home-section-Name">Developer Corner</div>
+        <p class="text-center">
             <img src="/static/img/home_minda.png" alt="Minda Silva @ Sargatanas" />
         </p>
         <p class="textLeft">
@@ -88,8 +88,8 @@
 
     </div>
 
-    <div class="homeSection">
-        <div class="homeSectionName">Contact &amp; Donate</div>
+    <div class="home-section">
+        <div class="home-section-name">Contact &amp; Donate</div>
         <p>
             You can contact me via email at
             <strong><a href="mailto:&#110;&#097;&#116;&#104;&#097;&#110;&#064;&#111;&#103;&#100;&#101;&#110;&#046;&#116;&#101;&#099;&#104;">&#110;&#097;&#116;&#104;&#097;&#110;&#064;&#111;&#103;&#100;&#101;&#110;&#046;&#116;&#101;&#099;&#104;</a></strong>
@@ -98,7 +98,7 @@
         <p>
             Additionally, If you like FFLiveParse consider making a donation to help with hosting costs and to fund further development!
         </p>
-        <div class="textCenter">
+        <div class="text-center">
             <form action="https://www.paypal.com/cgi-bin/webscr" target="_blank" method="post">
                 <!-- Identify your business so that you can collect the payments. -->
                 <input type="hidden" name="business"
@@ -119,8 +119,8 @@
         </div>
         <div class="spacer"></div>
     </div>
-    <div class="homeSection">
-        <div class="homeSectionName">Version Notes</div>
+    <div class="home-section">
+        <div class="home-section-name">Version Notes</div>
         <h3>Version 1.16</h3>
         <p>
             <strong>Bug Fixes</strong>

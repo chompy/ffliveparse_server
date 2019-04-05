@@ -1,25 +1,25 @@
-#homeContent {
+#home-content {
     margin:20px;
 }
 
-.homeSection {
+.home-section {
     background-color: #262626;
     border: 1px solid #696969;
     padding: 5px 10px;
     margin-bottom: 15px;
 }
 
-.homeSection img {
+.home-section img {
     max-width: 100%;
 }
 
-.homeSection .homeSectionName {
+.home-section .home-section-name {
     position: absolute;
     margin-top: -14px;
     font-weight: bold;
     font-style: italic;
 }
 
-.homeSection p {
+.home-section p {
     padding: 0;
 }

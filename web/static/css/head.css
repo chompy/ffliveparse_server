@@ -6,10 +6,10 @@
     position: relative;
     z-index: 3;
 }
-#head #logo, #head #webId, #head #zone-info, #head #encounterId {
+#head #logo, #head #web-id, #head #zone-info, #head #encounter-id {
     display: inline-block;
 }
-#head #webId::before, #head #zone-info span::before, #head #webId::before, #head #encounterId::before {
+#head #web-id::before, #head #zone-info span::before, #head #web-id::before, #head #encounter-id::before {
     content: "::";
     display: inline-block;
     margin-right: 4px;
@@ -33,7 +33,7 @@
     float: right;
 }
 
-#head .right-side #appHeaderRight {
+#head .right-side #app-header-right {
     display: inline-block;
 }
 
@@ -47,7 +47,7 @@
 }
 
 @media (max-width: 940px) {
-    #head #encounterId {
+    #head #encounter-id {
         display: none;
     }
 }

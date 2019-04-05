@@ -1,52 +1,52 @@
-#encounterContent {
+#encounter-content {
     margin:20px;
 
 }
 
-#encounterContent .encounterItem {
+#encounter-content .encounter-item {
     padding: 5px;
 }
-#encounterContent .encounterItem.encounterSuccess, #encounterContent .encounterItem.encounterSuccess a {
+#encounter-content .encounter-item.encounter-success, #encounter-content .encounter-item.encounter-success a {
     color: #06ea06;
 }
 
-#encounterContent .encounterItem div {
+#encounter-content .encounter-item div {
     display: inline-block;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
 }
 
-#encounterContent .encounterItem .encounterTime {
+#encounter-content .encounter-item .encounter-time {
     width: 20%;
 }
 
-#encounterContent .encounterItem .encounterZone {
+#encounter-content .encounter-item .encounter-zone {
     width: 30%;
 }
 
-#encounterContent .encounterItem .encounterLength {
+#encounter-content .encounter-item .encounter-length {
     width: 15%;
 }
 
-#encounterContent .encounterItem .encounterCombatants {
+#encounter-content .encounter-item .encounter-combatants {
     width: 30%;
 }
 
-#encounterContent .encounterItem .encounterCombatants .encounterCombatant::after {
+#encounter-content .encounter-item .encounter-combatants .encounter-combatant::after {
     display: inline;
     content: ", ";
 }
 
-#encounterContent .encounterItem .encounterCombatants .encounterCombatant:last-child::after {
+#encounter-content .encounter-item .encounter-combatants .encounter-combatant:last-child::after {
     content: "";
 }
 
-#encounterContent .encounterPagination {
+#encounter-content .encounter-pagination {
     margin-top: 15px;
     font-size: 20px;
 }
 
-#encounterContent .encounterPagination a {
+#encounter-content .encounter-pagination a {
     font-size: 14px;
 }

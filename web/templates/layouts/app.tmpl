@@ -4,11 +4,11 @@
 {{ end }}
 
 {{ define "headerLeft" }}
-<div id="webId"><a href="/{{ .WebIDString }}">{{ .WebIDString }}</a></div>
+<div id="web-id"><a href="/{{ .WebIDString }}">{{ .WebIDString }}</a></div>
 {{ end }}
 
 {{ define "headerRight" }}
-<div id="appHeaderRight">
+<div id="app-header-right">
     <!-- <a href="#">Triggers</a> -->
     <!-- <a href="#">Extensions</a> -->
     <a href="#" class="hamburger-open"><img src="/static/img/hamburger.png" /></a>
@@ -17,36 +17,6 @@
 {{ end }}
 
 {{ define "content" }}
-<div id="timeline-overlay" class="hide">
-    <div class="close">x</div>
-    <div class="inner">
-        <img class="action-icon" src="/static/img/attack.png" />
-        <div class="action-name">Action Name</div>
-        <div class="action-desc">....Action description here....</div>
-        <div class="action-info">
-            <span class="action-time">00.00</span>
-            <span class="action-flags">Critical, Direct Hit, Heal</span>
-            <div class="action-targets"></div>
-        </div>
-        <div class="other-actions-head">Other Nearby Actions</div>
-        <div class="other-actions">
-            <div class="other-action">
-                <span class="action-time">00.00</span>
-                <img class="action-icon" src="/static/img/attack.png" />
-                <span class="action-name">Action Name</span>
-            </div>
-        </div>
-    </div>
-</div>
-<div id="timeline-mouseover">
-    <div class="action-name">Action Name</div>
-    <div class="action-desc">....Action description here....</div>
-    <div class="action-info">
-        <span class="action-time">00.00</span>
-        <div class="action-targets"></div>
-    </div>
-</div>
-<div id="loadingMessage">Loading...</div>
 <div id="side-menu" class="hide">
     <div class="side-menu-section">
         <div class="side-menu-section-title">View</div>
@@ -71,21 +41,10 @@
     <span id="encounter-status" class="hide"></span>
     <span id="encounter-length"></span>
 </div>
-<div id="combatants">
-    <div id="combatant-col-names"></div>
-    <div class="combatant combatant-info combatant-npc">
-        <div class="info-text">
-            <span class="name">Enemy Combatant(s)</span>
-        </div>
-    </div>
-    <div id="playerCombatants">
-    </div>
+<div id="loading-message">Loading...</div>
+<div id="overlays">
 </div>
-<div id="timeline">
-    <canvas id="timeline-canvas"></canvas>
-    <div id="timeline-progress">
-        <input type="range" min="1" max="100" value="8" class="slider" id="timeline-progress-slider">
-    </div>
+<div id="views">
 </div>
 {{ end }}
 

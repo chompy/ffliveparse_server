@@ -1,31 +1,31 @@
-.textBold {
+.text-bold {
     font-weight: bold;
 }
 
-.textItalic {
+.text-italic {
     font-style: italic;
 }
 
-.textLeft {
+.text-left {
     text-align: left;
 }
 
-.textRight {
+.text-right {
     text-align: right;
 }
 
-.textCenter {
+.text-center {
     text-align: center;
 }
 
-.textError {
+.text-error {
     color: #ff1111;
 }
 
-.textSuccess {
+.text-success {
     color: #a4ce25;
 }
 
-.textProgress {
+.text-progress {
     color: #edffba;
 }

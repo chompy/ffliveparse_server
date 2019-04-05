@@ -1,0 +1,59 @@
+/*
+This file is part of FFLiveParse.
+
+FFLiveParse is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+FFLiveParse is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with FFLiveParse.  If not, see <https://www.gnu.org/licenses/>.
+*/
+
+class ViewBase
+{
+
+    /**
+     * @param {CombatantCollector} combatantCollector 
+     * @param {ActionCollector} actionCollector 
+     */
+    constructor(combatantCollector, actionCollector)
+    {
+        this.combatants = combatantCollector;
+        this.actionCollector = actionCollector;
+        this.actionData = null;
+        this.statusData = null;
+    }
+
+    /**
+     * Get widget name.
+     * @return {string}
+     */
+    getName()
+    {
+        return "base";
+    }
+
+    /**
+     * Get widget title.
+     * @return {string}
+     */
+    getTitle()
+    {
+        return "Default";
+    }
+
+    /**
+     * Start the widget.
+     */
+    init()
+    {
+        return;
+    }
+
+}

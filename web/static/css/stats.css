@@ -1,17 +1,17 @@
-#statsContent {
+#stats-content {
     margin: 20px;
 }
 
-#statsContent .statItem {
+#stats-content .stat-item {
     margin-bottom: 5px;
 }
 
-#statsContent .statItem .statName {
+#stats-content .stat-item .stat-name {
     display: inline-block;
     min-width: 332px;
     margin-right: 10px;
 }
 
-#statsContent .statItem .statValue {
+#stats-content .stat-item .stat-value {
     display: inline-block;
 }

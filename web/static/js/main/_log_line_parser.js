@@ -61,6 +61,15 @@ var MESSAGE_TYPE_DEATH = 25;
 var MESSAGE_TYPE_GAIN_EFFECT = 26;
 var MESSAGE_TYPE_LOSE_EFFECT = 30;
 
+var LOG_LINE_FLAG_DODGE = "dodge";
+var LOG_LINE_FLAG_HEAL = "heal";
+var LOG_LINE_FLAG_DAMAGE = "damage";
+var LOG_LINE_FLAG_CRIT = "crit";
+var LOG_LINE_FLAG_DIRECT_HIT = "direct-hit";
+var LOG_LINE_FLAG_GAIN_EFFECT = "gain-effect";
+var LOG_LINE_FLAG_LOSE_EFFECT = "lose-effect";
+var LOG_LINE_FLAG_DEATH = "death";
+
 /**
  * Parse contents of log line and expand in to dictionary object.
  * @param {string} message 
@@ -120,7 +129,7 @@ function parseLogLine(message)
         {
             case "1":
             {
-                data.flags.push("dodge");
+                data.flags.push(LOG_LINE_FLAG_DODGE);
                 break;
             }
             case "3":
@@ -129,29 +138,29 @@ function parseLogLine(message)
                 {
                     case "3":
                     {
-                        data.flags.push("instant-death");
+                        //data.flags.push("instant-death");
                         break;
                     }
                     default:
                     {
-                        data.flags.push("damage");
+                        data.flags.push(LOG_LINE_FLAG_DAMAGE);
                         if (rawFlags.length >= 3) {
                             switch(rawFlags.substring(rawFlags.length - 3, rawFlags.length - 2))
                             {
                                 case "1":
                                 {
-                                    data.flags.push("crit");
+                                    data.flags.push(LOG_LINE_FLAG_CRIT);
                                     break;
                                 }
                                 case "2":
                                 {
-                                    data.flags.push("direct-hit");
+                                    data.flags.push(LOG_LINE_FLAG_DIRECT_HIT);
                                     break;
                                 }
                                 case "3":
                                 {
-                                    data.flags.push("crit");
-                                    data.flags.push("direct-hit");
+                                    data.flags.push(LOG_LINE_FLAG_CRIT);
+                                    data.flags.push(LOG_LINE_FLAG_DIRECT_HIT);
                                     break;
                                 }
                             }
@@ -163,20 +172,20 @@ function parseLogLine(message)
             }
             case "4":
             {
-                data.flags.push("heal");
+                data.flags.push(LOG_LINE_FLAG_HEAL);
                 if (rawFlags.length >= 5 && rawFlags.substring(rawFlags.length - 5, rawFlags.length - 4) == "1") {
-                    data.flags.push("crit");
+                    data.flags.push(LOG_LINE_FLAG_CRIT);
                 }
                 break;
             }
             case "5":
             {
-                data.flags.push("blocked-damage");
+                //data.flags.push("blocked-damage");
                 break;
             }
             case "6":
             {
-                data.flags.push("parried-damage");
+                //data.flags.push("parried-damage");
                 break;
             }
         }

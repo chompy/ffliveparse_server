@@ -16,6 +16,63 @@ along with FFLiveParse.  If not, see <https://www.gnu.org/licenses/>.
 */
 
 /**
+ * Collects all combatants.
+ */
+class CombatantCollector
+{
+
+    constructor()
+    {
+        this.reset();
+    }
+
+    reset()
+    {
+        this.combatants = [];
+    }
+
+    /**
+     * Add or update combatant.
+     * @param {object} data 
+     * @return {Combatant|null}
+     */
+    update(data)
+    {
+        // must have a name
+        if (typeof(data.Name) == "undefined" || !data.Name) {
+            return null;
+        }
+        // update
+        var combatant = this.find(data);
+        if (combatant) {
+            combatant.update(data);
+            return combatant;
+        }
+        // new
+        combatant = new Combatant();
+        combatant.update(data);
+        this.combatants.push(combatant);
+        return null;
+    }
+
+    /**
+     * Find combatant.
+     * @param {mixed} data 
+     * @return {Combatant|null}
+     */
+    find(data)
+    {
+        for (var i in this.combatants) {
+            if (this.combatants[i].compare(data)) {
+                return this.combatants[i];
+            }
+        }
+        return null;
+    }
+
+}
+
+/**
  * Store information about a combatant.
  */
 class Combatant
