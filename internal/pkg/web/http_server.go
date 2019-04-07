@@ -18,16 +18,21 @@ along with FFLiveParse.  If not, see <https://www.gnu.org/licenses/>.
 package web
 
 import (
+	"bufio"
+	"bytes"
 	"fmt"
 	"html/template"
 	"io/ioutil"
 	"log"
 	"math"
 	"net/http"
+	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
+
+	libsass "github.com/wellington/go-libsass"
 
 	"github.com/olebedev/emitter"
 	"github.com/tdewolff/minify"
@@ -115,7 +120,7 @@ func HTTPStartServer(port uint16, userManager *user.Manager, actManager *act.Man
 		fmt.Fprint(w, compiledJs["worker.js"])
 	})
 	// compile/minify css, serve compiled css
-	compiledCSS, err := compileCSS()
+	compiledCSS, err := compileSCSS()
 	if err != nil {
 		log.Panicln("Error occured while compiling CSS,", err)
 	}
@@ -123,7 +128,7 @@ func HTTPStartServer(port uint16, userManager *user.Manager, actManager *act.Man
 		w.Header().Set("Content-Type", "text/css;charset=utf-8")
 		// in dev mode recompile css every request
 		if devMode {
-			compiledCSS, err = compileCSS()
+			compiledCSS, err = compileSCSS()
 			if err != nil {
 				log.Panicln("Error occured while compiling CSS,", err)
 			}
@@ -423,30 +428,31 @@ func compileJavascript() (map[string]string, error) {
 	return output, nil
 }
 
-// compileCSS - Compile all CSS in to single string that can be served from memory
-func compileCSS() (string, error) {
-	log.Println("Compiling and minifing CSS...")
-	// compile all css in to a single string
-	files, err := ioutil.ReadDir("./web/static/css")
+// compileSCSS - Compile all SCSS in to single string that can be served from memory
+func compileSCSS() (string, error) {
+	log.Println("Compiling and minifing SCSS...")
+	// sass compile
+	mainScss, err := os.Open("./web/static/scss/main.scss")
 	if err != nil {
 		return "", err
 	}
-	compiledCSS := ""
-	for _, file := range files {
-		filename := file.Name()
-		if !strings.HasSuffix(filename, ".css") {
-			continue
-		}
-		js, err := ioutil.ReadFile("./web/static/css/" + filename)
-		if err != nil {
-			return "", err
-		}
-		compiledCSS += string(js)
+	defer mainScss.Close()
+	var cssBuf bytes.Buffer
+	cssBufIo := bufio.NewWriter(&cssBuf)
+	scssOptions := libsass.Path("./web/static/scss/main.scss")
+	comp, err := libsass.New(cssBufIo, mainScss, scssOptions)
+	if err != nil {
+		return "", err
 	}
+	err = comp.Run()
+	if err != nil {
+		return "", err
+	}
+	cssBufIo.Flush()
 	// minify css string
 	m := minify.New()
 	m.AddFunc("text/css", css.Minify)
-	compiledCSS, err = m.String("text/css", compiledCSS)
+	compiledCSS, err := m.String("text/css", cssBuf.String())
 	if err != nil {
 		return "", err
 	}

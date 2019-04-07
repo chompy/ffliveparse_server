@@ -93,6 +93,7 @@ class ViewBase
      */
     onActive()
     {
+        this.active = true;
         this.getElement().classList.remove("hide");
     }
 
@@ -101,6 +102,7 @@ class ViewBase
      */
     onInactive()
     {
+        this.active = false;
         this.getElement().classList.add("hide");
     }
 
@@ -169,20 +171,6 @@ class ViewBase
         window.localStorage.setItem(
             USER_CONFIG_LOCAL_STORAGE_KEY,
             JSON.stringify(userConfig)
-        );
-    }
-
-    /**
-     * Check that number is valid number for parsing.
-     * I.e. a real number that is a non negative
-     * @param {numeric} value 
-     */
-    isValidParseNumber(value)
-    {
-        return (
-            !isNaN(value) &&
-            isFinite(value) &&
-            value >= 0
         );
     }
 

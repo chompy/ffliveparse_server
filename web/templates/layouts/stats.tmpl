@@ -1,26 +1,26 @@
 {{ define "title" }} :: Stats{{ end }}
 
 {{ define "headerLeft" }}
-<div id="webId">Stats</div>
+<div id="web-id">Stats</div>
 {{ end }}
 
 {{ define "headerRight" }}
 {{ end }}
 
 {{ define "content" }}
-    <div id="statsContent">
+    <div id="stats-content">
 
-        <div class="statItem">
-            <div class="statName">Active ACT Connections</div>
-            <div class="statValue">{{ .StatActConnections }}</div>
+        <div class="stat-item">
+            <div class="stat-name">Active ACT Connections</div>
+            <div class="stat-value">{{ .StatActConnections }}</div>
         </div>
-        <div class="statItem">
-            <div class="statName">Active Web Users</div>
-            <div class="statValue">{{ .StatActiveWebUsers }}</div>
+        <div class="stat-item">
+            <div class="stat-name">Active Web Users</div>
+            <div class="stat-value">{{ .StatActiveWebUsers }}</div>
         </div>
-        <div class="statItem">
-            <div class="statName">Page Loads</div>
-            <div class="statValue">{{ .StatPageLoads }}</div>
+        <div class="stat-item">
+            <div class="stat-name">Page Loads</div>
+            <div class="stat-value">{{ .StatPageLoads }}</div>
         </div>
 
     </div>

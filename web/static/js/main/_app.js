@@ -41,6 +41,8 @@ class Application
         this.workers = [];
         // user config
         this.userConfig = {};
+        // current encounter
+        this.encounter = null;
         // combatant collector
         this.combatantCollector = new CombatantCollector();        
         // action collector
@@ -61,7 +63,8 @@ class Application
         // load views, statically for now, eventually views should be 
         // loaded dynamically and user should be able to load their own views in
         this.views = [
-            new ViewTest(this.combatantCollector, this.actionCollector)
+            new ViewCombatantTable(this.combatantCollector, this.actionCollector),
+            new ViewCombatantStream(this.combatantCollector, this.actionCollector)
         ];
         // init all views
         for (var i in this.views) {
@@ -82,6 +85,10 @@ class Application
      */
     setView(viewName)
     {
+        // do nothing if same view
+        if (viewName == this.currentView && viewName) {
+            return;
+        }
         // no views loaded, do nothing
         if (this.views.length == 0) {
             return;
@@ -109,10 +116,12 @@ class Application
         }
         // set view
         this.currentView = viewName
+        bodyElement.classList.add("view-" + this.currentView);
         // make view button active and set view active
         for (var i in this.views) {
             if (this.views[i].getName() == this.currentView) {
                 sideMenuSetActiveView(this.views[i]);
+                console.log(this.views[i].getName());
                 this.views[i].onActive();
             }
         }
@@ -195,6 +204,10 @@ class Application
             t.initViews();
             fetchActionData();
             fetchStatusData();
+            // display encounter data
+            var encounterDisplay = new EncounterDisplay();
+            encounterDisplay.init();
+            // log connection
             console.log(">> Connected to server.");
             t.loadingMessageElement.innerText = "Connected. Waiting for encounter data...";
         };
@@ -223,16 +236,20 @@ class Application
         // log incoming data
         var lastEncounterUid = null;
         window.addEventListener("act:encounter", function(e) {
-            if (e.detail.UID != lastEncounterUid) {
+            if (!t.encounter || e.detail.UID != t.encounter.data.UID) {
                 console.log(">> Receieved new encounter, ", e.detail);
                 lastEncounterUid = e.detail.UID;
                 t.combatantCollector.reset();
                 t.actionCollector.reset();
-                // forward encoutner to all views
+                t.encounter = new Encounter();
+                t.encounter.update(e.detail);
+                // forward encounter to all views
                 for (var i in t.views) {
-                    t.views[i].onEncounter(e.detail);
+                    t.views[i].onEncounter(t.encounter);
                 }
+                return;
             }
+            t.encounter.update(e.detail);
         });
         // add/update combatant
         window.addEventListener("act:combatant", function(e) {

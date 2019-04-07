@@ -53,6 +53,10 @@ func (c *CombatantCollector) Reset() {
 
 // UpdateCombatantTracker - Sync ACT combatant data
 func (c *CombatantCollector) UpdateCombatantTracker(combatant Combatant) {
+	// ignore invalid combatants
+	if combatant.ID > 1000000000 && combatant.Job != "" {
+		return
+	}
 	// update existing
 	for index := range c.CombatantTrackers {
 		if c.CombatantTrackers[index].Start.ID == combatant.ID {
@@ -69,7 +73,7 @@ func (c *CombatantCollector) UpdateCombatantTracker(combatant Combatant) {
 		}
 	}
 	// create new
-	log.Println("[", c.userIDHash, "][ Combatant", combatant.ID, "] Added", combatant.Name)
+	log.Println("[", c.userIDHash, "][ Combatant", combatant.ID, "] Added", combatant.Name, combatant.ID, combatant.Job)
 	ct := combatantCollectorCombatantTracker{
 		Start: combatant,
 		Data:  make([]Combatant, 0),
@@ -98,14 +102,20 @@ func (c *CombatantCollector) ReadLogLine(l *LogLineData) {
 		}
 	case LogTypeGameLog:
 		{
-			if l.TargetName != "" && l.AttackerName != "" {
-				// sync world
-				for index := range c.CombatantTrackers {
-					if c.CombatantTrackers[index].Start.Name == l.AttackerName && c.CombatantTrackers[index].Start.World != l.TargetName {
-						c.CombatantTrackers[index].Start.World = l.TargetName
-						log.Println("[", c.userIDHash, "][ Combatant", c.CombatantTrackers[index].Start.ID, "] Set world name", l.TargetName)
-						break
+			switch l.SubType {
+			case LogSubTypeWorldName:
+				{
+					if l.TargetName != "" && l.AttackerName != "" {
+						// sync world
+						for index := range c.CombatantTrackers {
+							if c.CombatantTrackers[index].Start.Name == l.AttackerName && c.CombatantTrackers[index].Start.World != l.TargetName {
+								c.CombatantTrackers[index].Start.World = l.TargetName
+								log.Println("[", c.userIDHash, "][ Combatant", c.CombatantTrackers[index].Start.ID, "] Set world name", l.TargetName)
+								break
+							}
+						}
 					}
+					break
 				}
 			}
 			break
@@ -136,38 +146,6 @@ func (c *CombatantCollector) resolvePets() {
 				if !hasParent {
 					//c.CombatantTrackers = append(c.CombatantTrackers[:index], c.CombatantTrackers[index+1])
 					return
-				}
-			} else if ct.Start.Name == "Demi-Bahamut" && ct.Start.Job == "Smn" {
-				// demi-bahamut, pair with smn as pet
-				// don't know smn that used it, pair it with first available smn
-				// this will show all demi-bahamuts with a single smn, oh well...
-				c.CombatantTrackers[index].Start.Job = "Pet"
-				hasSmn := false
-				for _, ownerCt := range c.CombatantTrackers {
-					if ownerCt.Start.ID < 1000000000 && ownerCt.Start.Name != "Demi-Bahamut" && ownerCt.Start.Job == "Smn" {
-						hasSmn = true
-						c.CombatantTrackers[index].Start.ParentID = ownerCt.Start.ID
-					}
-				}
-				// no smn to pair with
-				if !hasSmn {
-					//c.CombatantTrackers = append(c.CombatantTrackers[:index], c.CombatantTrackers[index+1])
-					return
-				}
-			} else {
-				// mark parent id for combatants that share the same name as parent
-				for _, ownerCt := range c.CombatantTrackers {
-					if ownerCt.Start.ID < 1000000000 && ((ownerCt.Start.ActName != "" && ownerCt.Start.ActName == ct.Start.Name) || ownerCt.Start.Name == ct.Start.Name) {
-						c.CombatantTrackers[index].Start.ActName = ct.Start.Name
-						c.CombatantTrackers[index].Start.Name = "(Object)"
-						c.CombatantTrackers[index].Start.ParentID = ownerCt.Start.ID
-						c.CombatantTrackers[index].Start.Job = "Pet"
-						// ast summons earthly star as seperate entity
-						if ownerCt.Start.Job == "Ast" {
-							c.CombatantTrackers[index].Start.Name = "Earthly Star"
-						}
-						break
-					}
 				}
 			}
 		}

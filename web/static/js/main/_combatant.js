@@ -52,7 +52,7 @@ class CombatantCollector
         combatant = new Combatant();
         combatant.update(data);
         this.combatants.push(combatant);
-        return null;
+        return combatant;
     }
 
     /**
@@ -68,6 +68,58 @@ class CombatantCollector
             }
         }
         return null;
+    }
+
+    /**
+     * Get total damage for combatant, combining all child combatants.
+     * @param {Combatant} combatant 
+     * @return float
+     */
+    getCombatantTotalDamage(combatant)
+    {
+        var damage = combatant.data.Damage;
+        for (var i in this.combatants) {
+            if (combatant.compare(parseInt(this.combatants[i].data.ParentID))) {
+                damage += this.combatants[i].data.Damage;
+            }
+        }
+        if (!this._isValidParseNumber(damage)) {
+            damage = 0;
+        }
+        return damage;
+    }
+
+    /**
+     * Get total healing for combatant, combining all child combatants.
+     * @param {Combatant} combatant 
+     * @return float
+     */    
+    getCombatantTotalHealing(combatant)
+    {
+        var healing = combatant.data.DamageHealed;
+        for (var i in this.combatants) {
+            if (combatant.compare(parseInt(this.combatants[i].data.ParentID))) {
+                healing += this.combatants[i].data.DamageHealed;
+            }
+        }
+        if (!this._isValidParseNumber(healing)) {
+            healing = 0;
+        }
+        return healing;        
+    }
+
+    /**
+     * Check that number is valid number for parsing.
+     * I.e. a real number that is a non negative
+     * @param {numeric} value 
+     */
+    _isValidParseNumber(value)
+    {
+        return (
+            !isNaN(value) &&
+            isFinite(value) &&
+            value >= 0
+        );
     }
 
 }
@@ -167,6 +219,38 @@ class Combatant
     {
         // right now enemies are non pet combatants that do not have a defined job
         return this.data && this.data.ParentID == 0 && this.data.Job == "";
+    }
+
+    /**
+     * Get value for given table column.
+     * @param {string} name 
+     * @return {string|float}
+     */
+    getTableCol(name)
+    {
+        switch(name) {
+            case "name":
+            {
+                return this.getDisplayName();
+            }
+            case "job":
+            {
+                return this.data.Job.toLowerCase();
+            }
+            case "damage":
+            {
+                return this.data.Damage;
+            }
+            case "healing":
+            {
+                return this.data.DamageHealed;
+            }
+            case "deaths":
+            {
+                return this.data.Deaths;
+            }
+        }
+        return "";
     }
 
 }

@@ -119,12 +119,19 @@ const LogFlagParry = 7
 // LogFlagInstantDeath - Log flag, instant death
 const LogFlagInstantDeath = 8
 
+// LogSubTypeWorldName - Log sub type, world name identify
+const LogSubTypeWorldName = 1
+
+// LogSubTypeJobChange = Log sub type, job change
+const LogSubTypeJobChange = 2
+
 // logShiftValues
 var logShiftValues = [...]int{0x3E, 0x113, 0x213, 0x313}
 
 // LogLineData - Data retrieved by parsing a log line
 type LogLineData struct {
 	Type              int
+	SubType           int
 	Raw               string
 	AttackerID        int
 	AttackerName      string
@@ -365,22 +372,37 @@ func ParseLogLine(logLine LogLine) (LogLineData, error) {
 		}
 	case LogTypeGameLog:
 		{
-			// get world name from game log
-			if len(fields) > 2 && fields[1] == "102b" {
-				re, err := regexp.Compile("102b:([a-zA-Z'\\-]*) ([A-Z'])([a-z'\\-]*)([A-Z])([a-z]*)")
-				if err != nil {
-					log.Println("10", logLineString)
-					return data, err
-				}
-				match := re.FindStringSubmatch(logLineString)
-				if len(match) < 6 {
+			if len(fields) <= 2 {
+				break
+			}
+
+			switch fields[1] {
+			// get world name
+			case "102b":
+				{
+					data.SubType = LogSubTypeWorldName
+					re, err := regexp.Compile("102b:([a-zA-Z'\\-]*) ([A-Z'])([a-z'\\-]*)([A-Z])([a-z]*)")
+					if err != nil {
+						log.Println("10", logLineString)
+						return data, err
+					}
+					match := re.FindStringSubmatch(logLineString)
+					if len(match) < 6 {
+						break
+					}
+					attackerName := fmt.Sprintf("%s %s%s", match[1], match[2], match[3])
+					worldName := fmt.Sprintf("%s%s", match[4], match[5])
+					data.AttackerName = attackerName
+					// special case, target name is world name
+					data.TargetName = worldName
 					break
 				}
-				attackerName := fmt.Sprintf("%s %s%s", match[1], match[2], match[3])
-				worldName := fmt.Sprintf("%s%s", match[4], match[5])
-				data.AttackerName = attackerName
-				// special case, target name is world name
-				data.TargetName = worldName
+			// job change
+			case "0839":
+				{
+					data.SubType = LogSubTypeJobChange
+					break
+				}
 			}
 			break
 		}
