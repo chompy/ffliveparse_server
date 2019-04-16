@@ -35,6 +35,7 @@
     <span id="encounter-status" class="hide"></span>
     <span id="encounter-length"></span>
 </div>
+<div id="loading-progress"></div>
 <div id="loading-message">Loading...</div>
 <div id="overlays">
 </div>
@@ -48,5 +49,7 @@
     var VERSION = "{{.VersionString}}";
     var ENCOUNTER_UID = "{{ .EncounterUID }}";
 </script>
+<script src="https://unpkg.com/text-encoding@0.6.4/lib/encoding-indexes.js"></script>
+<script src="https://unpkg.com/text-encoding@0.6.4/lib/encoding.js"></script>
 <script type="text/javascript" src="/app.min.js?v={{ .VersionString }}"></script>
 {{ end }}

@@ -51,6 +51,8 @@ class Application
         this.currentView = "";
         // loading message element
         this.loadingMessageElement = document.getElementById("loading-message");
+        // loading progress element
+        this.loadingProgressElement = document.getElementById("loading-progress");
         // error overlay element
         this.errorOverlayElement = document.getElementById("error-overlay")
     }
@@ -64,7 +66,8 @@ class Application
         // loaded dynamically and user should be able to load their own views in
         this.views = [
             new ViewCombatantTable(this.combatantCollector, this.actionCollector),
-            new ViewCombatantStream(this.combatantCollector, this.actionCollector)
+            new ViewCombatantStream(this.combatantCollector, this.actionCollector),
+            new ViewTimeline(this.combatantCollector, this.actionCollector)
         ];
         // init all views
         for (var i in this.views) {
@@ -121,7 +124,6 @@ class Application
         for (var i in this.views) {
             if (this.views[i].getName() == this.currentView) {
                 sideMenuSetActiveView(this.views[i]);
-                console.log(this.views[i].getName());
                 this.views[i].onActive();
             }
         }
@@ -164,13 +166,17 @@ class Application
                     case "status_in_progress":
                     {
                         // update status message
-                        t.loadingMessageElement.classList.remove("hide");
-                        t.loadingMessageElement.innerText = e.data.message;
+                        t.loadingProgressElement.style.width = e.data.value + "%";
+                        t.loadingProgressElement.innerText = e.data.message;
+                        t.loadingProgressElement.classList.remove("hide");
                         break;
                     }
                     case "status_ready":
                     {
+                        t.loadingProgressElement.style.width = "0";
+                        t.loadingProgressElement.classList.add("hide");
                         t.loadingMessageElement.classList.add("hide");
+                        
                         break;
                     }
                     case "error":
@@ -310,6 +316,12 @@ class Application
                     break;
                 }
             }
+        });
+        // resize event
+        window.addEventListener("resize", function(e) {
+            for (var i in t.views) {
+                t.views[i].onResize();
+            }            
         });
     }    
 

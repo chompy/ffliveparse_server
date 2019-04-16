@@ -298,18 +298,24 @@ class ViewCombatantTable extends ViewBase
         if (!combatant.data.Job) {
             return;
         }
+        var isNew = false;
         if (typeof(this.combatantElements[combatant.data.Name]) == "undefined") {
             this.combatantElements[combatant.data.Name] = this.buildCombatantElement();
+            isNew = true;
         }
         this.updateCombatantElement(combatant, this.combatantElements[combatant.data.Name]);
         // update parent combatant
         if (combatant.data.ParentID) {
             var parentCombatant = this.combatantCollector.find(combatant.data.ParentID);
-            if (typeof(this.combatantElements[parentCombatant.data.Name]) != "undefined") {
+            if (parentCombatant) {
                 this.updateCombatantElement(parentCombatant, this.combatantElements[parentCombatant.data.Name]);
             }
         }
         this.displayCombatants();
+        if (isNew) {
+            // TODO find a way to make this automatic?
+            fflpFixFooter();
+        }
     }
 
     onActive()

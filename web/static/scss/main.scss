@@ -65,6 +65,19 @@ img.loading {
     padding: 20px;
 }
 
+#loading-progress {
+    position: absolute;
+    height: 16px;
+    color: #000;
+    font-size: 12px;
+    font-weight: bold;
+    line-height: 15px;
+    padding: 3px;
+    overflow: hidden;
+    white-space: nowrap;
+    background: #6aff00;
+}
+
 @import "text";
 @import "head";
 @import "head_encounter";

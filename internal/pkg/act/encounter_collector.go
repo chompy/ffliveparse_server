@@ -27,7 +27,10 @@ import (
 )
 
 // encounterInactiveTime - Time before last combat action before encounter should go inactive
-const encounterInactiveTime = 5000
+const encounterInactiveTime = 1000
+
+// combatantTimeout - Time before last combat action before a combatant should be considered defeated/removed
+const combatantTimeout = 7500
 
 // encounterCollectorCombatantTracker - Track combatants in encounter to determine active status
 type encounterCollectorCombatantTracker struct {
@@ -35,6 +38,7 @@ type encounterCollectorCombatantTracker struct {
 	MaxHP          int
 	Team           uint8
 	IsAlive        bool
+	WasAttacked    bool // combatant was attacked by another
 	LastActionTime time.Time
 }
 
@@ -173,6 +177,8 @@ func (ec *EncounterCollector) ReadLogLine(l *LogLineData) {
 			if ctTarget == nil {
 				break
 			}
+			// set attacked flag
+			ctTarget.WasAttacked = true
 			// ignore log line if last action happened after this one
 			if ctAttacker.LastActionTime.After(l.Time) || ctTarget.LastActionTime.After(l.Time) {
 				break
@@ -320,10 +326,13 @@ func (ec *EncounterCollector) CheckInactive() {
 		return
 	}
 	// check to see if a team is dead, if so encounter should be considered inactive
+	combatantTimeoutTime := time.Now().Add(time.Duration(-combatantTimeout) * time.Microsecond)
 	for team := 1; team <= 2; team++ {
 		teamDead := true
 		for _, ct := range ec.CombatantTracker {
-			if ct.Team == uint8(team) && ct.IsAlive {
+			// if combatant on same team, is flagged as alive, and was either attacked by something previously
+			// or has not timed out then team is still alive
+			if ct.Team == uint8(team) && ct.IsAlive && (ct.WasAttacked || combatantTimeoutTime.Before(ct.LastActionTime)) {
 				teamDead = false
 				break
 			}

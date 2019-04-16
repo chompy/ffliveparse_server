@@ -143,6 +143,14 @@ class ViewBase
     }
 
     /**
+     * Called when browser window is resized.
+     */
+    onResize()
+    {
+        return;
+    }
+
+    /**
      * Load user config from local storage and
      * set userConfig var.
      */
@@ -172,6 +180,30 @@ class ViewBase
             USER_CONFIG_LOCAL_STORAGE_KEY,
             JSON.stringify(userConfig)
         );
+    }
+
+    /**
+     * Get width available to view.
+     * @return {int}
+     */
+    getViewWidth()
+    {
+        return window.innerWidth;
+    }
+
+    /**
+     * Get height available to view.
+     * @return {int}
+     */
+    getViewHeight()
+    {
+        return window.innerHeight - 
+            (
+                document.getElementById("head").offsetHeight +
+                document.getElementById("footer").offsetHeight +
+                document.getElementById("encounter").offsetHeight
+            )
+        ;            
     }
 
 }

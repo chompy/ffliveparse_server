@@ -229,9 +229,12 @@ function parseNextMessage(buffer, pos, count)
     // every ~200 send status update and use setTimeout to prevent recursion error
     if (count > 200) {
         if (reportStatus) {
+
+            var loadingProgress = ((pos / buffer.byteLength) * 100).toFixed(1);
             postMessage({
                 "type"      : "status_in_progress",
-                "message"   : "Loading (" + ((pos / buffer.byteLength) * 100).toFixed(1) + "%)"
+                "message"   : "Loading (" + loadingProgress + "%)",
+                "value"     : loadingProgress
             });
         }
         setTimeout(function() { parseNextMessage(buffer, pos, 0); }, 1);

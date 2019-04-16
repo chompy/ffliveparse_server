@@ -33,9 +33,6 @@ class ViewCombatantStream extends ViewCombatantTable
         super.init();
         this.userConfig["sortBy"] = "damage";
         var t = this;
-        window.addEventListener("resize", function(e) {
-            t.onResize();
-        });
         setTimeout(function() {
             t.onResize();
         }, 100);
