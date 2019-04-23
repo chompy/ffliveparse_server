@@ -125,19 +125,7 @@ class ViewCombatantTable extends ViewBase
     updateCombatantElement(combatant, element)
     {
         // set role class
-        var defaultRoleClass = "dps";
-        var roleClasses = {
-            "tank"    : ["WAR", "DRK", "PLD", "GLA", "MRD"],
-            "healer"  : ["SCH", "WHM", "AST", "CNJ"],
-            "pet"     : ["PET"],
-        };
-        var roleClass = defaultRoleClass;
-        for (var role in roleClasses) {
-            if (roleClasses[role].indexOf(combatant.data.Job.toUpperCase()) != -1) {
-                roleClass = role;
-                break;
-            }
-        }
+        var roleClass = combatant.getRole();
         if (!element.classList.contains(roleClass)) {
             element.classList.add(roleClass);
         }
@@ -215,70 +203,7 @@ class ViewCombatantTable extends ViewBase
             return;
         }
         // make combatant list
-        var combatants = [];
-        for (var i in this.combatantCollector.combatants) {
-            combatants.push(this.combatantCollector.combatants[i]);
-        }
-        // sort combatant list
-        var t = this;
-        // re-sort so all pets are at the bottom
-        combatants.sort(function(a, b) {
-            if (a.data.ParentID > 0 && b.data.ParentID == 0) {
-                return 1;
-            }
-            return 0;
-        });
-        combatants.sort(function(a, b) {
-            // keep pet with their owner
-            if (b.data.ParentID) {
-                if (a.data.ParentID && a.data.ParentID == b.data.ParentID) {
-                    return a.data.Name.localeCompare(b.data.Name);
-                }                
-                if (!a.compare(b.data.ParentID)) {
-                    return 1;
-                }
-                return 0;
-            }
-
-            // sort by user config sort option
-            switch (t.userConfig["sortBy"])
-            {
-                case "healing":
-                {
-                    return t.combatantCollector.getCombatantTotalHealing(b) - t.combatantCollector.getCombatantTotalHealing(a);
-                }
-                case "deaths":
-                {
-                    return b.data.Deaths - a.data.Deaths;
-                }
-                case "name":
-                {
-                    return a.data.Name.localeCompare(b.data.Name);
-                }
-                case "job":
-                {
-                    var jobCats = [
-                        ["WAR", "DRK", "PLD", "GLA", "MRD"],  // tanks
-                        ["SCH", "WHM", "AST", "CNJ"]   // healers
-                    ];
-                    for (var i in jobCats) {
-                        var indexA = jobCats[i].indexOf(a.data.Job.toUpperCase());
-                        var indexB = jobCats[i].indexOf(b.data.Job.toUpperCase());
-                        if (indexA != -1 && indexB == -1) {
-                            return -1;
-                        } else if (indexA == -1 && indexB != -1) {
-                            return 1;
-                        }
-                    }
-                    return a.data.Job.localeCompare(b.data.Job);
-                }
-                default:
-                case "damage":
-                {
-                    return t.combatantCollector.getCombatantTotalDamage(b) - t.combatantCollector.getCombatantTotalDamage(a);
-                }
-            }
-        });
+        var combatants = this.combatantCollector.getSortedCombatants(this.userConfig["sortBy"]);
         // display elements
         for (var i in combatants) {
             var element = this.combatantElements[combatants[i].data.Name];

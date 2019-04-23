@@ -15,6 +15,14 @@ You should have received a copy of the GNU General Public License
 along with FFLiveParse.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+var combatantDefaultRoleClass = "dps";
+var combatantRoleClasses = {
+    "tank"    : ["WAR", "DRK", "PLD", "GLA", "MRD"],
+    "healer"  : ["SCH", "WHM", "AST", "CNJ"],
+    "pet"     : ["PET"],
+    "enemy"   : ["ENEMY"]
+};
+
 /**
  * Collects all combatants.
  */
@@ -120,6 +128,86 @@ class CombatantCollector
             isFinite(value) &&
             value >= 0
         );
+    }
+
+    /**
+     * Get sorted list of combatants.
+     * @param {string} sort 
+     * @return {array}
+     */
+    getSortedCombatants(sort)
+    {
+        // make combatant list
+        var combatants = [];
+        for (var i in this.combatants) {
+            combatants.push(this.combatants[i]);
+        }
+        // sort combatant list
+        var t = this;
+        var sort = sort;
+        // re-sort so all pets are at the bottom
+        combatants.sort(function(a, b) {
+            if (a.data.ParentID > 0 && b.data.ParentID == 0) {
+                return 1;
+            }
+            return 0;
+        });
+        combatants.sort(function(a, b) {
+            // keep pet with their owner
+            if (b.data.ParentID) {
+                if (a.data.ParentID && a.data.ParentID == b.data.ParentID) {
+                    return a.data.Name.localeCompare(b.data.Name);
+                }                
+                if (!a.compare(b.data.ParentID)) {
+                    return 1;
+                }
+                return 0;
+            }
+
+            // sort by user config sort option
+            switch (sort)
+            {
+                case "healing":
+                {
+                    return t.getCombatantTotalHealing(b) - t.getCombatantTotalHealing(a);
+                }
+                case "deaths":
+                {
+                    return b.data.Deaths - a.data.Deaths;
+                }
+                case "name":
+                {
+                    return a.data.Name.localeCompare(b.data.Name);
+                }
+                case "job":
+                {
+                    return a.data.Job.localeCompare(b.data.Job);
+                }
+                case "role":
+                {
+                    var jobCats = [
+                        ["WAR", "DRK", "PLD", "GLA", "MRD"],  // tanks
+                        ["SCH", "WHM", "AST", "CNJ"]   // healers
+                    ];
+                    for (var i in jobCats) {
+                        var indexA = jobCats[i].indexOf(a.data.Job.toUpperCase());
+                        var indexB = jobCats[i].indexOf(b.data.Job.toUpperCase());
+                        if (indexA != -1 && indexB == -1) {
+                            return -1;
+                        } else if (indexA == -1 && indexB != -1) {
+                            return 1;
+                        }
+                    }
+                    return a.getDisplayName().localeCompare(b.getDisplayName());
+                }
+                default:
+                case "damage":
+                {
+                    return t.getCombatantTotalDamage(b) - t.getCombatantTotalDamage(a);
+                }
+            }
+        });
+        return combatants;
     }
 
 }
@@ -251,6 +339,21 @@ class Combatant
             }
         }
         return "";
+    }
+
+    /**
+     * Get role of combatant. (healer, tank, dps)
+     * @return string
+     */
+    getRole()
+    {
+        var job = this.data.Job.toUpperCase();
+        for (var role in combatantRoleClasses) {
+            if (combatantRoleClasses[role].indexOf(job) != -1) {
+                return role;
+            }
+        }
+        return combatantDefaultRoleClass;
     }
 
 }

@@ -125,6 +125,9 @@ func (ec *EncounterCollector) getCombatantTrackers(name string, maxHP int) []*en
 // getCombatantTracker - Get first matching tracked combatant
 func (ec *EncounterCollector) getCombatantTracker(name string, maxHP int) *encounterCollectorCombatantTracker {
 	trackers := ec.getCombatantTrackers(name, maxHP)
+	if len(trackers) == 0 {
+		return nil
+	}
 	return trackers[0]
 }
 
