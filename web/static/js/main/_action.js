@@ -173,8 +173,8 @@ class ActionCollector
     {
         var results = [];
         for (var i in this.actions) {
-            if (this.actions[i].time > start && this.actions[i].time < end) {
-                results.push(this.action[i]);
+            if (this.actions[i].time.getTime() > start.getTime() && this.actions[i].time.getTime() < end.getTime()) {
+                results.push(this.actions[i]);
             }
         }
         return results;

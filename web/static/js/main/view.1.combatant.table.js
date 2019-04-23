@@ -206,6 +206,9 @@ class ViewCombatantTable extends ViewBase
         var combatants = this.combatantCollector.getSortedCombatants(this.userConfig["sortBy"]);
         // display elements
         for (var i in combatants) {
+            if (typeof(this.combatantElements[combatants[i].data.Name]) == "undefined") {
+                continue;
+            }
             var element = this.combatantElements[combatants[i].data.Name];
             this.tableBody.appendChild(element);
         }

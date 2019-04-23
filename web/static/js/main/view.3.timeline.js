@@ -28,7 +28,14 @@ var TIMELINE_ROLE_COLORS = {
     "healer"        : ["#2fa35f", "#000"],
     "tank"          : ["#4f59c4", "#fff"],
     "dps"           : ["#723c3a", "#fff"],
-    "enemy"         : ["#404040", "#fff"]
+    "enemy"         : ["#404040", "#fff"],
+    "pet"           : ["#404040", "#fff"]
+};
+var TIMELINE_ACTION_ICON_SIZES = {
+    [ACTION_TYPE_NORMAL]: [40, 40],
+    [ACTION_TYPE_GAIN_STATUS_EFFECT]: [24, 32],
+    [ACTION_TYPE_LOSE_STATUS_EFFECT]: [24, 32],
+    [ACTION_TYPE_DEATH]: [40, 40]
 };
 
 class ViewTimeline extends ViewBase
@@ -47,12 +54,14 @@ class ViewTimeline extends ViewBase
     init()
     {
         super.init();
+        this.encounter = null;
         this.canvasElement = null;
         this.canvasContext = null;
         this.needRedraw = true;
         this.seek = null;
         this.tickTimeout = null;
         this.images = {};
+        this.combatants =[];
         this.buildBaseElements();
         this.onResize();
         this.tick();
@@ -77,11 +86,13 @@ class ViewTimeline extends ViewBase
 
     onCombatant(combatant)
     {
+        this.combatants = [];
         this.needRedraw = true;
     }
 
     onEncounter(encounter)
     {
+        this.encounter = encounter;
         this.needRedraw = true;
     }
     
@@ -118,31 +129,31 @@ class ViewTimeline extends ViewBase
 
     redraw()
     {
+        this.canvasContext.clearRect(0, 0, this.canvasElement.width, this.canvasElement.height);
         this.drawCombatants();
+        this.drawTimeKeys();
+        this.drawActions();
     }
 
     drawCombatants()
     {
         // get combatant list
-        var combatants = this.combatantCollector.getSortedCombatants("role");
-        // enemy combatant
-        combatants.unshift(new Combatant());
-        console.log(combatants);
-        combatants[0].data = {
-            "Job"       : "enemy",
-            "Name"      : "Enemy Combatant(s)"
-        }
-
+        var combatants = this.getCombatantList();
         // set draw styles
         this.canvasContext.fillStyle = "#fff";
         this.canvasContext.font = TIMELINE_COMBATANT_NAME_SIZE + "px sans-serif";
         this.canvasContext.textAlign = "left";
+        var combatantCount = -1;
         for (var i = 0; i < combatants.length; i++) {
             var combatant = combatants[i];
+            if (combatant.isEnemy() || !combatant.data.Job) {
+                continue;
+            }
+            combatantCount++;
             // draw role bg color
             this.canvasContext.fillStyle = TIMELINE_ROLE_COLORS[combatant.getRole()][0];
             this.canvasContext.fillRect(
-                0, TIMELINE_KEY_HEIGHT + (i * TIMELINE_COMBATANT_HEIGHT), TIMELINE_COMBATANT_WIDTH, TIMELINE_COMBATANT_HEIGHT
+                0, TIMELINE_KEY_HEIGHT + (combatantCount * TIMELINE_COMBATANT_HEIGHT), TIMELINE_COMBATANT_WIDTH, TIMELINE_COMBATANT_HEIGHT
             );
             // draw role icon
             var jobIconSrc = "/static/img/job/" + combatant.data.Job.toLowerCase() + ".png";
@@ -152,7 +163,7 @@ class ViewTimeline extends ViewBase
             this.drawImage(
                 jobIconSrc,
                 16,
-                TIMELINE_KEY_HEIGHT + ((i + 1) * TIMELINE_COMBATANT_HEIGHT) - ((TIMELINE_COMBATANT_HEIGHT + TIMELINE_COMBATANT_JOB_ICON_SIZE) / 2),
+                TIMELINE_KEY_HEIGHT + ((combatantCount + 1) * TIMELINE_COMBATANT_HEIGHT) - ((TIMELINE_COMBATANT_HEIGHT + TIMELINE_COMBATANT_JOB_ICON_SIZE) / 2),
                 TIMELINE_COMBATANT_JOB_ICON_SIZE,
                 TIMELINE_COMBATANT_JOB_ICON_SIZE
             );
@@ -161,18 +172,118 @@ class ViewTimeline extends ViewBase
             this.canvasContext.fillText(
                 combatant.getDisplayName(),
                 TIMELINE_COMBATANT_JOB_ICON_SIZE + 24,
-                TIMELINE_KEY_HEIGHT + ((i + 1) * TIMELINE_COMBATANT_HEIGHT) - ((TIMELINE_COMBATANT_HEIGHT + TIMELINE_COMBATANT_NAME_SIZE) / 2) + TIMELINE_COMBATANT_NAME_SIZE
+                TIMELINE_KEY_HEIGHT + ((combatantCount + 1) * TIMELINE_COMBATANT_HEIGHT) - ((TIMELINE_COMBATANT_HEIGHT + TIMELINE_COMBATANT_NAME_SIZE) / 2) + TIMELINE_COMBATANT_NAME_SIZE
             );
 
             // draw seperator line
             this.canvasContext.fillStyle = "#fff";
             this.canvasContext.fillRect(
-                0, TIMELINE_KEY_HEIGHT + (i * TIMELINE_COMBATANT_HEIGHT - 1), this.getViewWidth(), 1
+                0, TIMELINE_KEY_HEIGHT + (combatantCount * TIMELINE_COMBATANT_HEIGHT - 1), this.getViewWidth(), 1
             );
             this.canvasContext.fillRect(
-                0, TIMELINE_KEY_HEIGHT + ((i + 1) * TIMELINE_COMBATANT_HEIGHT - 1), this.getViewWidth(), 1
+                0, TIMELINE_KEY_HEIGHT + ((combatantCount + 1) * TIMELINE_COMBATANT_HEIGHT - 1), this.getViewWidth(), 1
             );
         }
+        // draw vertical seperator
+        this.canvasContext.fillRect(
+            TIMELINE_COMBATANT_WIDTH, 0, 1, this.getViewHeight()
+        );
+    }
+    
+    /**
+     * Draw timestamps.
+     */
+    drawTimeKeys()
+    {
+        if (!this.encounter) {
+            return;
+        }
+        // get time to draw from
+        var drawTime = this.encounter.getEndTime();
+        if (this.seek) {
+            drawTime = this.seek;
+        }
+        // draw background
+        this.canvasContext.fillStyle = "#404040";
+        this.canvasContext.fillRect(
+            0, 0, this.getViewWidth(), TIMELINE_KEY_HEIGHT
+        );
+        // draw line
+        this.canvasContext.fillStyle = "#fff";
+        this.canvasContext.fillRect(
+            0, TIMELINE_KEY_HEIGHT - 1, this.getViewWidth(), 1
+        );
+        // draw times
+        this.canvasContext.font = "14px sans-serif";
+        this.canvasContext.textAlign = "center";
+        var duration = drawTime.getTime() - this.encounter.data.StartTime.getTime();
+        var offset = (duration % 1000) * TIMELINE_PIXELS_PER_MILLISECOND;
+        for (var i = 0; i < 99; i++) {
+            // draw text
+            var seconds = parseInt(duration / 1000) - i;
+            if (seconds < 0) {
+                break;
+            }
+            var timeKeyText = ((seconds / 60) < 10 ? "0" : "") + (Math.floor((seconds / 60)).toFixed(0)) + ":" + ((seconds % 60) < 10 ? "0" : "") + (seconds % 60);
+            var position = parseInt((i * 1000) * TIMELINE_PIXELS_PER_MILLISECOND) + offset;
+            if (position > this.getViewWidth() - TIMELINE_COMBATANT_WIDTH) {
+                break;
+            }
+            this.canvasContext.fillText(
+                timeKeyText,
+                position + TIMELINE_COMBATANT_WIDTH,
+                TIMELINE_KEY_HEIGHT - 8
+            );
+            // draw vertical grid line
+            this.canvasContext.fillRect(position + TIMELINE_COMBATANT_WIDTH, 25, 1, this.getViewHeight());
+        }
+    }
+
+    /**
+     * Draw actions in current timeline viewport.
+     */
+    drawActions()
+    {
+        if (!this.encounter || !this.actionData) {
+            return;
+        }
+        // get end time to draw from
+        var drawEndTime = this.encounter.getEndTime();
+        if (this.seek) {
+            drawEndTime = this.seek;
+        }    
+        // get start time to draw from
+        var drawDuration = Math.ceil((this.getViewWidth() - TIMELINE_COMBATANT_WIDTH) / TIMELINE_PIXELS_PER_MILLISECOND);
+        var drawStartTime = new Date(drawEndTime.getTime() - drawDuration);
+        // get actions in time frame
+        var actions = this.actionCollector.findInDateRange(
+            drawStartTime,
+            drawEndTime
+        );
+        // itterate and draw actions
+        for (var i in actions) {
+            var action = actions[i];
+            var actionDrawData = this.getActionDrawData(action);
+            if (!actionDrawData || !action || !action.type) {
+                continue;
+            }
+            // calculate position/size
+            var w = TIMELINE_ACTION_ICON_SIZES[action.type][0];
+            var h = TIMELINE_ACTION_ICON_SIZES[action.type][1];
+            var x = TIMELINE_COMBATANT_WIDTH + parseInt((drawEndTime.getTime() - action.time.getTime()) * TIMELINE_PIXELS_PER_MILLISECOND);
+            var y = TIMELINE_KEY_HEIGHT + (actionDrawData.vindex * TIMELINE_COMBATANT_HEIGHT) + ((TIMELINE_COMBATANT_HEIGHT - h) / 2);
+
+            this.drawImage(
+                actionDrawData.icon,
+                x,
+                y,
+                w,
+                h
+            );
+
+
+        }
+
     }
 
     /**
@@ -206,6 +317,98 @@ class ViewTimeline extends ViewBase
             this.images[src],
             x, y, w, h
         );
+    }
+
+    /**
+     * Get list of combatants.
+     * @return {array}
+     */
+    getCombatantList()
+    {
+        if (this.combatants && this.combatants.length > 0) {
+            return this.combatants;
+        }
+        this.combatants = [];
+        // enemy combatant
+        this.combatants.push(new Combatant());
+        this.combatants[0].data = {
+            "Job"       : "enemy",
+            "Name"      : "Enemy Combatant(s)"
+        }
+        // get combatant list
+        var fetchedCombatants = this.combatantCollector.getSortedCombatants("role");
+        for (var i in fetchedCombatants) {
+            if (!fetchedCombatants[i].isEnemy() && fetchedCombatants[i].data.Job) {
+                this.combatants.push(fetchedCombatants[i]);
+            }
+        }
+        return this.combatants;
+    }
+
+    /**
+     * Get data needed to draw action.
+     * @param {Action} action 
+     * @return {object}
+     */
+    getActionDrawData(action)
+    {
+        // find combatant
+        var combatants = this.getCombatantList();
+        var combatant = null;
+        switch (action.type) {
+            case ACTION_TYPE_GAIN_STATUS_EFFECT:
+            case ACTION_TYPE_LOSE_STATUS_EFFECT:
+            {
+                combatant = action.targetCombatant;
+                break;
+            }
+            default:
+            {
+                combatant = action.sourceCombatant;
+                break;
+            }
+        }
+        if (combatants.indexOf(combatant) == -1) {
+            combatant = combatants[0];
+        }
+        // get vertical index
+        var vIndex = combatants.indexOf(combatant);
+        if (vIndex == -1) {
+            return null;
+        }
+        // get action data
+        var actionData = null;
+        switch (action.type) {
+            case ACTION_TYPE_NORMAL:
+            {
+                actionData = this.actionData.getActionById(action.data.actionId);
+                break;
+            }
+            case ACTION_TYPE_GAIN_STATUS_EFFECT:
+            case ACTION_TYPE_LOSE_STATUS_EFFECT:
+            {
+                actionData = this.statusData.getStatusByName(action.data.actionName);
+                break;
+            }
+        }
+        // get icon image
+        var actionImageSrc = "";
+        if (!actionData && action.type == ACTION_TYPE_DEATH) {
+            actionImageSrc = "/static/img/death.png";
+        } else if (combatant.isEnemy()) {
+            actionImageSrc = "/static/img/enemy.png";
+        } else if (actionData && actionData.icon) {
+            actionImageSrc = ACTION_DATA_BASE_URL + actionData.icon;
+            if ([ACTION_TYPE_GAIN_STATUS_EFFECT, ACTION_TYPE_LOSE_STATUS_EFFECT].indexOf(action.type) != -1) {
+                actionImageSrc = STATUS_DATA_BASE_URL + actionData.icon;
+            }
+        }
+        return {
+            "combatant"         : combatant,
+            "data"              : actionData,
+            "icon"              : actionImageSrc,
+            "vindex"            : vIndex
+        };
     }
 
 }
