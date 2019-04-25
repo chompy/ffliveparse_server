@@ -59,12 +59,75 @@ class ViewTimeline extends ViewBase
         this.canvasContext = null;
         this.needRedraw = true;
         this.seek = null;
+        this.vOffset = 0;
         this.tickTimeout = null;
         this.images = {};
         this.combatants =[];
         this.buildBaseElements();
         this.onResize();
         this.tick();
+        
+        var t = this;
+        // horizontal scrolling
+        function hScrollTimeline(e) {
+            var delta = Math.max(-1, Math.min(1, (e.wheelDelta || -e.detail)));
+            t.addSeek(delta * 800);
+        }
+        this.canvasElement.addEventListener("mousewheel", hScrollTimeline);
+        this.canvasElement.addEventListener("DOMMouseScroll", hScrollTimeline);
+        // drag scroll timeline
+        this.mouseIsDown = false;
+        this.mouseHasDrag = false;
+        
+        this.canvasElement.addEventListener("mousedown", function(e) {
+            t.mouseIsDown = true;
+        });
+        this.canvasElement.addEventListener("touchstart", function(e) {
+            t.mouseIsDown = true;
+        });
+        window.addEventListener("mouseup", function(e) {
+            t.mouseIsDown = false;
+        });
+        window.addEventListener("touchend", function(e) {
+            t.mouseIsDown = false;
+        });
+        var scrollTimeline = function(movement) {
+            if (!t.mouseIsDown) {
+                return;
+            }
+            if (Math.abs(movement[0]) > 1 || Math.abs(movement[1]) > 1) {
+                t.mouseHasDrag = true;
+            }
+            t.addSeek(movement[0] * 15);
+            // vertical scroll
+            /*var combatantOffset = parseInt(t.combatantContainerElement.style.marginTop);
+            if (!combatantOffset) {
+                combatantOffset = 0;
+            }
+            combatantOffset = combatantOffset + (movement[1] * 2);
+            if (combatantOffset > 0) {
+                combatantOffset = 0;
+            } else if (combatantOffset < -(t.combatantContainerElement.offsetHeight - (window.innerHeight - t.timelineVOffset))) {
+                combatantOffset = -(t.combatantContainerElement.offsetHeight - (window.innerHeight - t.timelineVOffset));
+            }
+            
+            t.combatantContainerElement.style.marginTop = combatantOffset + "px";
+            t.timelineElement.style.marginTop = combatantOffset + "px";*/
+        };
+        this.canvasElement.addEventListener("mousemove", function(e) {
+            scrollTimeline([e.movementX, e.movementY]);
+        });
+        this.lastTouchPos = null;
+        this.canvasElement.addEventListener("touchmove", function(e) {
+            if (!t.lastTouchPos) {
+                t.lastTouchPos = [e.touches[0].clientX, e.touches[0].clientY];
+                return;
+            }
+            scrollTimeline([e.touches[0].clientX - t.lastTouchPos[0], e.touches[0].clientY - t.lastTouchPos[1]]);
+            t.lastTouchPos = null;
+        });
+
+
     }
 
     buildBaseElements()
@@ -409,6 +472,16 @@ class ViewTimeline extends ViewBase
             "icon"              : actionImageSrc,
             "vindex"            : vIndex
         };
+    }
+
+    addSeek(offset)
+    {
+        var currentSeekTime = this.encounter.getEndTime();
+        if (this.seek) {
+            currentSeekTime = this.seek;
+        }
+        this.seek = new Date(currentSeekTime.getTime() + offset);
+        this.redraw();
     }
 
 }

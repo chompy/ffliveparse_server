@@ -236,15 +236,11 @@ func (ec *EncounterCollector) ReadLogLine(l *LogLineData) {
 			}
 			break
 		}
-	case LogTypeDefeat, LogTypeRemoveCombatant, LogTypeHPPercent:
+	case LogTypeDefeat, LogTypeRemoveCombatant:
 		{
 			// must be active
 			if !ec.Encounter.Active {
 				return
-			}
-			// if hp percent then it must be 0
-			if l.Type == LogTypeHPPercent && l.Damage != 0 {
-				break
 			}
 			// get combatant tracker data
 			ctTargets := ec.getCombatantTrackers(l.TargetName, l.TargetMaxHP)
@@ -330,7 +326,8 @@ func (ec *EncounterCollector) CheckInactive() {
 		return
 	}
 	// check if new zone
-	if ec.CurrentZone != ec.Encounter.Zone {
+	if ec.CurrentZone != ec.Encounter.Zone && ec.Encounter.Zone != "" {
+		log.Println("[", ec.userIDHash, "][ Encounter", ec.Encounter.UID, "] New zone detected.", ec.CurrentZone, ec.Encounter.Zone)
 		ec.endEncounter()
 		return
 	}
