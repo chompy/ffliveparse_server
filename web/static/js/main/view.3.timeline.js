@@ -63,6 +63,7 @@ class ViewTimeline extends ViewBase
         this.tickTimeout = null;
         this.images = {};
         this.combatants =[];
+        this.mousePos = [0, 0];
         this.buildBaseElements();
         this.onResize();
         this.tick();
@@ -77,8 +78,6 @@ class ViewTimeline extends ViewBase
         this.canvasElement.addEventListener("DOMMouseScroll", hScrollTimeline);
         // drag scroll timeline
         this.mouseIsDown = false;
-        this.mouseHasDrag = false;
-        
         this.canvasElement.addEventListener("mousedown", function(e) {
             t.mouseIsDown = true;
         });
@@ -95,27 +94,15 @@ class ViewTimeline extends ViewBase
             if (!t.mouseIsDown) {
                 return;
             }
-            if (Math.abs(movement[0]) > 1 || Math.abs(movement[1]) > 1) {
-                t.mouseHasDrag = true;
-            }
             t.addSeek(movement[0] * 15);
-            // vertical scroll
-            /*var combatantOffset = parseInt(t.combatantContainerElement.style.marginTop);
-            if (!combatantOffset) {
-                combatantOffset = 0;
+            t.vOffset -= movement[1];
+            if (t.vOffset < 0) {
+                t.vOffset = 0;
             }
-            combatantOffset = combatantOffset + (movement[1] * 2);
-            if (combatantOffset > 0) {
-                combatantOffset = 0;
-            } else if (combatantOffset < -(t.combatantContainerElement.offsetHeight - (window.innerHeight - t.timelineVOffset))) {
-                combatantOffset = -(t.combatantContainerElement.offsetHeight - (window.innerHeight - t.timelineVOffset));
-            }
-            
-            t.combatantContainerElement.style.marginTop = combatantOffset + "px";
-            t.timelineElement.style.marginTop = combatantOffset + "px";*/
         };
         this.canvasElement.addEventListener("mousemove", function(e) {
             scrollTimeline([e.movementX, e.movementY]);
+            t.mousePos = [e.x, e.y];
         });
         this.lastTouchPos = null;
         this.canvasElement.addEventListener("touchmove", function(e) {
@@ -126,8 +113,6 @@ class ViewTimeline extends ViewBase
             scrollTimeline([e.touches[0].clientX - t.lastTouchPos[0], e.touches[0].clientY - t.lastTouchPos[1]]);
             t.lastTouchPos = null;
         });
-
-
     }
 
     buildBaseElements()
@@ -194,8 +179,8 @@ class ViewTimeline extends ViewBase
     {
         this.canvasContext.clearRect(0, 0, this.canvasElement.width, this.canvasElement.height);
         this.drawCombatants();
-        this.drawTimeKeys();
         this.drawActions();
+        this.drawTimeKeys();
     }
 
     drawCombatants()
@@ -216,7 +201,7 @@ class ViewTimeline extends ViewBase
             // draw role bg color
             this.canvasContext.fillStyle = TIMELINE_ROLE_COLORS[combatant.getRole()][0];
             this.canvasContext.fillRect(
-                0, TIMELINE_KEY_HEIGHT + (combatantCount * TIMELINE_COMBATANT_HEIGHT), TIMELINE_COMBATANT_WIDTH, TIMELINE_COMBATANT_HEIGHT
+                0, TIMELINE_KEY_HEIGHT + (combatantCount * TIMELINE_COMBATANT_HEIGHT) - this.vOffset, TIMELINE_COMBATANT_WIDTH, TIMELINE_COMBATANT_HEIGHT
             );
             // draw role icon
             var jobIconSrc = "/static/img/job/" + combatant.data.Job.toLowerCase() + ".png";
@@ -226,7 +211,7 @@ class ViewTimeline extends ViewBase
             this.drawImage(
                 jobIconSrc,
                 16,
-                TIMELINE_KEY_HEIGHT + ((combatantCount + 1) * TIMELINE_COMBATANT_HEIGHT) - ((TIMELINE_COMBATANT_HEIGHT + TIMELINE_COMBATANT_JOB_ICON_SIZE) / 2),
+                TIMELINE_KEY_HEIGHT + ((combatantCount + 1) * TIMELINE_COMBATANT_HEIGHT) - ((TIMELINE_COMBATANT_HEIGHT + TIMELINE_COMBATANT_JOB_ICON_SIZE) / 2) - this.vOffset,
                 TIMELINE_COMBATANT_JOB_ICON_SIZE,
                 TIMELINE_COMBATANT_JOB_ICON_SIZE
             );
@@ -235,16 +220,22 @@ class ViewTimeline extends ViewBase
             this.canvasContext.fillText(
                 combatant.getDisplayName(),
                 TIMELINE_COMBATANT_JOB_ICON_SIZE + 24,
-                TIMELINE_KEY_HEIGHT + ((combatantCount + 1) * TIMELINE_COMBATANT_HEIGHT) - ((TIMELINE_COMBATANT_HEIGHT + TIMELINE_COMBATANT_NAME_SIZE) / 2) + TIMELINE_COMBATANT_NAME_SIZE
+                TIMELINE_KEY_HEIGHT + ((combatantCount + 1) * TIMELINE_COMBATANT_HEIGHT) - ((TIMELINE_COMBATANT_HEIGHT + TIMELINE_COMBATANT_NAME_SIZE) / 2) + TIMELINE_COMBATANT_NAME_SIZE - this.vOffset
             );
 
             // draw seperator line
             this.canvasContext.fillStyle = "#fff";
             this.canvasContext.fillRect(
-                0, TIMELINE_KEY_HEIGHT + (combatantCount * TIMELINE_COMBATANT_HEIGHT - 1), this.getViewWidth(), 1
+                0,
+                TIMELINE_KEY_HEIGHT + (combatantCount * TIMELINE_COMBATANT_HEIGHT - 1) - this.vOffset,
+                this.getViewWidth(),
+                1
             );
             this.canvasContext.fillRect(
-                0, TIMELINE_KEY_HEIGHT + ((combatantCount + 1) * TIMELINE_COMBATANT_HEIGHT - 1), this.getViewWidth(), 1
+                0,
+                TIMELINE_KEY_HEIGHT + ((combatantCount + 1) * TIMELINE_COMBATANT_HEIGHT - 1) - this.vOffset,
+                this.getViewWidth(),
+                1
             );
         }
         // draw vertical seperator
@@ -335,18 +326,23 @@ class ViewTimeline extends ViewBase
             var h = TIMELINE_ACTION_ICON_SIZES[action.type][1];
             var x = TIMELINE_COMBATANT_WIDTH + parseInt((drawEndTime.getTime() - action.time.getTime()) * TIMELINE_PIXELS_PER_MILLISECOND);
             var y = TIMELINE_KEY_HEIGHT + (actionDrawData.vindex * TIMELINE_COMBATANT_HEIGHT) + ((TIMELINE_COMBATANT_HEIGHT - h) / 2);
-
             this.drawImage(
                 actionDrawData.icon,
                 x,
-                y,
+                y - this.vOffset,
                 w,
                 h
             );
-
-
+            // mouse over?
+            if (
+                this.mousePos[0] > x &&
+                this.mousePos[1] > y &&
+                this.mousePos[0] < x + w &&
+                this.mousePos[1] < y + w
+            ) {
+                this.drawAction(actions[i], x, y);
+            }
         }
-
     }
 
     /**
@@ -379,6 +375,20 @@ class ViewTimeline extends ViewBase
         this.canvasContext.drawImage(
             this.images[src],
             x, y, w, h
+        );
+    }
+
+    drawAction(action, x, y)
+    {
+        if (!action) {
+            return;
+        }
+        this.canvasContext.fillStyle = "rgba(0,0,0,.5)";
+        this.canvasContext.fillRect(
+            x,
+            y,
+            200,
+            200
         );
     }
 
