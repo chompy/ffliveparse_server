@@ -54,7 +54,7 @@ func (c *CombatantCollector) Reset() {
 // UpdateCombatantTracker - Sync ACT combatant data
 func (c *CombatantCollector) UpdateCombatantTracker(combatant Combatant) {
 	// ignore invalid combatants
-	if combatant.ID > 1000000000 && combatant.Job != "" {
+	if combatant.ID > 1000000000 && combatant.Job != "" && combatant.ParentID == 0 {
 		return
 	}
 	// update existing

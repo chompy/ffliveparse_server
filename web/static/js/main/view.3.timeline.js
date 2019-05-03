@@ -19,6 +19,49 @@ var TIMELINE_PIXELS_PER_MILLISECOND = 0.07; // how many pixels represents a mill
 var TIMELINE_PIXEL_OFFSET = TIMELINE_PIXELS_PER_MILLISECOND * 1000;
 var GAIN_EFFECT_REGEX = /1A\:([a-zA-Z0-9` ']*) gains the effect of ([a-zA-Z0-9` ']*) from ([a-zA-Z0-9` ']*) for ([0-9]*)\.00 Seconds\./;
 var LOSE_EFFECT_REGEX = /1E\:([a-zA-Z0-9` ']*) loses the effect of ([a-zA-Z0-9` ']*) from ([a-zA-Z0-9` ']*)\./;
+
+// define sizes of different elements at different break points
+var TIMELINE_BREAKPOINT_FULL = 99999;
+var TIMELINE_BREAKPOINT_MOBILE = 768;
+var TIMELINE_ELEMENT_SIZES = {
+    "key_height" : {
+        [TIMELINE_BREAKPOINT_FULL] : 24
+    },
+    "combatant_height" : {
+        [TIMELINE_BREAKPOINT_FULL] : 64
+    },
+    "combatant_width" : {
+        [TIMELINE_BREAKPOINT_FULL] : 256
+    },
+    "job_icon_width" : {
+        [TIMELINE_BREAKPOINT_FULL] : 48
+    },
+    "job_icon_height" : {
+        [TIMELINE_BREAKPOINT_FULL] : 48
+    },
+    "combatant_name_font" : {
+        [TIMELINE_BREAKPOINT_FULL] : 16
+    },
+    "action_icon_normal_width" : {
+        [TIMELINE_BREAKPOINT_FULL] : 40
+    },
+    "action_icon_normal_height" : {
+        [TIMELINE_BREAKPOINT_FULL] : 40
+    },
+    "action_icon_gain_status_width" : {
+        [TIMELINE_BREAKPOINT_FULL] : 24
+    },
+    "action_icon_gain_status_height" : {
+        [TIMELINE_BREAKPOINT_FULL] : 32
+    },
+    "action_icon_lose_status_width" : {
+        [TIMELINE_BREAKPOINT_FULL] : 24
+    },
+    "action_icon_lose_status_height" : {
+        [TIMELINE_BREAKPOINT_FULL] : 32
+    },
+}
+
 var TIMELINE_KEY_HEIGHT = 24;
 var TIMELINE_COMBATANT_HEIGHT =  64;
 var TIMELINE_COMBATANT_WIDTH = 256;
@@ -62,8 +105,10 @@ class ViewTimeline extends ViewBase
         this.vOffset = 0;
         this.tickTimeout = null;
         this.images = {};
+        this.elementSizes = {};
         this.combatants =[];
-        this.mousePos = [0, 0];
+        this.actionPositions = [];
+        this.overlayAction = null;
         this.buildBaseElements();
         this.onResize();
         this.tick();
@@ -78,22 +123,55 @@ class ViewTimeline extends ViewBase
         this.canvasElement.addEventListener("DOMMouseScroll", hScrollTimeline);
         // drag scroll timeline
         this.mouseIsDown = false;
+        this.mouseIsDrag = false;
         this.canvasElement.addEventListener("mousedown", function(e) {
             t.mouseIsDown = true;
         });
         this.canvasElement.addEventListener("touchstart", function(e) {
             t.mouseIsDown = true;
         });
+        var displayOverlay = function(e) {
+            // remove overlay
+            if (t.overlayAction) {
+                t.overlayAction = null;
+                t.redraw();
+                return;
+            }
+            // don't display overlay if mouse is dragging
+            if (t.mouseIsDrag) {
+                return;
+            }
+            // show overlay
+            var mousePos = t._getCursorPosition(e);
+            for (var i in t.actionPositions) {
+                var actionPosData = t.actionPositions[i];
+                if (
+                    mousePos[0] > actionPosData[1] && mousePos[1] > actionPosData[2] &&
+                    mousePos[0] < actionPosData[1] + actionPosData[3] &&
+                    mousePos[1] < actionPosData[2] + actionPosData[4]
+                ) {
+                    t.overlayAction = actionPosData[0];
+                    t.redraw();
+                    break;
+                }
+            }
+        }
         window.addEventListener("mouseup", function(e) {
             t.mouseIsDown = false;
+            displayOverlay(e);
+            t.mouseIsDrag = false;
         });
         window.addEventListener("touchend", function(e) {
             t.mouseIsDown = false;
+            displayOverlay(e);
+            t.mouseIsDrag = false;
         });
         var scrollTimeline = function(movement) {
             if (!t.mouseIsDown) {
                 return;
             }
+            t.overlayAction = null;
+            t.mouseIsDrag = true;
             t.addSeek(movement[0] * 15);
             t.vOffset -= movement[1];
             if (t.vOffset < 0) {
@@ -121,10 +199,12 @@ class ViewTimeline extends ViewBase
         this.canvasElement = document.createElement("canvas");
         this.canvasContext = this.canvasElement.getContext("2d");
         element.appendChild(this.canvasElement);
+        
     }
 
     onResize()
     {
+        this.elementSizes = {};
         if (this.canvasElement) {
             this.canvasElement.width = this.getViewWidth();
             this.canvasElement.height = this.getViewHeight();
@@ -171,7 +251,7 @@ class ViewTimeline extends ViewBase
         var t = this;
         this.tickTimeout = setTimeout(
             function() { t.tick(); },
-            1000
+            250
         );
     }
 
@@ -181,6 +261,7 @@ class ViewTimeline extends ViewBase
         this.drawCombatants();
         this.drawActions();
         this.drawTimeKeys();
+        this.drawOverlay();
     }
 
     drawCombatants()
@@ -201,7 +282,10 @@ class ViewTimeline extends ViewBase
             // draw role bg color
             this.canvasContext.fillStyle = TIMELINE_ROLE_COLORS[combatant.getRole()][0];
             this.canvasContext.fillRect(
-                0, TIMELINE_KEY_HEIGHT + (combatantCount * TIMELINE_COMBATANT_HEIGHT) - this.vOffset, TIMELINE_COMBATANT_WIDTH, TIMELINE_COMBATANT_HEIGHT
+                0,
+                this._ES("key_height") + (combatantCount * this._ES("combatant_height")) - this.vOffset,
+                this._ES("combatant_width"),
+                this._ES("combatant_height")
             );
             // draw role icon
             var jobIconSrc = "/static/img/job/" + combatant.data.Job.toLowerCase() + ".png";
@@ -211,36 +295,38 @@ class ViewTimeline extends ViewBase
             this.drawImage(
                 jobIconSrc,
                 16,
-                TIMELINE_KEY_HEIGHT + ((combatantCount + 1) * TIMELINE_COMBATANT_HEIGHT) - ((TIMELINE_COMBATANT_HEIGHT + TIMELINE_COMBATANT_JOB_ICON_SIZE) / 2) - this.vOffset,
-                TIMELINE_COMBATANT_JOB_ICON_SIZE,
-                TIMELINE_COMBATANT_JOB_ICON_SIZE
+                this._ES("key_height") + ((combatantCount + 1) * this._ES("combatant_height")) - ((this._ES("combatant_height") + this._ES("job_icon_width")) / 2) - this.vOffset,
+                this._ES("job_icon_width"),
+                this._ES("job_icon_height")
             );
             // draw role name
             this.canvasContext.fillStyle = TIMELINE_ROLE_COLORS[combatant.getRole()][1];
             this.canvasContext.fillText(
                 combatant.getDisplayName(),
-                TIMELINE_COMBATANT_JOB_ICON_SIZE + 24,
-                TIMELINE_KEY_HEIGHT + ((combatantCount + 1) * TIMELINE_COMBATANT_HEIGHT) - ((TIMELINE_COMBATANT_HEIGHT + TIMELINE_COMBATANT_NAME_SIZE) / 2) + TIMELINE_COMBATANT_NAME_SIZE - this.vOffset
+                this._ES("job_icon_width") + 24,
+                this._ES("key_height") + ((combatantCount + 1) * this._ES("combatant_height")) - 
+                    ((this._ES("combatant_height") + this._ES("combatant_name_font")) / 2) + 
+                    this._ES("combatant_name_font") - this.vOffset
             );
 
             // draw seperator line
             this.canvasContext.fillStyle = "#fff";
             this.canvasContext.fillRect(
                 0,
-                TIMELINE_KEY_HEIGHT + (combatantCount * TIMELINE_COMBATANT_HEIGHT - 1) - this.vOffset,
+                this._ES("key_height") + (combatantCount * this._ES("combatant_height") - 1) - this.vOffset,
                 this.getViewWidth(),
                 1
             );
             this.canvasContext.fillRect(
                 0,
-                TIMELINE_KEY_HEIGHT + ((combatantCount + 1) * TIMELINE_COMBATANT_HEIGHT - 1) - this.vOffset,
+                this._ES("key_height") + ((combatantCount + 1) * this._ES("combatant_height") - 1) - this.vOffset,
                 this.getViewWidth(),
                 1
             );
         }
         // draw vertical seperator
         this.canvasContext.fillRect(
-            TIMELINE_COMBATANT_WIDTH, 0, 1, this.getViewHeight()
+            this._ES("combatant_width"), 0, 1, this.getViewHeight()
         );
     }
     
@@ -260,12 +346,12 @@ class ViewTimeline extends ViewBase
         // draw background
         this.canvasContext.fillStyle = "#404040";
         this.canvasContext.fillRect(
-            0, 0, this.getViewWidth(), TIMELINE_KEY_HEIGHT
+            0, 0, this.getViewWidth(), this._ES("key_height")
         );
         // draw line
         this.canvasContext.fillStyle = "#fff";
         this.canvasContext.fillRect(
-            0, TIMELINE_KEY_HEIGHT - 1, this.getViewWidth(), 1
+            0, this._ES("key_height") - 1, this.getViewWidth(), 1
         );
         // draw times
         this.canvasContext.font = "14px sans-serif";
@@ -280,16 +366,16 @@ class ViewTimeline extends ViewBase
             }
             var timeKeyText = ((seconds / 60) < 10 ? "0" : "") + (Math.floor((seconds / 60)).toFixed(0)) + ":" + ((seconds % 60) < 10 ? "0" : "") + (seconds % 60);
             var position = parseInt((i * 1000) * TIMELINE_PIXELS_PER_MILLISECOND) + offset;
-            if (position > this.getViewWidth() - TIMELINE_COMBATANT_WIDTH) {
+            if (position > this.getViewWidth() - this._ES("combatant_width")) {
                 break;
             }
             this.canvasContext.fillText(
                 timeKeyText,
-                position + TIMELINE_COMBATANT_WIDTH,
-                TIMELINE_KEY_HEIGHT - 8
+                position + this._ES("combatant_width"),
+                this._ES("key_height") - 8
             );
             // draw vertical grid line
-            this.canvasContext.fillRect(position + TIMELINE_COMBATANT_WIDTH, 25, 1, this.getViewHeight());
+            this.canvasContext.fillRect(position + this._ES("combatant_width"), 25, 1, this.getViewHeight());
         }
     }
 
@@ -307,7 +393,7 @@ class ViewTimeline extends ViewBase
             drawEndTime = this.seek;
         }    
         // get start time to draw from
-        var drawDuration = Math.ceil((this.getViewWidth() - TIMELINE_COMBATANT_WIDTH) / TIMELINE_PIXELS_PER_MILLISECOND);
+        var drawDuration = Math.ceil((this.getViewWidth() - this._ES("combatant_width")) / TIMELINE_PIXELS_PER_MILLISECOND);
         var drawStartTime = new Date(drawEndTime.getTime() - drawDuration);
         // get actions in time frame
         var actions = this.actionCollector.findInDateRange(
@@ -315,6 +401,7 @@ class ViewTimeline extends ViewBase
             drawEndTime
         );
         // itterate and draw actions
+        this.actionPositions = [];
         for (var i in actions) {
             var action = actions[i];
             var actionDrawData = this.getActionDrawData(action);
@@ -333,15 +420,23 @@ class ViewTimeline extends ViewBase
                 w,
                 h
             );
-            // mouse over?
-            if (
-                this.mousePos[0] > x &&
-                this.mousePos[1] > y &&
-                this.mousePos[0] < x + w &&
-                this.mousePos[1] < y + w
-            ) {
-                this.drawAction(actions[i], x, y);
+
+            // draw +/- for buffs/debuffs
+            if (action.type == ACTION_TYPE_GAIN_STATUS_EFFECT || action.type == ACTION_TYPE_LOSE_STATUS_EFFECT) {
+                this.canvasContext.font = "20px sans-serif";
+                this.canvasContext.textAlign = "center";
+                this.canvasContext.fillStyle = "#6def11";
+                var buffText = "+";
+                if (action.type == ACTION_TYPE_LOSE_STATUS_EFFECT) {
+                    buffText = "-";
+                }
+                this.canvasContext.fillText(
+                    buffText, x, y - this.vOffset
+                );
             }
+
+            // record action positions for click overlay
+            this.actionPositions.push([action, x, y - this.vOffset, w, h]);
         }
     }
 
@@ -378,18 +473,16 @@ class ViewTimeline extends ViewBase
         );
     }
 
-    drawAction(action, x, y)
+    /**
+     * Draw overlay with details about an action.
+     */
+    drawOverlay()
     {
-        if (!action) {
+        if (!this.overlayAction) {
             return;
         }
-        this.canvasContext.fillStyle = "rgba(0,0,0,.5)";
-        this.canvasContext.fillRect(
-            x,
-            y,
-            200,
-            200
-        );
+        this.canvasContext.fillStyle = "rgba(0,0,0,.75)";
+        this.canvasContext.fillRect(0, 0, 500, 500);
     }
 
     /**
@@ -468,8 +561,10 @@ class ViewTimeline extends ViewBase
         var actionImageSrc = "";
         if (!actionData && action.type == ACTION_TYPE_DEATH) {
             actionImageSrc = "/static/img/death.png";
-        } else if (combatant.isEnemy()) {
+        } else if (!actionData && combatant.isEnemy()) {
             actionImageSrc = "/static/img/enemy.png";
+        } else if (actionData && actionData.name == "Attack") {
+            actionImageSrc = "/static/img/attack.png";
         } else if (actionData && actionData.icon) {
             actionImageSrc = ACTION_DATA_BASE_URL + actionData.icon;
             if ([ACTION_TYPE_GAIN_STATUS_EFFECT, ACTION_TYPE_LOSE_STATUS_EFFECT].indexOf(action.type) != -1) {
@@ -492,6 +587,62 @@ class ViewTimeline extends ViewBase
         }
         this.seek = new Date(currentSeekTime.getTime() + offset);
         this.redraw();
+    }
+
+    /**
+     * Fetch an element size for a given key.
+     * @param {string} key 
+     * @return {integer}
+     */
+    getElementSize(key)
+    {
+        // already retrieved
+        if (key in this.elementSizes) {
+            return this.elementSizes[key];
+        }
+        // retrieve and determine best breakpoint
+        if (key in TIMELINE_ELEMENT_SIZES) {
+            var currentCanvasWidth = this.getViewWidth();
+            var elementSizes = TIMELINE_ELEMENT_SIZES[key];
+            var bestBreakpoint = null;
+            for (var breakpoint in elementSizes) {
+                if (
+                    currentCanvasWidth <= breakpoint && 
+                    (!bestBreakpoint || breakpoint > bestBreakpoint)
+                ) {
+                    bestBreakpoint = breakpoint;
+                }
+            }
+            if (bestBreakpoint) {
+                this.elementSizes[key] = elementSizes[bestBreakpoint];
+                return this.elementSizes[key];
+            }
+        }
+        // key not found
+        return 0;
+    }
+
+    /**
+     * Short hand for getElementSize
+     * @param {string} key 
+     * @return {integer}
+     */
+    _ES(key)
+    {
+        return this.getElementSize(key)
+    }
+
+
+    /**
+     * Get cursor position relative to canvas.
+     * @param {Event} event 
+     * @see https://stackoverflow.com/a/18053642
+     */
+    _getCursorPosition(event) {
+        var rect = this.canvasElement.getBoundingClientRect();
+        var x = event.clientX - rect.left;
+        var y = event.clientY - rect.top;
+        return [parseInt(x), parseInt(y)];
     }
 
 }

@@ -18,6 +18,7 @@ along with FFLiveParse.  If not, see <https://www.gnu.org/licenses/>.
 package act
 
 import (
+	"fmt"
 	"log"
 	"strings"
 	"time"
@@ -31,6 +32,9 @@ const encounterInactiveTime = 1000
 
 // combatantTimeout - Time before last combat action before a combatant should be considered defeated/removed
 const combatantTimeout = 7500
+
+// reportDisplayIntervals - Interval at which to log encounter report
+const reportDisplayIntervals = 10000
 
 // encounterCollectorCombatantTracker - Track combatants in encounter to determine active status
 type encounterCollectorCombatantTracker struct {
@@ -50,6 +54,7 @@ type EncounterCollector struct {
 	userIDHash       string
 	PlayerTeam       uint8
 	CurrentZone      string
+	LastReportTime   time.Time
 }
 
 // NewEncounterCollector - Create new encounter collector
@@ -77,6 +82,7 @@ func (ec *EncounterCollector) Reset() {
 	}
 	ec.CombatantTracker = make([]encounterCollectorCombatantTracker, 0)
 	ec.PlayerTeam = 0
+	ec.LastReportTime = time.Now()
 }
 
 // UpdateEncounter - Sync encounter data from ACT
@@ -131,6 +137,27 @@ func (ec *EncounterCollector) getCombatantTracker(name string, maxHP int) *encou
 	return trackers[0]
 }
 
+// logEncounterReport - Log report of current encounter
+func (ec *EncounterCollector) logEncounterReport() {
+	ec.LastReportTime = time.Now()
+	delta := ec.LastActionTime.Sub(ec.Encounter.StartTime)
+	encTimeString := fmt.Sprintf("%02d:%02d", int(delta.Minutes()), int(delta.Seconds())&60)
+	aliveString := ""
+	for team := 1; team <= 2; team++ {
+		teamAlive := make([]string, 0)
+		for _, ct := range ec.CombatantTracker {
+			if ct.Team == uint8(team) && ct.IsAlive {
+				teamAlive = append(teamAlive, ct.Name)
+			}
+		}
+		if aliveString != "" {
+			aliveString += " -- "
+		}
+		aliveString += fmt.Sprintf("TEAM %d: %d alive (%s)", team, len(teamAlive), strings.Join(teamAlive, ","))
+	}
+	log.Println("[", ec.userIDHash, "][ Encounter", ec.Encounter.UID, "]", encTimeString, aliveString)
+}
+
 // endEncounter - Flag encounter as inactive and set end time to last action time
 func (ec *EncounterCollector) endEncounter() {
 	switch ec.Encounter.SuccessLevel {
@@ -147,16 +174,7 @@ func (ec *EncounterCollector) endEncounter() {
 			log.Println("[", ec.userIDHash, "][ Encounter", ec.Encounter.UID, "] Ended")
 		}
 	}
-	// display who is still alive on both teams
-	for team := 1; team <= 2; team++ {
-		teamAlive := make([]string, 0)
-		for _, ct := range ec.CombatantTracker {
-			if ct.Team == uint8(team) && ct.IsAlive {
-				teamAlive = append(teamAlive, ct.Name)
-			}
-		}
-		log.Println("[", ec.userIDHash, "][ Encounter", ec.Encounter.UID, "] Team", team, "has", len(teamAlive), "combatant(s) alive. (", strings.Join(teamAlive, ","), ")")
-	}
+	ec.logEncounterReport()
 	ec.Encounter.Active = false
 	ec.Encounter.EndTime = ec.LastActionTime
 }
@@ -174,11 +192,12 @@ func (ec *EncounterCollector) ReadLogLine(l *LogLineData) {
 			if len(ec.CombatantTracker) == 0 && !ec.Encounter.Active {
 				// time should have passed since last encounter
 				if time.Now().Add(time.Duration(-encounterInactiveTime) * time.Millisecond).Before(ec.LastActionTime) {
-					return
+					break
 				}
 				log.Println("[", ec.userIDHash, "][ Encounter", ec.Encounter.UID, "] Started")
 				ec.Encounter.Active = true
 				ec.Encounter.StartTime = l.Time
+				ec.LastReportTime = time.Now()
 			}
 			// update encounter end time
 			if ec.Encounter.EndTime.Before(l.Time) {
@@ -303,7 +322,10 @@ func (ec *EncounterCollector) ReadLogLine(l *LogLineData) {
 			break
 		}
 	}
-
+	// log encounter report
+	if time.Now().Add(time.Duration(-reportDisplayIntervals) * time.Millisecond).After(ec.LastReportTime) {
+		ec.logEncounterReport()
+	}
 }
 
 // IsNewEncounter - Check if log data is for new encounter

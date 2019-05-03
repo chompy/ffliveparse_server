@@ -38,6 +38,9 @@ import (
 // lastUpdateInactiveTime - Time in ms between last data update before data is considered inactive
 const lastUpdateInactiveTime = 1800000 // 30 minutes
 
+// minEncounterSaveLength - Length encounter must be in order to save encounter data
+const minEncounterSaveLength = 20000 // 20 seconds
+
 // logLineRetainCount - Number of log lines to retain in memory before dumping to temp file
 const logLineRetainCount = 1000
 
@@ -240,6 +243,11 @@ func initDatabase(database *sql.DB) error {
 func (d *Data) SaveEncounter() error {
 	// no encounter
 	if d.EncounterCollector.Encounter.UID == "" {
+		return nil
+	}
+	// ensure encounter meets min encounter length
+	duration := d.EncounterCollector.Encounter.EndTime.Sub(d.EncounterCollector.Encounter.StartTime)
+	if duration*time.Millisecond < minEncounterSaveLength {
 		return nil
 	}
 	// get database
