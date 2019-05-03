@@ -95,6 +95,7 @@ class ViewBase
     {
         this.active = true;
         this.getElement().classList.remove("hide");
+        setTimeout(function(){ fflpFixFooter(); }, 500);
     }
 
     /**

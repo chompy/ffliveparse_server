@@ -55,6 +55,23 @@ class ActionCollector
         switch (action.data.type)
         {
             case MESSAGE_TYPE_AOE:
+            {
+                var otherAoeActions = [];
+                for (var i in this.actions) {
+                    if (
+                        this.actions[i].data.type == MESSAGE_TYPE_AOE &&
+                        this.actions[i].time.getTime() == action.time.getTime() &&
+                        this.actions[i].data.actionId == action.data.actionId
+                    ) {
+                        otherAoeActions.push(this.actions[i]);
+                        this.actions[i].relatedActions.push(action);
+                    }
+                }
+                if (otherAoeActions.length > 0) {
+                    action.displayAction = false;
+                }
+                action.data.relatedActions = otherAoeActions;
+            }
             case MESSAGE_TYPE_SINGLE_TARGET:
             {
                 action.type = ACTION_TYPE_NORMAL;
@@ -202,6 +219,12 @@ class Action
         this.targetCombatant = null;
         // raw parse data for action
         this.data = null;
+        // other actions related to this one
+        // specifically used for aoes that have multiple targets
+        this.relatedActions = [];
+        // rather or not this action should be rendered in views that would
+        // display it in some way (timeline, etc)
+        this.displayAction = true;
     }
 
 }

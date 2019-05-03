@@ -143,10 +143,11 @@ func (ec *EncounterCollector) logEncounterReport() {
 	delta := ec.LastActionTime.Sub(ec.Encounter.StartTime)
 	encTimeString := fmt.Sprintf("%02d:%02d", int(delta.Minutes()), int(delta.Seconds())&60)
 	aliveString := ""
+	combatantTimeoutTime := time.Now().Add(time.Duration(-combatantTimeout) * time.Millisecond)
 	for team := 1; team <= 2; team++ {
 		teamAlive := make([]string, 0)
 		for _, ct := range ec.CombatantTracker {
-			if ct.Team == uint8(team) && ct.IsAlive {
+			if ct.Team == uint8(team) && ct.IsAlive && (ct.WasAttacked || combatantTimeoutTime.Before(ct.LastActionTime)) {
 				teamAlive = append(teamAlive, ct.Name)
 			}
 		}
@@ -323,7 +324,7 @@ func (ec *EncounterCollector) ReadLogLine(l *LogLineData) {
 		}
 	}
 	// log encounter report
-	if time.Now().Add(time.Duration(-reportDisplayIntervals) * time.Millisecond).After(ec.LastReportTime) {
+	if time.Now().Add(time.Duration(-reportDisplayIntervals)*time.Millisecond).After(ec.LastReportTime) && ec.Encounter.Active {
 		ec.logEncounterReport()
 	}
 }
@@ -368,7 +369,7 @@ func (ec *EncounterCollector) CheckInactive() {
 		return
 	}
 	// check to see if a team is dead, if so encounter should be considered inactive
-	combatantTimeoutTime := time.Now().Add(time.Duration(-combatantTimeout) * time.Microsecond)
+	combatantTimeoutTime := time.Now().Add(time.Duration(-combatantTimeout) * time.Millisecond)
 	for team := 1; team <= 2; team++ {
 		teamDead := true
 		for _, ct := range ec.CombatantTracker {
