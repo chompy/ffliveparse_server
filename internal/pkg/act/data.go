@@ -247,7 +247,7 @@ func (d *Data) SaveEncounter() error {
 	}
 	// ensure encounter meets min encounter length
 	duration := d.EncounterCollector.Encounter.EndTime.Sub(d.EncounterCollector.Encounter.StartTime)
-	if duration*time.Millisecond < minEncounterSaveLength {
+	if duration < minEncounterSaveLength*time.Millisecond {
 		return nil
 	}
 	// get database

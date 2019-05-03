@@ -1,3 +1,11 @@
+1.17
+- Added "views" API to allow for easy creation of new interfaces.
+- Numerous tweaks to encounter detection.
+- Numerous tweaks to interface.
+- Timeline view is now rendered entirely in HTML5 canvas.
+- Some timeline functionality removed in favor of pushing out new version more quickly.
+- Table view is now the default view.
+
 1.16
 - Tweaks and hotfixes to server side log parsing.
 - Imposed a delay before a new encounter can begin.

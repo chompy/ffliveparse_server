@@ -15,7 +15,7 @@ You should have received a copy of the GNU General Public License
 along with FFLiveParse.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-var TIMELINE_PIXELS_PER_MILLISECOND = 0.07; // how many pixels represents a millisecond in timeline
+var TIMELINE_PIXELS_PER_MILLISECOND = .125; // how many pixels represents a millisecond in timeline
 var TIMELINE_PIXEL_OFFSET = TIMELINE_PIXELS_PER_MILLISECOND * 1000;
 var GAIN_EFFECT_REGEX = /1A\:([a-zA-Z0-9` ']*) gains the effect of ([a-zA-Z0-9` ']*) from ([a-zA-Z0-9` ']*) for ([0-9]*)\.00 Seconds\./;
 var LOSE_EFFECT_REGEX = /1E\:([a-zA-Z0-9` ']*) loses the effect of ([a-zA-Z0-9` ']*) from ([a-zA-Z0-9` ']*)\./;
@@ -31,13 +31,20 @@ var TIMELINE_ELEMENT_SIZES = {
         [TIMELINE_BREAKPOINT_FULL] : 64
     },
     "combatant_width" : {
-        [TIMELINE_BREAKPOINT_FULL] : 256
+        [TIMELINE_BREAKPOINT_FULL] : 256,
+        [TIMELINE_BREAKPOINT_MOBILE] : 64,
     },
     "job_icon_width" : {
         [TIMELINE_BREAKPOINT_FULL] : 48
     },
     "job_icon_height" : {
         [TIMELINE_BREAKPOINT_FULL] : 48
+    },
+    "job_icon_width_small" : {
+        [TIMELINE_BREAKPOINT_FULL] : 24
+    },
+    "job_icon_height_small" : {
+        [TIMELINE_BREAKPOINT_FULL] : 24
     },
     "combatant_name_font" : {
         [TIMELINE_BREAKPOINT_FULL] : 16
@@ -48,25 +55,13 @@ var TIMELINE_ELEMENT_SIZES = {
     "action_icon_normal_height" : {
         [TIMELINE_BREAKPOINT_FULL] : 40
     },
-    "action_icon_gain_status_width" : {
+    "action_icon_status_width" : {
         [TIMELINE_BREAKPOINT_FULL] : 24
     },
-    "action_icon_gain_status_height" : {
+    "action_icon_status_height" : {
         [TIMELINE_BREAKPOINT_FULL] : 32
-    },
-    "action_icon_lose_status_width" : {
-        [TIMELINE_BREAKPOINT_FULL] : 24
-    },
-    "action_icon_lose_status_height" : {
-        [TIMELINE_BREAKPOINT_FULL] : 32
-    },
+    }
 }
-
-var TIMELINE_KEY_HEIGHT = 24;
-var TIMELINE_COMBATANT_HEIGHT =  64;
-var TIMELINE_COMBATANT_WIDTH = 256;
-var TIMELINE_COMBATANT_JOB_ICON_SIZE = 48;
-var TIMELINE_COMBATANT_NAME_SIZE = 16;
 var TIMELINE_ROLE_COLORS = {
     "healer"        : ["#2fa35f", "#000"],
     "tank"          : ["#4f59c4", "#fff"],
@@ -74,11 +69,11 @@ var TIMELINE_ROLE_COLORS = {
     "enemy"         : ["#404040", "#fff"],
     "pet"           : ["#404040", "#fff"]
 };
-var TIMELINE_ACTION_ICON_SIZES = {
-    [ACTION_TYPE_NORMAL]: [40, 40],
-    [ACTION_TYPE_GAIN_STATUS_EFFECT]: [24, 32],
-    [ACTION_TYPE_LOSE_STATUS_EFFECT]: [24, 32],
-    [ACTION_TYPE_DEATH]: [40, 40]
+var TIMELINE_ACTION_ICON_SIZE_KEYS = {
+    [ACTION_TYPE_NORMAL]: ["action_icon_normal_width", "action_icon_normal_height"],
+    [ACTION_TYPE_GAIN_STATUS_EFFECT]: ["action_icon_status_width", "action_icon_status_height"],
+    [ACTION_TYPE_LOSE_STATUS_EFFECT]: ["action_icon_status_width", "action_icon_status_height"],
+    [ACTION_TYPE_DEATH]: ["action_icon_normal_width", "action_icon_normal_width"]
 };
 
 class ViewTimeline extends ViewBase
@@ -130,6 +125,20 @@ class ViewTimeline extends ViewBase
         this.canvasElement.addEventListener("touchstart", function(e) {
             t.mouseIsDown = true;
         });
+        var mouseOverAction = function(e) {
+            var mousePos = t._getCursorPosition(e);
+            for (var i = t.actionPositions.length - 1; i >= 0; i--) {
+                var actionPosData = t.actionPositions[i];
+                if (
+                    mousePos[0] > actionPosData[1] && mousePos[1] > actionPosData[2] &&
+                    mousePos[0] < actionPosData[1] + actionPosData[3] &&
+                    mousePos[1] < actionPosData[2] + actionPosData[4]
+                ) {
+                    return actionPosData[0];
+                }
+            }
+            return null;
+        }
         var displayOverlay = function(e) {
             // remove overlay
             if (t.overlayAction) {
@@ -143,28 +152,23 @@ class ViewTimeline extends ViewBase
             }
             // show overlay
             var mousePos = t._getCursorPosition(e);
-            for (var i in t.actionPositions) {
-                var actionPosData = t.actionPositions[i];
-                if (
-                    mousePos[0] > actionPosData[1] && mousePos[1] > actionPosData[2] &&
-                    mousePos[0] < actionPosData[1] + actionPosData[3] &&
-                    mousePos[1] < actionPosData[2] + actionPosData[4]
-                ) {
-                    t.overlayAction = actionPosData[0];
-                    t.redraw();
-                    break;
-                }
+            var action = mouseOverAction(e);
+            if (action) {
+                t.overlayAction = action;
+                t.redraw();
             }
         }
         window.addEventListener("mouseup", function(e) {
             t.mouseIsDown = false;
             displayOverlay(e);
             t.mouseIsDrag = false;
+            t.lastTouchPos = null;
         });
         window.addEventListener("touchend", function(e) {
             t.mouseIsDown = false;
             displayOverlay(e);
             t.mouseIsDrag = false;
+            t.lastTouchPos = null;
         });
         var scrollTimeline = function(movement) {
             if (!t.mouseIsDown) {
@@ -181,6 +185,16 @@ class ViewTimeline extends ViewBase
         this.canvasElement.addEventListener("mousemove", function(e) {
             scrollTimeline([e.movementX, e.movementY]);
             t.mousePos = [e.x, e.y];
+            if (t.mouseIsDrag) {
+                t.canvasElement.classList.remove("action-over");
+                return;
+            }
+            // show mouse pointer if hovering over action
+            if (mouseOverAction(e)) {
+                t.canvasElement.classList.add("action-over");
+            } else {
+                t.canvasElement.classList.remove("action-over");
+            }
         });
         this.lastTouchPos = null;
         this.canvasElement.addEventListener("touchmove", function(e) {
@@ -270,7 +284,7 @@ class ViewTimeline extends ViewBase
         var combatants = this.getCombatantList();
         // set draw styles
         this.canvasContext.fillStyle = "#fff";
-        this.canvasContext.font = TIMELINE_COMBATANT_NAME_SIZE + "px sans-serif";
+        this.canvasContext.font = this._ES("combatant_name_font") + "px sans-serif";
         this.canvasContext.textAlign = "left";
         var combatantCount = -1;
         for (var i = 0; i < combatants.length; i++) {
@@ -294,20 +308,21 @@ class ViewTimeline extends ViewBase
             }
             this.drawImage(
                 jobIconSrc,
-                16,
+                this.getViewWidth() > TIMELINE_BREAKPOINT_MOBILE ? 16 : 8,
                 this._ES("key_height") + ((combatantCount + 1) * this._ES("combatant_height")) - ((this._ES("combatant_height") + this._ES("job_icon_width")) / 2) - this.vOffset,
                 this._ES("job_icon_width"),
                 this._ES("job_icon_height")
             );
-            // draw role name
-            this.canvasContext.fillStyle = TIMELINE_ROLE_COLORS[combatant.getRole()][1];
-            this.canvasContext.fillText(
-                combatant.getDisplayName(),
-                this._ES("job_icon_width") + 24,
-                this._ES("key_height") + ((combatantCount + 1) * this._ES("combatant_height")) - 
-                    ((this._ES("combatant_height") + this._ES("combatant_name_font")) / 2) + 
-                    this._ES("combatant_name_font") - this.vOffset
-            );
+            // draw combatant name
+            if (this.getViewWidth() > TIMELINE_BREAKPOINT_MOBILE) {
+                this.canvasContext.fillStyle = TIMELINE_ROLE_COLORS[combatant.getRole()][1];
+                this.canvasContext.textBaseline = "middle";
+                this.canvasContext.fillText(
+                    combatant.getDisplayName(),
+                    this._ES("job_icon_width") + 24,
+                    this._ES("key_height") + (combatantCount * this._ES("combatant_height")) + (this._ES("combatant_height") / 2) - this.vOffset
+                );
+            }
 
             // draw seperator line
             this.canvasContext.fillStyle = "#fff";
@@ -356,6 +371,7 @@ class ViewTimeline extends ViewBase
         // draw times
         this.canvasContext.font = "14px sans-serif";
         this.canvasContext.textAlign = "center";
+        this.canvasContext.textBaseline = "middle";
         var duration = drawTime.getTime() - this.encounter.data.StartTime.getTime();
         var offset = (duration % 1000) * TIMELINE_PIXELS_PER_MILLISECOND;
         for (var i = 0; i < 99; i++) {
@@ -372,7 +388,7 @@ class ViewTimeline extends ViewBase
             this.canvasContext.fillText(
                 timeKeyText,
                 position + this._ES("combatant_width"),
-                this._ES("key_height") - 8
+                this._ES("key_height") / 2
             );
             // draw vertical grid line
             this.canvasContext.fillRect(position + this._ES("combatant_width"), 25, 1, this.getViewHeight());
@@ -405,14 +421,14 @@ class ViewTimeline extends ViewBase
         for (var i in actions) {
             var action = actions[i];
             var actionDrawData = this.getActionDrawData(action);
-            if (!actionDrawData || !action || !action.type) {
+            if (!actionDrawData || !action || !action.type || !action.displayAction) {
                 continue;
             }
             // calculate position/size
-            var w = TIMELINE_ACTION_ICON_SIZES[action.type][0];
-            var h = TIMELINE_ACTION_ICON_SIZES[action.type][1];
-            var x = TIMELINE_COMBATANT_WIDTH + parseInt((drawEndTime.getTime() - action.time.getTime()) * TIMELINE_PIXELS_PER_MILLISECOND);
-            var y = TIMELINE_KEY_HEIGHT + (actionDrawData.vindex * TIMELINE_COMBATANT_HEIGHT) + ((TIMELINE_COMBATANT_HEIGHT - h) / 2);
+            var w = this._ES(TIMELINE_ACTION_ICON_SIZE_KEYS[action.type][0]);
+            var h = this._ES(TIMELINE_ACTION_ICON_SIZE_KEYS[action.type][1]);
+            var x = this._ES("combatant_width") + parseInt((drawEndTime.getTime() - action.time.getTime()) * TIMELINE_PIXELS_PER_MILLISECOND);
+            var y = this._ES("key_height") + (actionDrawData.vindex * this._ES("combatant_height")) + ((this._ES("combatant_height") - h) / 2);
             this.drawImage(
                 actionDrawData.icon,
                 x,
@@ -426,6 +442,7 @@ class ViewTimeline extends ViewBase
                 this.canvasContext.font = "20px sans-serif";
                 this.canvasContext.textAlign = "center";
                 this.canvasContext.fillStyle = "#6def11";
+                this.canvasContext.textBaseline = "middle";
                 var buffText = "+";
                 if (action.type == ACTION_TYPE_LOSE_STATUS_EFFECT) {
                     buffText = "-";
@@ -481,8 +498,153 @@ class ViewTimeline extends ViewBase
         if (!this.overlayAction) {
             return;
         }
+        var w = this.getViewWidth() < 500 ? this.getViewWidth() : 500;
+        var h = this.getViewHeight() < 500 ? this.getViewHeight() : 500;
+
+        var offsetX = (this.getViewWidth() - w) / 2; 
+        var offsetY = (this.getViewHeight() - h) / 2; 
+
+        var actionDrawData = this.getActionDrawData(this.overlayAction);
+        
+        // draw bg
         this.canvasContext.fillStyle = "rgba(0,0,0,.75)";
-        this.canvasContext.fillRect(0, 0, 500, 500);
+        this.canvasContext.fillRect(offsetX, offsetY, w, h);
+
+        // add padding to offset
+        offsetX += 16;
+        offsetY += 16;
+
+        // draw action icon
+        var iconW = this._ES(TIMELINE_ACTION_ICON_SIZE_KEYS[this.overlayAction.type][0]);
+        var iconH = this._ES(TIMELINE_ACTION_ICON_SIZE_KEYS[this.overlayAction.type][1]);
+        this.drawImage(
+            actionDrawData.icon,
+            offsetX,
+            offsetY,
+            iconW,
+            iconH
+        );
+
+        // draw action name
+        this.canvasContext.font = "24px sans-serif";
+        this.canvasContext.textBaseline = "middle";
+        this.canvasContext.textAlign = "left";
+        this.canvasContext.fillStyle = "#fff";
+        this.canvasContext.fillText(
+            this.overlayAction.data.actionName,
+            offsetX + iconW + 10,
+            offsetY + (iconH / 2)
+        );
+
+        // break text block in to lines to draw on canvas
+        // @see https://stackoverflow.com/a/16599668
+        var getLines = function(ctx, text, maxWidth) {
+            var words = text.split(" ");
+            var lines = [];
+            var currentLine = words[0];
+        
+            for (var i = 1; i < words.length; i++) {
+                var word = words[i];
+                var width = ctx.measureText(currentLine + " " + word).width;
+                if (width < maxWidth) {
+                    currentLine += " " + word;
+                } else {
+                    lines.push(currentLine);
+                    currentLine = word;
+                }
+            }
+            lines.push(currentLine);
+            return lines;
+        }
+
+        // draw action description
+        this.canvasContext.font = "12px sans-serif";
+        this.canvasContext.textBaseline = "top";
+        var lines = getLines(
+            this.canvasContext,
+            actionDrawData.data && actionDrawData.data.description ? actionDrawData.data.description : "(no description)",
+            w - 48 - iconW
+        );
+        lines.push("");
+
+        // draw type
+        var actionTypeDisplayName = "Buff/Debuff";
+        switch (this.overlayAction.type) {
+            case ACTION_TYPE_GAIN_STATUS_EFFECT: {
+                actionTypeDisplayName = "Gain Status";
+                break;
+            }
+            case ACTION_TYPE_LOSE_STATUS_EFFECT:
+            {
+                actionTypeDisplayName = "Lose Status";
+                break;
+            }
+            case ACTION_TYPE_DEATH:
+            {
+                actionTypeDisplayName = "Death";
+                break;
+            }
+            case ACTION_TYPE_NORMAL:
+            {
+                if (this.overlayAction.data.flags.indexOf("heal") != -1) {
+                    actionTypeDisplayName = "Heal";
+                } else if (this.overlayAction.data.flags.indexOf("damage") != -1) {
+                    actionTypeDisplayName = "Damage";
+                }
+                break;
+            }
+        }
+        lines.push(actionTypeDisplayName);
+        // draw extra flags, crit, direct hit
+        if (this.overlayAction.type == ACTION_TYPE_NORMAL) {
+            var actionFlagDisplay = "";
+            var actionFlagTypes = ["crit", "direct-hit"];
+            for (var i in actionFlagTypes) {
+                if (this.overlayAction.data.flags.indexOf(actionFlagTypes[i]) != -1) {
+                    if (actionFlagDisplay) {
+                        actionFlagDisplay += ", ";
+                    }
+                    switch(actionFlagTypes[i]) {
+                        case "crit": {
+                            actionFlagDisplay += "Critical Hit";
+                            break;
+                        }
+                        case "direct-hit":
+                        {
+                            actionFlagDisplay += "Direct Hit";
+                            break;
+                        }
+                    }
+                }
+            }
+            if (actionFlagDisplay) {
+                lines.push(actionFlagDisplay);
+            }
+        }
+        for (var i in lines) {
+            this.canvasContext.fillText(
+                lines[i],
+                offsetX + iconW + 10,
+                offsetY + iconH + 8 + (14 * i)
+            );            
+        }
+
+        // draw targets of action
+        var targetY = iconH + (lines.length * 14) + 14;
+        this.drawActionTarget(
+            this.overlayAction,
+            offsetX + iconW + 10,
+            offsetY + targetY
+        );
+        for (var i in this.overlayAction.relatedActions) {
+            targetY += this._ES("job_icon_height_small") + 4;
+            this.drawActionTarget(
+                this.overlayAction.relatedActions[i],
+                offsetX + iconW + 10,
+                offsetY + targetY
+            );
+        }
+
     }
 
     /**
@@ -558,12 +720,12 @@ class ViewTimeline extends ViewBase
             }
         }
         // get icon image
-        var actionImageSrc = "";
+        var actionImageSrc = "/static/img/enemy.png";
         if (!actionData && action.type == ACTION_TYPE_DEATH) {
             actionImageSrc = "/static/img/death.png";
-        } else if (!actionData && combatant.isEnemy()) {
-            actionImageSrc = "/static/img/enemy.png";
         } else if (actionData && actionData.name == "Attack") {
+            actionImageSrc = "/static/img/attack.png";
+        } else if (!actionData && ["Attack", "Shot"].indexOf(action.data.actionName) != -1) {
             actionImageSrc = "/static/img/attack.png";
         } else if (actionData && actionData.icon) {
             actionImageSrc = ACTION_DATA_BASE_URL + actionData.icon;
@@ -586,6 +748,9 @@ class ViewTimeline extends ViewBase
             currentSeekTime = this.seek;
         }
         this.seek = new Date(currentSeekTime.getTime() + offset);
+        if (this.seek.getTime() > this.encounter.getEndTime().getTime()) {
+            this.seek = null;
+        }
         this.redraw();
     }
 
@@ -608,7 +773,7 @@ class ViewTimeline extends ViewBase
             for (var breakpoint in elementSizes) {
                 if (
                     currentCanvasWidth <= breakpoint && 
-                    (!bestBreakpoint || breakpoint > bestBreakpoint)
+                    (!bestBreakpoint || breakpoint < bestBreakpoint)
                 ) {
                     bestBreakpoint = breakpoint;
                 }
@@ -632,7 +797,6 @@ class ViewTimeline extends ViewBase
         return this.getElementSize(key)
     }
 
-
     /**
      * Get cursor position relative to canvas.
      * @param {Event} event 
@@ -643,6 +807,69 @@ class ViewTimeline extends ViewBase
         var x = event.clientX - rect.left;
         var y = event.clientY - rect.top;
         return [parseInt(x), parseInt(y)];
+    }
+
+    /**
+     * Draw details about target of action
+     * @param {Action} action 
+     * @param {integer} x 
+     * @param {integer} y 
+     */
+    drawActionTarget(action, x, y)
+    {
+        // draw combatant job icons
+        var combatants = [action.sourceCombatant, action.targetCombatant];
+        for (var i in combatants) {
+            var combatant = combatants[i];
+            // get job icon
+            var jobIconSrc = "/static/img/enemy.png";
+            if (combatant && combatant.data.Job != "enemy") {
+                var jobIconSrc = "/static/img/job/" + combatant.data.Job.toLowerCase() + ".png";
+            }
+            this.drawImage(
+                jobIconSrc,
+                x + ((this._ES("job_icon_width_small") + 24) * i) ,
+                y,
+                this._ES("job_icon_width_small"),
+                this._ES("job_icon_height_small")
+            );
+        }
+        // draw arrow target sep
+        this.canvasContext.font = "14px sans-serif";
+        this.canvasContext.fillStyle = "#fff";
+        this.canvasContext.textAlign = "center";
+        this.canvasContext.textBaseline = "middle";
+        this.canvasContext.fillText(
+            "→",
+            x + this._ES("job_icon_width_small") + 12,
+            y + (this._ES("job_icon_height_small") / 2)
+        );
+
+        // draw damage/heal amount
+        var damageText = "";
+        var hpAfter = 0;
+        if (action.data.flags.indexOf("damage") != -1) {
+            hpAfter = parseInt(action.data.targetCurrentHp) - action.data.damage;
+            damageText += "-" + action.data.damage;
+        } else if (action.data.flags.indexOf("heal") != -1) {
+            hpAfter = parseInt(action.data.targetCurrentHp) + action.data.damage;
+            damageText += "+" + action.data.damage;
+        }
+        if (damageText) {
+            if (hpAfter > action.data.targetMaxHp) {
+                hpAfter = action.data.targetMaxHp;
+            } else if (hpAfter < 0) {
+                hpAfter = 0;
+            }
+            damageText += " = " + hpAfter;
+            this.canvasContext.textAlign = "left";
+            this.canvasContext.fillText(
+                damageText,
+                x + (this._ES("job_icon_width_small") * 2) + 32,
+                y + (this._ES("job_icon_height_small") / 2)
+            );            
+        }
+
     }
 
 }

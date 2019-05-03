@@ -50,9 +50,16 @@ You can run the server on your own machine if you prefer.
 
 ## Todos
 
-- Track DOTs to be able to better track causes of death.
-- Past encounter list. (Be able to review all your past encounters.)
 - Ability to have user provided custom widgets/plugins.
 - Restore functionality from v0.XX
     - Custom triggers
     - Cactbot triggers
+- Restore functionality from v1.16
+    - Death tracker
+    - Timeline scrollbar
+- Timeline improvements
+    - Filter actions
+- Log view, display detailed log of fight with nice visual styling
+- Trigger view
+- Search and filter past encounters
+- Stats, view detailed information about your best runs and parses

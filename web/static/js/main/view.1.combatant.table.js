@@ -242,7 +242,7 @@ class ViewCombatantTable extends ViewBase
         this.displayCombatants();
         if (isNew) {
             // TODO find a way to make this automatic?
-            fflpFixFooter();
+            setTimeout(function(){ fflpFixFooter(); }, 500);
         }
     }
 
