@@ -1,9 +1,7 @@
 version: "3"
 services:    
     ffliveparse-app:
-        build:
-            context: "../"
-            dockerfile: "docker/app/Dockerfile"
+        image: "chompy/ffliveparse"
         ports:
             - "31593:31593/udp"
         env_file:
