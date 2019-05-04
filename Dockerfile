@@ -13,6 +13,5 @@ RUN cd /app && \
     go get github.com/rs/xid && \
     go get github.com/wellington/go-libsass && \
     go build -o app.bin && \
-    apk del git build-base && \
-    chmod +x /app/docker/app/start.sh
+    apk del git build-base
 CMD ["/app/app.bin"]
