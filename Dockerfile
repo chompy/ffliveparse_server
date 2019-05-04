@@ -2,7 +2,7 @@ FROM golang:alpine
 WORKDIR /app
 COPY . /app/
 RUN cd /app && \
-    apk add --update git build-base && \
+    apk add --update git build-base libsass-dev && \
     go get github.com/olebedev/emitter && \
     go get golang.org/x/net/websocket && \
     go get github.com/tdewolff/minify && \
