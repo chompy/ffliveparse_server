@@ -6,10 +6,9 @@ services:
             - "31593:31593/udp"
         env_file:
             - "docker.env"
-        restart: always
+        restart: never
         volumes:
             - "ffliveparse-data:/app/data/database"
-            - "ffliveparse-logging:/app/data/logging"
             - "/mnt/ffliveparse_logs:/app/data/logs"
 
     ffliveparse-nginx:
@@ -28,4 +27,3 @@ services:
 
 volumes:
     "ffliveparse-data": 
-    "ffliveparse-logging":

@@ -1,6 +1,8 @@
 *.exe
 *.pyc
 *.code-workspace
-data/
-!data/.placeholder
+data/database/*
+!data/database/.placeholder
+data/logs/*
+!data/logs/.placeholder
 __pycache__
