@@ -215,8 +215,6 @@ class CombatantCollector
                 }
             }
         }
-
-
         return combatants;
     }
 

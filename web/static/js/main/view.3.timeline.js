@@ -168,6 +168,15 @@ class ViewTimeline extends ViewBase
             t.vOffset -= movement[1];
             if (t.vOffset < 0) {
                 t.vOffset = 0;
+                return;
+            }
+            var combatants = t.getCombatantList();
+            var maxVScroll = (combatants.length * t._ES("combatant_height")) - t.getViewHeight();
+            if (t.vOffset > maxVScroll) {
+                t.vOffset = maxVScroll;
+                if (t.vOffset < 0) {
+                    t.vOffset = 0;
+                }
             }
         };
         this.canvasElement.addEventListener("mousemove", function(e) {
