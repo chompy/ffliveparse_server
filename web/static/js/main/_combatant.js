@@ -140,18 +140,15 @@ class CombatantCollector
         // make combatant list
         var combatants = [];
         for (var i in this.combatants) {
+            // skip pets
+            if (this.combatants[i].data.ParentID) {
+                continue;
+            }
             combatants.push(this.combatants[i]);
         }
         // sort combatant list
         var t = this;
         var sort = sort;
-        // re-sort so all pets are at the bottom
-        combatants.sort(function(a, b) {
-            if (a.data.ParentID > 0 && b.data.ParentID == 0) {
-                return 1;
-            }
-            return 0;
-        });
         combatants.sort(function(a, b) {
             // keep pet with their owner
             if (b.data.ParentID) {
@@ -207,6 +204,19 @@ class CombatantCollector
                 }
             }
         });
+        // add pets under their owner
+        for (var i in this.combatants) {
+            if (!this.combatants[i].data.ParentID) {
+                continue;
+            }
+            for (var j in combatants) {
+                if (combatants[j].compare(this.combatants[i].data.ParentID)) {
+                    combatants.splice(j, 1, combatants[j], this.combatants[i]);
+                }
+            }
+        }
+
+
         return combatants;
     }
 

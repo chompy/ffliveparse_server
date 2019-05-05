@@ -61,7 +61,8 @@ class ActionCollector
                     if (
                         this.actions[i].data.type == MESSAGE_TYPE_AOE &&
                         this.actions[i].time.getTime() == action.time.getTime() &&
-                        this.actions[i].data.actionId == action.data.actionId
+                        this.actions[i].data.actionId == action.data.actionId &&
+                        this.actions[i].data.actionName == action.data.actionName
                     ) {
                         otherAoeActions.push(this.actions[i]);
                         this.actions[i].relatedActions.push(action);

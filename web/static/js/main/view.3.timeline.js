@@ -92,22 +92,10 @@ class ViewTimeline extends ViewBase
     init()
     {
         super.init();
-        this.encounter = null;
-        this.canvasElement = null;
-        this.canvasContext = null;
-        this.needRedraw = true;
-        this.seek = null;
-        this.vOffset = 0;
-        this.tickTimeout = null;
-        this.images = {};
-        this.elementSizes = {};
-        this.combatants =[];
-        this.actionPositions = [];
-        this.overlayAction = null;
+        this.reset();
         this.buildBaseElements();
         this.onResize();
         this.tick();
-        
         var t = this;
         // horizontal scrolling
         function hScrollTimeline(e) {
@@ -207,13 +195,26 @@ class ViewTimeline extends ViewBase
         });
     }
 
+    reset()
+    {
+        this.encounter = null;
+        this.needRedraw = true;
+        this.seek = null;
+        this.vOffset = 0;
+        this.tickTimeout = null;
+        this.images = {};
+        this.elementSizes = {};
+        this.combatants =[];
+        this.actionPositions = [];
+        this.overlayAction = null;
+    }
+
     buildBaseElements()
     {
         var element = this.getElement();
         this.canvasElement = document.createElement("canvas");
         this.canvasContext = this.canvasElement.getContext("2d");
         element.appendChild(this.canvasElement);
-        
     }
 
     onResize()
@@ -234,8 +235,9 @@ class ViewTimeline extends ViewBase
 
     onEncounter(encounter)
     {
+        this.reset();
         this.encounter = encounter;
-        this.needRedraw = true;
+        this.redraw();
     }
     
     onLogLine(logLine)
@@ -638,6 +640,19 @@ class ViewTimeline extends ViewBase
         );
         for (var i in this.overlayAction.relatedActions) {
             targetY += this._ES("job_icon_height_small") + 4;
+            if (i > 6) {
+                this.canvasContext.font = "14px sans-serif";
+                this.canvasContext.fillStyle = "#fff";
+                this.canvasContext.textAlign = "left";
+                this.canvasContext.textBaseline = "top";
+                this.canvasContext.fillText(
+                    "+" + (this.overlayAction.relatedActions.length - 6) + " more",
+                    offsetX + iconW + 10,
+                    offsetY + targetY + 8
+                )
+                break
+            }
+
             this.drawActionTarget(
                 this.overlayAction.relatedActions[i],
                 offsetX + iconW + 10,
@@ -823,7 +838,7 @@ class ViewTimeline extends ViewBase
             var combatant = combatants[i];
             // get job icon
             var jobIconSrc = "/static/img/enemy.png";
-            if (combatant && combatant.data.Job != "enemy") {
+            if (combatant && combatant.data.Job && combatant.data.Job != "enemy") {
                 var jobIconSrc = "/static/img/job/" + combatant.data.Job.toLowerCase() + ".png";
             }
             this.drawImage(

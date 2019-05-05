@@ -204,6 +204,7 @@ class ViewCombatantTable extends ViewBase
         }
         // make combatant list
         var combatants = this.combatantCollector.getSortedCombatants(this.userConfig["sortBy"]);
+        this.tableBody.innerHTML = "";
         // display elements
         for (var i in combatants) {
             if (typeof(this.combatantElements[combatants[i].data.Name]) == "undefined") {
