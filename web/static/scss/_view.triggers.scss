@@ -1,0 +1,47 @@
+.view-triggers {
+    .trigger-import {
+        background: #2d2d2d;
+        padding: 20px 23px 13px 20px;
+        textarea {
+            width: 100%;
+            padding: 0;
+        }
+        .trigger-import-status {
+            color: #fff;
+            font-size: 12px;            
+        }
+    }
+    .trigger-list {
+        padding: 10px;
+        background: #e7e7e7;        
+        color: #000;
+        .trigger-list-empty {
+            text-align: center;
+        }
+        .trigger-list-element {
+            padding: 10px;
+            font-size: 14px;
+            position: relative;
+            input {
+                vertical-align: -2px;
+            }
+            .trigger-element-tree {
+                display: inline-block;
+                vertical-align: middle;
+                margin-left: 2px;
+                width: 1px;
+                margin-right: 7px;
+                background: #000;
+                height: 2px;
+            }
+            .trigger-element-name {
+                display: inline-block;
+            }
+      
+        }
+        button {
+            margin-top: 10px;
+            margin-right: 5px;
+        }
+    }
+}

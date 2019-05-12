@@ -67,7 +67,8 @@ class Application
         this.views = [
             new ViewCombatantTable(this.combatantCollector, this.actionCollector),
             new ViewCombatantStream(this.combatantCollector, this.actionCollector),
-            new ViewTimeline(this.combatantCollector, this.actionCollector)
+            new ViewTimeline(this.combatantCollector, this.actionCollector),
+            new ViewTriggers(this.combatantCollector, this.actionCollector),
         ];
         // init all views
         for (var i in this.views) {
@@ -176,7 +177,14 @@ class Application
                         t.loadingProgressElement.style.width = "0";
                         t.loadingProgressElement.classList.add("hide");
                         t.loadingMessageElement.classList.add("hide");
-                        
+                        setTimeout(
+                            function() {
+                                for (var i in t.views) {
+                                    t.views[i].onReady();
+                                }
+                            },
+                            1000
+                        ); 
                         break;
                     }
                     case "error":
@@ -347,6 +355,5 @@ class Application
             JSON.stringify(this.userConfig)
         );
     }
-
 
 }

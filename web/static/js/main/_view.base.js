@@ -38,6 +38,7 @@ class ViewBase
         this.active = false;
         this.eventListenerCallbacks = {};
         this.userConfig = {};
+        this.ready = false;
         this.loadUserConfig();
     }
 
@@ -86,6 +87,16 @@ class ViewBase
             viewContainerElement.appendChild(this.element);
         }
         return this.element;
+    }
+
+    /**
+     * Called when the application is loaded and ready,
+     * this occurs after all previous log lines have been processed.
+     */
+    onReady()
+    {
+        this.ready = true;
+        return;
     }
 
     /**
