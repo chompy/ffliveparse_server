@@ -1,3 +1,6 @@
+1.18
+- Added "triggers" view with support for complex triggers and ACT import.
+
 1.17
 - Added "views" API to allow for easy creation of new interfaces.
 - Numerous tweaks to encounter detection.
