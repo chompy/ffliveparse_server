@@ -24,11 +24,11 @@
       font-weight: bold
 
     #encounter-name
-      @media (max-width: 600px)
+      & @media (max-width: 600px)
         display: none
 
   #encounter-id
-    @media (max-width: 940px)
+    & @media (max-width: 940px)
       display: none
 
   .left-side

@@ -8,8 +8,6 @@
       font-size: 18px
       &.sort a
         color: yellow
-      @media(max-width: 640px)
-        font-size: 14px !important
   .combatant-body
     .combatant-row
       padding: 15px
@@ -38,18 +36,18 @@
       text-align: center
       img
         max-width: 48px
-        @media (max-width: 640px)
+        & @media (max-width: 640px)
           max-width: 32px
     &.name
       width: 23%
       font-weight: bold
-      @media(max-width: 640px)
+      & @media(max-width: 640px)
         font-size: 12px
     &.damage
       width: 18%
       font-size: 22px
       text-align: center
-      @media(max-width: 640px)
+      & @media(max-width: 640px)
         font-size: 16px
     &.healing
       width: 18%
@@ -57,5 +55,18 @@
     &.deaths
       width: 18%
       text-align: center
-    @media(max-width: 640px)
+
+@media(max-width: 640px)
+  .view-table, .view-stream
+    .combatant-head
+      .combatant-col
+        font-size: 14px !important
+    .combatant-col
       font-size: 12px
+      &.job
+        img
+          max-width: 32px      
+      &.name
+        font-size: 12px
+      &.damage
+        font-size: 16px

@@ -6,8 +6,6 @@
   .combatant-row
     &.pet
       display: none
-    @media (max-width: 320px)
-      padding: 7px 5px !important
   .combatant-col
     margin-left: 0
     margin-right: 0
@@ -33,3 +31,8 @@
       text-align: left   
     &.healing, &.deaths
       display: none
+
+@media (max-width: 320px)
+  .view-stream
+    .combatant-row
+      padding: 7px 5px !important
