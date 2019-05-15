@@ -1,3 +1,8 @@
+1.19
+- Fixed a bug with ACT trigger import.
+- Switched CSS preprocessor from SCSS to GCSS.
+- Responsive CSS tweaks.
+
 1.18
 - Added "triggers" view with support for complex triggers and ACT import.
 
