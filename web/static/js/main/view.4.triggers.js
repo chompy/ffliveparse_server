@@ -607,6 +607,8 @@ class ViewTriggers extends ViewBase
         triggerNameLabelElement.innerText = trigger.getName();
         triggerNameLabelElement.setAttribute("for", elementId);
         triggerNameElement.appendChild(triggerNameLabelElement);
+
+        setTimeout(function(){ fflpFixFooter(); }, 500);
     }
 
 
