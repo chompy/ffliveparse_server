@@ -1,0 +1,10 @@
+#stats-content
+  margin: 20px
+  .stat-item
+    margin-bottom: 5px
+    .stat-name
+      display: inline-block
+      min-width: 332px
+      margin-right: 10px
+    .stat-value
+      display: inline-block

@@ -1,0 +1,20 @@
+#home-content
+  margin: 20px
+
+.home-section
+  background-color: #262626
+  border: 1px solid #696969
+  padding: 5px 10px
+  margin-bottom: 15px
+
+.home-section
+  img
+    max-width: 100%
+  .home-section-name
+    position: absolute
+    margin-top: -14px
+    font-weight: bold
+    font-style: italic
+
+.home-section p
+  padding: 0

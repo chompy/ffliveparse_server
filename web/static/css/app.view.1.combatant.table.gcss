@@ -1,0 +1,61 @@
+.view-table, .view-stream
+  .combatant-head
+    font-weight: bold
+    background: #2d2d2d
+    border-bottom: 1px solid #fff
+    padding: 15px
+    .combatant-col
+      font-size: 18px
+      &.sort a
+        color: yellow
+      @media(max-width: 640px)
+        font-size: 14px !important
+  .combatant-body
+    .combatant-row
+      padding: 15px
+      &.dps
+        background-color: #723c3a
+      &.healer
+        background-color: #2fa35f
+        color: #000
+      &.tank
+        background-color: #4f59c4
+      &.pet
+        background-color: #175906
+        .damage, .healing
+          font-style: italic
+          font-weight: normal
+          font-size: 14px
+  .combatant-col
+    display: inline-block
+    vertical-align: middle
+    font-size: 16px
+    font-weight: bold
+    margin-left: 1%
+    margin-right: 1%
+    &.job
+      width: 13%
+      text-align: center
+      img
+        max-width: 48px
+        @media (max-width: 640px)
+          max-width: 32px
+    &.name
+      width: 23%
+      font-weight: bold
+      @media(max-width: 640px)
+        font-size: 12px
+    &.damage
+      width: 18%
+      font-size: 22px
+      text-align: center
+      @media(max-width: 640px)
+        font-size: 16px
+    &.healing
+      width: 18%
+      text-align: center
+    &.deaths
+      width: 18%
+      text-align: center
+    @media(max-width: 640px)
+      font-size: 12px

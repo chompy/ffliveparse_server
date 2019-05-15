@@ -159,6 +159,7 @@ class Application
         }
         var t = this;
         // create worker
+        var onReadyTimeout = null;
         for (var i = 0; i < WORKER_COUNT; i++) {
             var worker = new Worker("/worker.min.js?v=" + VERSION);
             worker.onmessage = function(e) {
@@ -170,6 +171,7 @@ class Application
                         t.loadingProgressElement.style.width = e.data.value + "%";
                         t.loadingProgressElement.innerText = e.data.message;
                         t.loadingProgressElement.classList.remove("hide");
+                        clearTimeout(onReadyTimeout);
                         break;
                     }
                     case "status_ready":
@@ -177,8 +179,10 @@ class Application
                         t.loadingProgressElement.style.width = "0";
                         t.loadingProgressElement.classList.add("hide");
                         t.loadingMessageElement.classList.add("hide");
-                        setTimeout(
+                        clearTimeout(onReadyTimeout);
+                        onReadyTimeout = setTimeout(
                             function() {
+                                console.log(">> Ready.");
                                 for (var i in t.views) {
                                     t.views[i].onReady();
                                 }
@@ -190,6 +194,7 @@ class Application
                     case "error":
                     {
                         t.errorOverlayElement.classList.remove("hide");
+                        clearTimeout(onReadyTimeout);
                         break;
                     }
                     case "act:encounter": 

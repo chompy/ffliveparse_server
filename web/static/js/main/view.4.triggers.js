@@ -52,7 +52,7 @@ class Trigger
         // compile trigger regex
         this.regex = null;
         if (this.getTrigger()) {
-            this.regex = new RegExp(this.getTrigger());
+            this.regex = new XRegExp(this.getTrigger(), "gm");
         }
         this.enabled = true;
     }

@@ -32,7 +32,7 @@ import (
 	"strings"
 	"time"
 
-	libsass "github.com/wellington/go-libsass"
+	"github.com/yosssi/gcss"
 
 	"github.com/olebedev/emitter"
 	"github.com/tdewolff/minify"
@@ -120,7 +120,7 @@ func HTTPStartServer(port uint16, userManager *user.Manager, actManager *act.Man
 		fmt.Fprint(w, compiledJs["worker.js"])
 	})
 	// compile/minify css, serve compiled css
-	compiledCSS, err := compileSCSS()
+	compiledCSS, err := compileGCSS()
 	if err != nil {
 		log.Panicln("Error occured while compiling CSS,", err)
 	}
@@ -128,12 +128,12 @@ func HTTPStartServer(port uint16, userManager *user.Manager, actManager *act.Man
 		w.Header().Set("Content-Type", "text/css;charset=utf-8")
 		// in dev mode recompile css every request
 		if devMode {
-			compiledCSS, err = compileSCSS()
+			compiledCSS, err = compileGCSS()
 			if err != nil {
 				log.Panicln("Error occured while compiling CSS,", err)
 			}
 		}
-		fmt.Fprint(w, compiledCSS)
+		fmt.Fprint(w, compiledCSS["app.min.css"])
 	})
 	// setup websocket connections
 	http.Handle("/ws/", websocket.Handler(func(ws *websocket.Conn) {
@@ -428,36 +428,55 @@ func compileJavascript() (map[string]string, error) {
 	return output, nil
 }
 
-// compileSCSS - Compile all SCSS in to single string that can be served from memory
-func compileSCSS() (string, error) {
-	log.Println("Compiling and minifing SCSS...")
-	// sass compile
-	mainScss, err := os.Open("./web/static/scss/main.scss")
-	if err != nil {
-		return "", err
-	}
-	defer mainScss.Close()
-	var cssBuf bytes.Buffer
-	cssBufIo := bufio.NewWriter(&cssBuf)
-	scssOptions := libsass.Path("./web/static/scss/main.scss")
-	comp, err := libsass.New(cssBufIo, mainScss, scssOptions)
-	if err != nil {
-		return "", err
-	}
-	err = comp.Run()
-	if err != nil {
-		return "", err
-	}
-	cssBufIo.Flush()
-	// minify css string
-	m := minify.New()
-	m.AddFunc("text/css", css.Minify)
-	compiledCSS, err := m.String("text/css", cssBuf.String())
-	if err != nil {
-		return "", err
+// compileGCSS - Compile all GCSS in to single string that can be served from memory
+func compileGCSS() (map[string]string, error) {
+	log.Println("Compiling and minifying [g]css...")
+	cssDirs := make(map[string]string)
+	cssDirs["app.min.css"] = "./web/static/css"
+	output := make(map[string]string)
+	for cssFile, cssDir := range cssDirs {
+		files, err := ioutil.ReadDir(cssDir)
+		if err != nil {
+			return output, err
+		}
+		compiledCSS := ""
+		for _, file := range files {
+			filename := file.Name()
+			if !strings.HasSuffix(filename, ".gcss") {
+				continue
+			}
+			// open gcss file
+			gcssFile, err := os.Open(cssDir + "/" + filename)
+			if err != nil {
+				return nil, err
+			}
+			defer gcssFile.Close()
+			// create css buffer to write compiled gcss to
+			var cssBuf bytes.Buffer
+			cssBufIo := bufio.NewWriter(&cssBuf)
+			// compile gcss
+			_, err = gcss.Compile(cssBufIo, gcssFile)
+			if err != nil {
+				return nil, err
+			}
+			cssBufIo.Flush()
+			// add to compiled css string
+			if err != nil {
+				return output, err
+			}
+			compiledCSS += cssBuf.String()
+		}
+		// minify css string
+		m := minify.New()
+		m.AddFunc("text/css", css.Minify)
+		compiledCSS, err = m.String("text/css", compiledCSS)
+		if err != nil {
+			return nil, err
+		}
+		output[cssFile] = compiledCSS
 	}
 	log.Println("...Done.")
-	return compiledCSS, nil
+	return output, nil
 }
 
 func wsReader(ws *websocket.Conn, actManager *act.Manager) {
