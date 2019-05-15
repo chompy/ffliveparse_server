@@ -11,7 +11,7 @@ RUN cd /app && \
     go get github.com/mattn/go-sqlite3 && \
     go get github.com/speps/go-hashids && \
     go get github.com/rs/xid && \
-    go get github.com/wellington/go-libsass && \
+    go get github.com/yosssi/gcss/... && \
     go build -o app.bin && \
     apk del git build-base
 CMD ["/app/app.bin"]
