@@ -310,13 +310,21 @@ class ViewTriggers extends ViewBase
     {
         // parse trigger(s)
         if (typeof(data) == "string") {
-            try {
-                data = JSON.parse(data);
-            } catch (e) {
+            // two passes, second one attempt to decompress string
+            for (var i = 0; i < 2; i++) {
+                if (i == 1) {
+                    data = LZString.decompressFromBase64(data)
+                }
                 try {
-                    data = this.convertActXML(data);
+                    data = JSON.parse(data);
                 } catch (e) {
-                    throw "Could not parse trigger data.";
+                    try {
+                        data = this.convertActXML(data);
+                    } catch (e) {
+                        if (i == 1) {
+                            throw "Could not parse trigger data.";
+                        }
+                    }
                 }
             }
         }
@@ -419,7 +427,7 @@ class ViewTriggers extends ViewBase
         }
         prompt(
             exportTriggerData.length + " trigger(s) exported...",
-            JSON.stringify(exportTriggerData)
+            LZString.compressToBase64(JSON.stringify(exportTriggerData))
         );
     }
 
