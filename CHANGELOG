@@ -1,3 +1,6 @@
+DEVELOPMENT
+- Added ability to import and export compressed base64 triggers.
+
 1.19
 - Fixed a bug with ACT trigger import.
 - Switched CSS preprocessor from SCSS to GCSS.
