@@ -8,6 +8,17 @@
     .trigger-import-status
       color: #fff
       font-size: 12px
+  .trigger-config
+    background: #e7e7e7
+    color: #000
+    border-bottom: 1px solid #2d2d2d
+    padding: 10px 20px
+    .trigger-config-input
+      display: inline-block
+      margin-right: 15px
+      vertical-align: middle
+      input[type=checkbox]
+        margin-right: 5px
   .trigger-list
     padding: 10px
     background: #e7e7e7

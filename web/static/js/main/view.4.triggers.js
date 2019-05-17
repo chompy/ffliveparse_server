@@ -15,6 +15,13 @@ You should have received a copy of the GNU General Public License
 along with FFLiveParse.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+var TRIGGER_KEY_ID = "i";
+var TRIGGER_KEY_NAME = "n";
+var TRIGGER_KEY_PARENT_ID = "p";
+var TRIGGER_KEY_TRIGGER = "t";
+var TRIGGER_KEY_ZONE = "z";
+var TRIGGER_KEY_ACTION = "a";
+
 /**
  * A single processable trigger.
  */
@@ -39,12 +46,12 @@ class Trigger
         this.data = data;
         this.vm = vm;
         // slugify id
-        this.id  = this.data["i"] = this.get("i")
+        this.id  = this.data["i"] = this.get(TRIGGER_KEY_ID)
             .toLowerCase()
             .replace(/ /g,'-')
             .replace(/[^\w-]+/g,'')
         ;
-        this.parentId = this.data["p"] = this.get("p")
+        this.parentId = this.data["p"] = this.get(TRIGGER_KEY_PARENT_ID)
             .toLowerCase()
             .replace(/ /g,'-')
             .replace(/[^\w-]+/g,'')
@@ -76,7 +83,7 @@ class Trigger
     isValid()
     {
         // must have id
-        return this.get("i");
+        return this.get(TRIGGER_KEY_ID);
     }
 
     /**
@@ -92,7 +99,7 @@ class Trigger
      */
     getName()
     {
-        var name = this.get("n");
+        var name = this.get(TRIGGER_KEY_NAME);
         if (!name) {
             name = this.getId();
         }
@@ -112,7 +119,7 @@ class Trigger
      */
     getZone()
     {
-        return this.get("z");
+        return this.get(TRIGGER_KEY_ZONE);
     }
 
     /**
@@ -120,7 +127,7 @@ class Trigger
      */
     getTrigger()
     {
-        return this.get("t");
+        return this.get(TRIGGER_KEY_TRIGGER);
     }
 
     /**
@@ -128,7 +135,7 @@ class Trigger
      */
     getAction()
     {
-        return this.get("a");
+        return this.get(TRIGGER_KEY_ACTION);
     }
 
     /**
@@ -173,6 +180,7 @@ class Trigger
             this.vm.eval(this.getAction());
         }
     }
+
 }
 
 class ViewTriggers extends ViewBase
@@ -196,6 +204,16 @@ class ViewTriggers extends ViewBase
         // create triggers in user config if not present
         if (!("triggers" in this.userConfig)) {
             this.userConfig["triggers"] = {};
+            this.saveUserConfig();
+        }
+        // create name in user config if not present
+        if (!("character_name" in this.userConfig)) {
+            this.userConfig["character_name"] = "";
+            this.saveUserConfig();
+        }
+        // create tts in user config if not present
+        if (!("enable_tts" in this.userConfig)) {
+            this.userConfig["enable_tts"] = true;
             this.saveUserConfig();
         }
         this.triggerTimeouts = [];
@@ -228,6 +246,48 @@ class ViewTriggers extends ViewBase
         this.importStatusDiv.textContent = "Loading..."
         importDiv.appendChild(this.importStatusDiv)
         element.appendChild(importDiv);
+
+        // trigger config area
+        var triggerConfigDiv = document.createElement("div");
+        triggerConfigDiv.classList.add("trigger-config");
+
+        var triggerSelectAllDiv = document.createElement("div")
+        triggerSelectAllDiv.classList.add("trigger-config-select-all", "trigger-config-input");
+        var triggerSelectAllInput = document.createElement("input");
+        triggerSelectAllInput.type = "checkbox";
+        triggerSelectAllInput.title = "Select All";
+        triggerSelectAllDiv.appendChild(triggerSelectAllInput);
+        triggerConfigDiv.appendChild(triggerSelectAllDiv);
+
+        var triggerNameDiv = document.createElement("div");
+        triggerNameDiv.classList.add("trigger-config-name", "trigger-config-input");
+        var triggerNameInput = document.createElement("input");
+        triggerNameInput.type = "text";
+        triggerNameInput.placeholder = "Character Name";
+        triggerNameInput.title = "Character Name";
+        triggerNameInput.value = this.userConfig["character_name"];
+        triggerNameDiv.appendChild(triggerNameInput);
+        triggerConfigDiv.appendChild(triggerNameDiv);
+
+        var triggerTtsDiv = document.createElement("div");
+        triggerTtsDiv.classList.add("trigger-config-tts", "trigger-config-input");
+        var triggerTtsCheckbox = document.createElement("input");
+        triggerTtsCheckbox.type = "checkbox"
+        triggerTtsCheckbox.title = "Enable Text-to-speech";
+        if (this.userConfig["enable_tts"]) {
+            triggerTtsCheckbox.checked = true;
+        }
+        triggerTtsCheckbox.setAttribute("id", "trigger-config-tts-checkbox");
+        var triggerTtsLabel = document.createElement("label");
+        triggerTtsLabel.innerText = "Enable TTS";
+        triggerTtsLabel.title = "Enable Text-to-speech";
+        triggerTtsLabel.setAttribute("for", triggerTtsCheckbox.id);
+        
+        triggerTtsDiv.appendChild(triggerTtsCheckbox);
+        triggerTtsDiv.appendChild(triggerTtsLabel);
+        triggerConfigDiv.appendChild(triggerTtsDiv);
+        element.appendChild(triggerConfigDiv);
+
         // trigger list area
         this.triggerListDiv = document.createElement("div");
         this.triggerListDiv.classList.add("trigger-list");
@@ -300,6 +360,23 @@ class ViewTriggers extends ViewBase
                 }
             }
         );
+        // save character name
+        triggerNameInput.addEventListener("change", function(e) {
+            t.userConfig["character_name"] = triggerNameInput.value;
+            t.saveUserConfig();
+        });
+        // enable/disable tts
+        triggerTtsCheckbox.addEventListener("change", function(e) {
+            t.userConfig["enable_tts"] = triggerTtsCheckbox.checked;
+            t.saveUserConfig();
+        });
+        // select all
+        triggerSelectAllInput.addEventListener("change", function(e) {
+            var checkboxes = t.triggerListDiv.getElementsByTagName("input");
+            for (var i = 0; i < checkboxes.length; i++) {
+                checkboxes[i].checked = true;
+            }
+        });
     }
 
     /**
