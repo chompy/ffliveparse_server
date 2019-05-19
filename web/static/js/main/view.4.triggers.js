@@ -35,9 +35,9 @@ class Trigger
      */
     constructor(data, vm)
     {
-        // convert data json string to object
+        // convert data json/yaml string to object
         if (typeof(data) == "string") {
-            data = JSON.parse(data);
+            data = YAML.parse(data);
         }
         // only accept one trigger per trigger object
         if (Array.isArray(data)) {
@@ -228,6 +228,7 @@ class ViewTriggers extends ViewBase
         for (var i in this.triggerTimeouts) {
             clearTimeout(this.triggerTimeouts[i]);
         }
+        this.logLineQueue = [];
         this.triggerTimeouts = [];
         this.triggerVariables = {};
         // (re)load triggers
@@ -396,7 +397,7 @@ class ViewTriggers extends ViewBase
                     data = LZString.decompressFromBase64(data)
                 }
                 try {
-                    data = JSON.parse(data);
+                    data = YAML.parse(data);
                     break;
                 } catch (e) {
                     try {
@@ -561,9 +562,10 @@ class ViewTriggers extends ViewBase
         vm.realm.global.me = this.userConfig["character_name"];
         vm.realm.global.data = {};
         var triggerFuncTimeout = function(func, delay) {
-            var delay = parseInt(delay ? delay : 1);
-            if (isNaN(delay)) {
-                delay = 1;
+            var delay = parseInt(delay ? delay : 0);
+            if (isNaN(delay) || !delay) {
+                func();
+                return;
             }
             t.triggerTimeouts.push(
                 setTimeout(func, delay)
@@ -818,7 +820,7 @@ class ViewTriggers extends ViewBase
             return;
         }
         for (var i in this.triggers) {
-            this.triggers[i].onLogLine(logLineData, this.currentZone)
+            this.triggers[i].onLogLine(logLineData);
         }
     }
 

@@ -1,3 +1,7 @@
+DEVELOPMENT
+- Fixed timing delay issue with all trigger functions that supported delay.
+- Added support to import triggers in YAML.
+
 1.20
 - Added ability to import and export compressed base64 triggers.
 - Fixed bug in trigger enable/disable action functions.
