@@ -78,7 +78,20 @@ Custom functions available to trigger eval code...
 - do(string tid, integer delay): Execute the action of trigger with 'tid' identifier. Optional delay of 'delay' milliseconds.
 - disable(string tid, integer delay): Disable the trigger with 'tid' identifier. Optional delay of 'delay' milliseconds.
 - enable(string tid, integer delay): Enable the trigger with 'tid' identifier. Optional delay of 'delay' milliseconds.
+- wait(function callback, integer delay): Execute callback after given delay in milliseconds.
 - nameShortify(string name): Shorten a name down to first name.
+- set(string key, mixed value): Set a value that is accessible by other trigger actions.
+- get(string key): Get a value set with set.
+- log(mixed value): Dump value to console.
+
+Custom variables available to trigger eval code...
+
+- match: Array of matches from trigger regex.
+- logLine: The log line that triggered the current action.
+- triggerId: The current trigger id.
+- triggerZone: The zone the current trigger is set to.
+- triggerRegex: The trigger regex.
+- me: Character name entered in character name input text box.
 
 
 ## Running The Server On Your Own Machine

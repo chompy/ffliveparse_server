@@ -128,6 +128,15 @@ class ViewBase
     }
 
     /**
+     * Called when an encounter becomes inactive.
+     * @param {object} encounter 
+     */
+    onEncounterInactive(encounter)
+    {
+        return;
+    }
+
+    /**
      * Called when a combatant is added/updated.
      * @param {Combatant} combatant 
      */

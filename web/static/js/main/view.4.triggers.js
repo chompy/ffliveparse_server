@@ -149,10 +149,10 @@ class Trigger
         if (!this.regex) {
             return false;
         }
-        if (this.getZone() && currentZone && this.getZone() != currentZone) {
+        /*if (this.getZone() && currentZone && this.getZone() != currentZone) {
             return false;
-        }
-        var match = logLine.LogLine.match(this.regex);
+        }*/
+        var match = XRegExp.exec(logLine.LogLine, this.regex);
         if (!match) {
             return false;
         }
@@ -223,11 +223,13 @@ class ViewTriggers extends ViewBase
 
     reset()
     {
+        console.log(">> Trigger, reset.");
         // cancel all trigger timeouts
         for (var i in this.triggerTimeouts) {
             clearTimeout(this.triggerTimeouts[i]);
         }
         this.triggerTimeouts = [];
+        this.triggerVariables = {};
         // (re)load triggers
         this.loadTriggers();
     }
@@ -253,10 +255,10 @@ class ViewTriggers extends ViewBase
 
         var triggerSelectAllDiv = document.createElement("div")
         triggerSelectAllDiv.classList.add("trigger-config-select-all", "trigger-config-input");
-        var triggerSelectAllInput = document.createElement("input");
-        triggerSelectAllInput.type = "checkbox";
-        triggerSelectAllInput.title = "Select All";
-        triggerSelectAllDiv.appendChild(triggerSelectAllInput);
+        this.triggerSelectAllInput = document.createElement("input");
+        this.triggerSelectAllInput.type = "checkbox";
+        this.triggerSelectAllInput.title = "Select All";
+        triggerSelectAllDiv.appendChild(this.triggerSelectAllInput);
         triggerConfigDiv.appendChild(triggerSelectAllDiv);
 
         var triggerNameDiv = document.createElement("div");
@@ -364,6 +366,7 @@ class ViewTriggers extends ViewBase
         triggerNameInput.addEventListener("change", function(e) {
             t.userConfig["character_name"] = triggerNameInput.value;
             t.saveUserConfig();
+            t.loadTriggers();
         });
         // enable/disable tts
         triggerTtsCheckbox.addEventListener("change", function(e) {
@@ -371,10 +374,10 @@ class ViewTriggers extends ViewBase
             t.saveUserConfig();
         });
         // select all
-        triggerSelectAllInput.addEventListener("change", function(e) {
+        this.triggerSelectAllInput.addEventListener("change", function(e) {
             var checkboxes = t.triggerListDiv.getElementsByTagName("input");
             for (var i = 0; i < checkboxes.length; i++) {
-                checkboxes[i].checked = true;
+                checkboxes[i].checked = t.triggerSelectAllInput.checked;
             }
         });
     }
@@ -394,9 +397,11 @@ class ViewTriggers extends ViewBase
                 }
                 try {
                     data = JSON.parse(data);
+                    break;
                 } catch (e) {
                     try {
                         data = this.convertActXML(data);
+                        break;
                     } catch (e) {
                         if (i == 1) {
                             throw "Could not parse trigger data.";
@@ -410,16 +415,30 @@ class ViewTriggers extends ViewBase
             data = [data];
         }
         // itterate triggers
+        var importNewCount = 0;
+        var importUpdateCount = 0;
+
         for (var i in data) {
             var trigger = new Trigger(data[i], new Vm());
             if (!trigger.isValid()) {
                 console.log(">> Trigger, import error, tried to import trigger without an ID (i).")
                 continue; 
             }
+            if (trigger.getId() in this.userConfig["triggers"]) {
+                importUpdateCount++;
+            } else {
+                importNewCount++
+            }
             this.userConfig["triggers"][trigger.getId()] = trigger.data;
             console.log(">> Trigger, imported '" + trigger.getId() + ".'");
         }
-        this.importStatusDiv.innerText = "Imported " + data.length + " trigger(s).";
+        this.importStatusDiv.innerText = "";
+        if (importNewCount > 0) {
+            this.importStatusDiv.innerText = "Added " + importNewCount + " trigger(s). ";
+        }
+        if (importUpdateCount > 0) {
+            this.importStatusDiv.innerText = "Updated " + importUpdateCount + " trigger(s).";
+        }
         // save user config
         this.saveUserConfig();
         // reset triggers
@@ -516,19 +535,22 @@ class ViewTriggers extends ViewBase
      */
     triggerIsChildOf(child, parent)
     {
-        var childParentId = child.getParentId();
-        while (childParentId) {
-            // found parent
-            if (childParentId == parent.getId()) {
-                return true;
-            }
-            for (var i in this.triggers) {
-                if (this.triggers[i].getId() == childParentId) {
-                    childParentId = this.triggers[i].getParentId();
+        if (!child.getParentId()) {
+            return false;
+        }
+        if (child.getParentId() == parent.getId()) {
+            return true;
+        }
+        var parentIds = [child.getParentId()];
+        for (var i in this.triggers) {
+            var trigger = this.triggers[i];
+            if (parentIds.indexOf(trigger.getId()) != -1) {
+                if (trigger.getParentId()) {
+                    parentIds.push(trigger.getParentId());
                 }
             }
         }
-        return false;
+        return parentIds.indexOf(parent.getId()) != -1;
     }
 
     loadTriggers()
@@ -536,6 +558,8 @@ class ViewTriggers extends ViewBase
         // create trigger condition+action vm
         var t = this;
         var vm = new Vm();
+        vm.realm.global.me = this.userConfig["character_name"];
+        vm.realm.global.data = {};
         var triggerFuncTimeout = function(func, delay) {
             var delay = parseInt(delay ? delay : 1);
             if (isNaN(delay)) {
@@ -546,24 +570,37 @@ class ViewTriggers extends ViewBase
             );
         };
         var triggerEnable = function(tid, enable) {
+            var count = 0;
             for (var i in t.triggers) {
                 var trigger = t.triggers[i];
                 if (trigger.getId() == tid) {
+                    count++;
                     trigger.enabled = enable;
                     for (var j in t.triggers) {
                         if (t.triggerIsChildOf(t.triggers[j], trigger)) {
+                            count++;
                             t.triggers[j].enabled = enable;
                         }
                     }
-
                 }
-            }            
+            }
+            if (count > 0) {
+                if (enable) {
+                    console.log(">> Trigger, ENABLE, " + tid + ", " + count + " trigger(s).");
+                    return;
+                }
+                console.log(">> Trigger, DISABLE, " + tid + ", " + count + " trigger(s).");
+            }
         }
         // SAY
         vm.realm.global.say = function(text, delay) {
             var text = text;
             triggerFuncTimeout(
                 function() {
+                    console.log(">> Trigger, SAY, " + text);
+                    if (!t.userConfig["enable_tts"]) {
+                        return;
+                    }
                     var msg = new SpeechSynthesisUtterance(text);
                     window.speechSynthesis.speak(msg);      
                 },
@@ -578,12 +615,20 @@ class ViewTriggers extends ViewBase
                     for (var i in t.triggers) {
                         var trigger = t.triggers[i];
                         if (trigger.getId() == tid) {
+                            console.log(">> Trigger, DO, " + tid);
                             return trigger.performAction();
                         }
                     }
                 },
                 delay
             );
+        };
+        // WAIT
+        vm.realm.global.wait = function(callback, delay) {
+            triggerFuncTimeout(
+                callback,
+                delay
+            )
         };
         // ENABLE
         vm.realm.global.enable = function(tid, delay) {
@@ -622,6 +667,19 @@ class ViewTriggers extends ViewBase
             }
             return parseLogLine(logLine);
         };
+        // SET
+        vm.realm.global.set = function(key, value) {
+            console.log(">> Trigger, SET, " + key + " = " + value);
+            t.triggerVariables[key] = value;
+        };
+        // GET
+        vm.realm.global.get = function(key) {
+            return key in t.triggerVariables ? t.triggerVariables[key] : null;
+        }
+        // LOG
+        vm.realm.global.log = function(value) {
+            console.log(">> Trigger, log, ", value);
+        }
         // load triggers with VM
         this.triggers = [];
         for (var tid in this.userConfig["triggers"]) {
@@ -664,6 +722,7 @@ class ViewTriggers extends ViewBase
         }
         this.triggerListDiv.appendChild(this.triggerDeleteBtn);
         this.triggerListDiv.appendChild(this.triggerExportBtn);
+        setTimeout(function(){ fflpFixFooter(); }, 500);
     }
 
     addTriggerElement(trigger, level)
@@ -693,7 +752,10 @@ class ViewTriggers extends ViewBase
         triggerNameLabelElement.setAttribute("for", elementId);
         triggerNameElement.appendChild(triggerNameLabelElement);
 
-        setTimeout(function(){ fflpFixFooter(); }, 500);
+        var t = this;
+        triggerSelectElement.addEventListener("change", function(e) {
+            t.triggerSelectAllInput.checked = false;
+        });      
     }
 
 
@@ -762,7 +824,13 @@ class ViewTriggers extends ViewBase
 
     onEncounter(encounter)
     {
+        this.reset();
         this.zoneName = encounter.data.Zone;
+    }
+
+    onEncounterInactive(encounter)
+    {
+        this.reset();
     }
 
 }

@@ -37,6 +37,8 @@ class Application
         this.views = {};
         // connection flag
         this.connected = false;
+        // ready flag
+        this.ready = false;
         // workers
         this.workers = [];
         // user config
@@ -180,15 +182,21 @@ class Application
                         t.loadingProgressElement.classList.add("hide");
                         t.loadingMessageElement.classList.add("hide");
                         clearTimeout(onReadyTimeout);
-                        onReadyTimeout = setTimeout(
-                            function() {
-                                console.log(">> Ready.");
-                                for (var i in t.views) {
-                                    t.views[i].onReady();
-                                }
-                            },
-                            1000
-                        ); 
+                        if (!t.ready) {
+                            onReadyTimeout = setTimeout(
+                                function() {
+                                    if (t.ready) {
+                                        return;
+                                    }
+                                    t.ready = true;
+                                    console.log(">> Ready.");
+                                    for (var i in t.views) {
+                                        t.views[i].onReady();
+                                    }
+                                },
+                                1000
+                            );
+                        }
                         break;
                     }
                     case "error":
@@ -256,7 +264,7 @@ class Application
         var lastEncounterUid = null;
         window.addEventListener("act:encounter", function(e) {
             if (!t.encounter || e.detail.UID != t.encounter.data.UID) {
-                console.log(">> Receieved new encounter, ", e.detail);
+                console.log(">> Encounter active, ", e.detail);
                 lastEncounterUid = e.detail.UID;
                 t.combatantCollector.reset();
                 t.actionCollector.reset();
@@ -269,7 +277,14 @@ class Application
                 return;
             }
             t.encounter.update(e.detail);
+            if (t.encounter && !e.detail.Active) {
+                console.log(">> Encounter inactive, ", e.detail);
+                for (var i in t.views) {
+                    t.views[i].onEncounterInactive(t.encounter);
+                } 
+            }
         });
+        
         // add/update combatant
         window.addEventListener("act:combatant", function(e) {
             var combatant = t.combatantCollector.update(e.detail);
