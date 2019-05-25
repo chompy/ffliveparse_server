@@ -1,4 +1,4 @@
-.view-table, .view-stream
+#view-table, #view-stream
   .combatant-head
     font-weight: bold
     background: #2d2d2d

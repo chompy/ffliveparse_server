@@ -1,4 +1,4 @@
-.view-stream
+#view-stream
   #loading-message
     display: none !important
   .combatant-head

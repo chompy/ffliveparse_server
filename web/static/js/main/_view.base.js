@@ -227,4 +227,37 @@ class ViewBase
         ;            
     }
 
+    getActionIcon(action)
+    {
+        var actionData = null;
+        switch (action.type) {
+            case ACTION_TYPE_NORMAL:
+            {
+                actionData = this.actionData.getActionById(action.data.actionId);
+                break;
+            }
+            case ACTION_TYPE_GAIN_STATUS_EFFECT:
+            case ACTION_TYPE_LOSE_STATUS_EFFECT:
+            {
+                actionData = this.statusData.getStatusByName(action.data.actionName);
+                break;
+            }
+        }
+        // get icon image
+        var actionImageSrc = "/static/img/enemy.png";
+        if (!actionData && action.type == ACTION_TYPE_DEATH) {
+            actionImageSrc = "/static/img/death.png";
+        } else if (actionData && actionData.name == "Attack") {
+            actionImageSrc = "/static/img/attack.png";
+        } else if (!actionData && ["Attack", "Shot"].indexOf(action.data.actionName) != -1) {
+            actionImageSrc = "/static/img/attack.png";
+        } else if (actionData && actionData.icon) {
+            actionImageSrc = ACTION_DATA_BASE_URL + actionData.icon;
+            if ([ACTION_TYPE_GAIN_STATUS_EFFECT, ACTION_TYPE_LOSE_STATUS_EFFECT].indexOf(action.type) != -1) {
+                actionImageSrc = STATUS_DATA_BASE_URL + actionData.icon;
+            }
+        }
+        return actionImageSrc;
+    }
+
 }

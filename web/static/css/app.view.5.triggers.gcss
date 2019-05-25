@@ -1,4 +1,4 @@
-.view-triggers
+#view-triggers
   .trigger-import
     background: #2d2d2d
     padding: 20px 23px 13px 20px

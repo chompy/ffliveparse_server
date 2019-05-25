@@ -70,6 +70,7 @@ class Application
             new ViewCombatantTable(this.combatantCollector, this.actionCollector),
             new ViewCombatantStream(this.combatantCollector, this.actionCollector),
             new ViewTimeline(this.combatantCollector, this.actionCollector),
+            new ViewLogs(this.combatantCollector, this.actionCollector),
             new ViewTriggers(this.combatantCollector, this.actionCollector),
         ];
         // init all views
