@@ -5,9 +5,9 @@
     background-color: #2d2d2d
     padding: 15px 0px
     .action
-      height: 42px
-      line-height: 42px
-      padding: 0px 15px
+      min-height: 32px
+      line-height: 12px
+      padding: 6px 15px
       &:nth-child(even)
         background-color: #3c3c3c
       .action-time
@@ -15,19 +15,43 @@
         vertical-align: 10px
         font-size: 14px
         margin-right: 15px
+      .action-source
+        margin-right: 3px
       .action-combatant, .action-icon
         display: inline-block
         img
           max-width: 32px
-      .action-targets
+      .action-icon
+        position: relative
         display: inline-block
-        margin-left: 5px
-        &::before
+        .action-icon-inner
+          display: inline-block
+          min-width: 32px
+          text-align: center
+        &::after
+          margin-left: 5px
           display: inline-block
           content: "»"
           width: 13px
           vertical-align: 10px
-          height: 32px
+      .action-targets
+        display: inline-block
+        margin-left: 5px
+        line-height: 24px
+        margin-top: 12px
+      &.action-gain-effect .action-icon::before, &.action-lose-effect .action-icon::before
+        position: absolute
+        display: inline-block
+        content: "+"
+        line-height: 14px
+        top: 0
+        font-size: 22px
+        left: 0
+        text-shadow: 1px 1px 1px #000
+      &.action-lose-effect .action-icon::before
+        content: "-"
+      &.action-death
+        background-color: #724444
       .action-damage
         display: inline-block
         line-height: 14px
@@ -36,6 +60,7 @@
         margin-left: 3px
         margin-right: 8px
         color: #cf8f8f
+        min-width: 70px
         &::before
           display: inline-block
           content: "-"

@@ -51,6 +51,7 @@ class ViewLogs extends ViewBase
     reset()
     {
         this.offset = 0;
+        this.lastAddedAction = null;
         this.logContainerElement.innerHTML = "";
     }
 
@@ -105,12 +106,22 @@ class ViewLogs extends ViewBase
         if (!action.displayAction || !action.type) {
             return;
         }
+        if (
+            this.lastAddedAction && 
+            action.type == this.lastAddedAction.type &&
+            action.data.actionName == this.lastAddedAction.data.actionName &&
+            action.time.getTime() == this.lastAddedAction.time.getTime()
+        ) {
+            console.log(action.data.actionId);
+            return;
+        }
+
         var logElement = document.createElement("div");
         logElement.classList.add("action", "action-" + action.type)
         
+        // create time element
         var timeElement = document.createElement("div");
         timeElement.classList.add("action-time")
-
         var timeElasped = new Date(action.time - this.encounter.data.StartTime);
         timeElement.innerText = (timeElasped.getMinutes() < 0 ? "0" : "") + 
         timeElasped.getMinutes() + ":" + 
@@ -122,62 +133,52 @@ class ViewLogs extends ViewBase
         ;
         logElement.appendChild(timeElement);
 
-        switch (action.type)
-        {
-            case ACTION_TYPE_NORMAL:
-            {
+        // create source element
+        var sourceCombatantElement = this.createCombatantElement(
+            action.sourceCombatant,
+            action.data.sourceName
+        );
+        sourceCombatantElement.classList.add("action-source");
+        logElement.appendChild(sourceCombatantElement);
 
-                // create source element
-                var sourceCombatantElement = this.createCombatantElement(
-                    action.sourceCombatant,
-                    action.data.sourceName
-                );
-                sourceCombatantElement.classList.add("action-source");
+        // create action element
+        var actionIcon = this.getActionIcon(action);
+        var actionIconElement = document.createElement("div");
+        actionIconElement.classList.add("action-icon");
+        var actionIconInnerElement = document.createElement("div");
+        actionIconInnerElement.classList.add("action-icon-inner");
+        actionIconElement.appendChild(actionIconInnerElement);
+        var actionIconImgElement = document.createElement("img");
+        actionIconImgElement.src = actionIcon;
+        actionIconImgElement.alt = action.data.actionName;
+        actionIconImgElement.title = actionIconImgElement.alt;
+        actionIconInnerElement.appendChild(actionIconImgElement);
 
-                logElement.appendChild(sourceCombatantElement);
+        logElement.appendChild(actionIconElement);
 
-                // create action element
-                var actionIcon = this.getActionIcon(action);
-                var actionIconElement = document.createElement("div");
-                actionIconElement.classList.add("action-icon")
-                var actionIconImgElement = document.createElement("img");
-                actionIconImgElement.src = actionIcon;
-                actionIconImgElement.alt = action.data.actionName;
-                actionIconImgElement.title = actionIconImgElement.alt;
-                actionIconElement.appendChild(actionIconImgElement);
-                logElement.appendChild(actionIconElement);
-
-
-                var targetCombatantContainerElement = document.createElement("div");
-                targetCombatantContainerElement.classList.add("action-targets");
-
-                targetCombatantContainerElement.appendChild(
-                    this.createCombatantElement(
-                        action.targetCombatant,
-                        action.data.targetName,
-                        action
-                    )
-                );
-                for (var i in action.relatedActions) {
-                    targetCombatantContainerElement.appendChild(
-                        this.createCombatantElement(
-                            action.relatedActions[i].targetCombatant,
-                            action.relatedActions[i].data.targetName,
-                            action.relatedActions[i]
-                        )
-                    );
-                }
-
-                
-                logElement.appendChild(targetCombatantContainerElement);
-
-                break;
-            }
+        // create target elements
+        var targetCombatantContainerElement = document.createElement("div");
+        targetCombatantContainerElement.classList.add("action-targets");
+        targetCombatantContainerElement.appendChild(
+            this.createCombatantElement(
+                action.targetCombatant,
+                action.data.targetName,
+                action
+            )
+        );
+        for (var i in action.relatedActions) {
+            targetCombatantContainerElement.appendChild(
+                this.createCombatantElement(
+                    action.relatedActions[i].targetCombatant,
+                    action.relatedActions[i].data.targetName,
+                    action.relatedActions[i]
+                )
+            );
         }
-
-
+        logElement.appendChild(targetCombatantContainerElement);
 
         this.logContainerElement.appendChild(logElement);
+        this.lastAddedAction = action;
 
     }
 

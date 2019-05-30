@@ -33,6 +33,8 @@
       display: none
 
 @media (max-width: 320px)
-  .view-stream
+  #view-stream
     .combatant-row
       padding: 7px 5px !important
+    .combatant-col.damage
+      font-size: 18px

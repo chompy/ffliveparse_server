@@ -29,24 +29,31 @@ import (
 )
 
 func readUint16(data []byte, pos *int) uint16 {
+	if len(data)-*pos < 2 {
+		return 0
+	}
 	dataString := data[*pos : *pos+2]
 	*pos += 2
 	return binary.BigEndian.Uint16(dataString)
 }
 
 func readUint32(data []byte, pos *int) uint32 {
+	if len(data)-*pos < 4 {
+		return 0
+	}
 	dataString := data[*pos : *pos+4]
 	*pos += 4
 	return binary.BigEndian.Uint32(dataString)
 }
 
 func readInt32(data []byte, pos *int) int32 {
-	dataString := data[*pos : *pos+4]
-	*pos += 4
-	return int32(binary.BigEndian.Uint32(dataString))
+	return int32(readUint32(data, pos))
 }
 
 func readByte(data []byte, pos *int) byte {
+	if len(data)-*pos < 1 {
+		return 0
+	}
 	output := data[*pos]
 	*pos++
 	return output
@@ -54,6 +61,9 @@ func readByte(data []byte, pos *int) byte {
 
 func readString(data []byte, pos *int) string {
 	length := int(readUint16(data, pos))
+	if length == 0 || len(data)-*pos < length {
+		return ""
+	}
 	output := string(data[*pos : *pos+length])
 	*pos += length
 	return output
