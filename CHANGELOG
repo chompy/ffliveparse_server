@@ -1,4 +1,5 @@
 DEVELOPMENT
+- Log file clean up function.
 - Fixed timing delay issue with all trigger functions that supported delay.
 - Added support to import triggers in YAML.
 

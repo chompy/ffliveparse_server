@@ -45,6 +45,9 @@ func main() {
 	actManager := act.NewManager(&events, &userManager, *devModePtr)
 	defer actManager.ClearAllData()
 
+	// clean up old encounters
+	act.CleanUpEncounters()
+
 	// start http server
 	go web.HTTPStartServer(uint16(*httpPort), &userManager, &actManager, &events, *devModePtr)
 

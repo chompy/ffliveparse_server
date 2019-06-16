@@ -47,6 +47,9 @@ const logLineRetainCount = 1000
 // PastEncounterFetchLimit - Max number of past encounters to fetch in one request
 const PastEncounterFetchLimit = 10
 
+// encounterCleanUpDays - Number of days that should pass before deleting encounter logs
+const encounterCleanUpDays = 90
+
 // Data - data about an ACT session
 type Data struct {
 	Session            Session
@@ -61,7 +64,7 @@ type Data struct {
 
 // NewData - create new ACT session data
 func NewData(session Session, user user.Data) (Data, error) {
-	database, err := getDatabase(user)
+	database, err := getDatabase()
 	if err != nil {
 		return Data{}, err
 	}
@@ -104,11 +107,16 @@ func (d *Data) GetLogTempPath() string {
 	return path.Join(os.TempDir(), fmt.Sprintf("fflp_LogLine_%s.dat", d.EncounterCollector.Encounter.UID))
 }
 
+// getPermanentLogPath - Get path to permanent log file from uid
+func getPermanentLogPath(uid string) string {
+	return filepath.Join(app.LogPath, uid+"_LogLines.dat")
+}
+
 // GetLogPath - Get path to log lines file
 func (d *Data) GetLogPath() string {
 	tempPath := d.GetLogTempPath()
 	if _, err := os.Stat(tempPath); os.IsNotExist(err) {
-		return filepath.Join(app.LogPath, d.EncounterCollector.Encounter.UID+"_LogLines.dat")
+		return getPermanentLogPath(d.EncounterCollector.Encounter.UID)
 	}
 	return tempPath
 }
@@ -173,8 +181,8 @@ func (d *Data) DumpLogLineBuffer() error {
 	return nil
 }
 
-// getDatabase - get encounter database for given user
-func getDatabase(user user.Data) (*sql.DB, error) {
+// getDatabase - get encounter database
+func getDatabase() (*sql.DB, error) {
 	// open database connection
 	database, err := sql.Open("sqlite3", app.DatabasePath)
 	if err != nil {
@@ -251,7 +259,7 @@ func (d *Data) SaveEncounter() error {
 		return nil
 	}
 	// get database
-	database, err := getDatabase(d.User)
+	database, err := getDatabase()
 	if err != nil {
 		return err
 	}
@@ -363,7 +371,7 @@ func (d *Data) ClearEncounter() {
 // GetPreviousEncounter - retrieve previous encounter data from database
 func GetPreviousEncounter(user user.Data, encounterUID string, fetchLogs bool) (Data, error) {
 	// get database
-	database, err := getDatabase(user)
+	database, err := getDatabase()
 	if err != nil {
 		return Data{}, err
 	}
@@ -406,6 +414,7 @@ func GetPreviousEncounter(user user.Data, encounterUID string, fetchLogs bool) (
 	combatantCollector := NewCombatantCollector(&user)
 	var parentID sql.NullInt64
 	var worldName sql.NullString
+	var actName sql.NullString
 	for rows.Next() {
 		combatant := Combatant{}
 		err := rows.Scan(
@@ -413,7 +422,7 @@ func GetPreviousEncounter(user user.Data, encounterUID string, fetchLogs bool) (
 			&parentID,
 			&combatant.EncounterUID,
 			&combatant.Name,
-			&combatant.ActName,
+			&actName,
 			&worldName,
 			&combatant.Job,
 			&combatant.Damage,
@@ -429,6 +438,9 @@ func GetPreviousEncounter(user user.Data, encounterUID string, fetchLogs bool) (
 		}
 		if worldName.Valid {
 			combatant.World = worldName.String
+		}
+		if actName.Valid {
+			combatant.ActName = actName.String
 		}
 		if err != nil {
 			return Data{}, err
@@ -451,7 +463,7 @@ func GetPreviousEncounter(user user.Data, encounterUID string, fetchLogs bool) (
 // GetPreviousEncounters - retrieve list of previous encounters
 func GetPreviousEncounters(user user.Data, offset int) ([]Data, error) {
 	// get database
-	database, err := getDatabase(user)
+	database, err := getDatabase()
 	if err != nil {
 		return nil, err
 	}
@@ -494,7 +506,7 @@ func GetPreviousEncounters(user user.Data, offset int) ([]Data, error) {
 // GetPreviousEncounterCount - get total number of previous encounters
 func GetPreviousEncounterCount(user user.Data) (int, error) {
 	// get database
-	database, err := getDatabase(user)
+	database, err := getDatabase()
 	if err != nil {
 		return 0, err
 	}
@@ -525,4 +537,47 @@ func GetPreviousEncounterCount(user user.Data) (int, error) {
 func (d *Data) IsActive() bool {
 	dur := time.Now().Sub(d.LastUpdate)
 	return int64(dur/time.Millisecond) < lastUpdateInactiveTime
+}
+
+// CleanUpEncounters - delete log files for old encounters
+func CleanUpEncounters() (int, error) {
+	log.Println("[CLEAN] Begin log clean up.")
+	// get database
+	database, err := getDatabase()
+	if err != nil {
+		return 0, err
+	}
+	defer database.Close()
+	cleanUpDate := time.Now().Add(time.Duration(-encounterCleanUpDays*24) * time.Hour)
+	// fetch encounters
+	rows, err := database.Query(
+		"SELECT uid FROM encounter WHERE DATETIME(start_time) < ?",
+		cleanUpDate,
+	)
+	if err != nil {
+		return 0, err
+	}
+	cleanUpCount := 0
+	for rows.Next() {
+		var uid sql.NullString
+		err = rows.Scan(
+			&uid,
+		)
+		if err != nil || !uid.Valid {
+			continue
+		}
+		logPath := getPermanentLogPath(uid.String)
+		if _, err := os.Stat(logPath); os.IsNotExist(err) {
+			continue
+		}
+		err = os.Remove(logPath)
+		if err != nil {
+			log.Println("[CLEAN] Error", uid.String, err.Error())
+		}
+		log.Println("[CLEAN]", uid.String)
+		cleanUpCount++
+	}
+	rows.Close()
+	log.Println("[CLEAN] Completed. Removed", cleanUpCount, "log(s).")
+	return cleanUpCount, nil
 }
