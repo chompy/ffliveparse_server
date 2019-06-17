@@ -12,6 +12,22 @@
     <div id="encounter-content">
         <h2>Past Encounters for {{ .WebIDString }}</h2>
 
+        <div class="encounter-search">
+            <form name="encounter-search" method="GET" action="">
+                <input type="text" name="search" placeholder="Player name, zone name" value="{{ .HistorySearchQuery }}" />
+                <label>
+                    From
+                    <input type="date" name="start" value="{{ .HistoryStartDate }}" />
+                </label>
+                <label>
+                    To
+                    <input type="date" name="end" value="{{ .HistoryEndDate }}" />
+                </label>
+                <input type="hidden" name="tz" id="timezone" />
+                <input type="submit" value="Search" />
+            </form>
+        </div>
+
         <div class="encounter-item">
             <div class="encounter-time"><strong>Start Time</strong></div>
             <div class="encounter-zone"><strong>Zone</strong></div>
@@ -36,11 +52,11 @@
 
         <div class="encounter-pagination text-center">
             {{ if lt 1 .EncounterCurrentPage }}
-            <a href="/history/{{ .WebIDString }}?offset={{ .EncounterPrevPageOffset }}">&laquo; Previous</a>
+            <a href="/history/{{ .WebIDString }}?offset={{ .EncounterPrevPageOffset }}&{{ .QueryString }}">&laquo; Previous</a>
             {{ end }}
             {{ .EncounterCurrentPage }} / {{ .EncounterTotalPage }}
             {{ if gt .EncounterTotalPage .EncounterCurrentPage }}
-            <a href="/history/{{ .WebIDString }}?offset={{ .EncounterNextPageOffset }}">Next &raquo;</a>
+            <a href="/history/{{ .WebIDString }}?offset={{ .EncounterNextPageOffset }}&{{ .QueryString }}">Next &raquo;</a>
             {{ end }}            
         </div>
 
@@ -49,6 +65,7 @@
 
 {{ define "scripts" }}
 <script type="text/javascript">
+    document.getElementById("timezone").value = new Date().getTimezoneOffset()
     var encounterTimeElements = document.getElementsByClassName("encounter-time");
     for (var i = 0; i < encounterTimeElements.length; i++) {
         var timestamp = encounterTimeElements[i].getAttribute("data-timestamp");

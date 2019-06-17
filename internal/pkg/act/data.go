@@ -369,7 +369,7 @@ func (d *Data) ClearEncounter() {
 }
 
 // GetPreviousEncounter - retrieve previous encounter data from database
-func GetPreviousEncounter(user user.Data, encounterUID string, fetchLogs bool) (Data, error) {
+func GetPreviousEncounter(user user.Data, encounterUID string) (Data, error) {
 	// get database
 	database, err := getDatabase()
 	if err != nil {
@@ -461,19 +461,43 @@ func GetPreviousEncounter(user user.Data, encounterUID string, fetchLogs bool) (
 }
 
 // GetPreviousEncounters - retrieve list of previous encounters
-func GetPreviousEncounters(user user.Data, offset int) ([]Data, error) {
+func GetPreviousEncounters(user user.Data, offset int, query string, start *time.Time, end *time.Time) ([]Data, error) {
 	// get database
 	database, err := getDatabase()
 	if err != nil {
 		return nil, err
 	}
 	defer database.Close()
+	// build query
+	params := make([]interface{}, 1)
+	params[0] = user.ID
+	dbQueryStr := "SELECT DISTINCT(uid) FROM encounter INNER JOIN combatant ON combatant.encounter_uid = encounter.uid"
+	dbQueryStr += " WHERE DATETIME(end_time) > DATETIME(start_time)"
+	dbQueryStr += " AND encounter.user_id = ?"
+	// search string
+	if query != "" {
+		dbQueryStr += " AND (zone LIKE ? OR combatant.name LIKE ?)"
+		params = append(params, "%"+query+"%", "%"+query+"%")
+	}
+	// start date
+	if start != nil {
+		dbQueryStr += " AND DATETIME(start_time) >= ?"
+		params = append(params, start)
+	} else {
+		dbQueryStr += " AND DATETIME(start_time) > '01-01-2019 00:00:00'"
+	}
+	// end date
+	if end != nil {
+		dbQueryStr += " AND DATETIME(end_time) <= ?"
+		params = append(params, end)
+	}
+	// limit, offset
+	dbQueryStr += " ORDER BY DATETIME(start_time) DESC LIMIT ? OFFSET ?"
+	params = append(params, PastEncounterFetchLimit, offset)
 	// fetch encounters
 	rows, err := database.Query(
-		"SELECT uid FROM encounter WHERE DATETIME(start_time) > '01-01-2019 00:00:00' AND DATETIME(end_time) > DATETIME(start_time) AND user_id = ? ORDER BY DATETIME(start_time) DESC LIMIT ? OFFSET ?",
-		user.ID,
-		PastEncounterFetchLimit,
-		offset,
+		dbQueryStr,
+		params...,
 	)
 	if err != nil {
 		return nil, err
@@ -494,7 +518,7 @@ func GetPreviousEncounters(user user.Data, offset int) ([]Data, error) {
 	// get full encounter data with each uid
 	encounters := make([]Data, 0)
 	for _, encounterUID := range uidList {
-		prevEncounter, err := GetPreviousEncounter(user, encounterUID, false)
+		prevEncounter, err := GetPreviousEncounter(user, encounterUID)
 		if err != nil {
 			return nil, err
 		}
@@ -504,17 +528,41 @@ func GetPreviousEncounters(user user.Data, offset int) ([]Data, error) {
 }
 
 // GetPreviousEncounterCount - get total number of previous encounters
-func GetPreviousEncounterCount(user user.Data) (int, error) {
+func GetPreviousEncounterCount(user user.Data, query string, start *time.Time, end *time.Time) (int, error) {
 	// get database
 	database, err := getDatabase()
 	if err != nil {
 		return 0, err
 	}
 	defer database.Close()
+
+	// build query
+	params := make([]interface{}, 1)
+	params[0] = user.ID
+	dbQueryStr := "SELECT COUNT(DISTINCT(uid)) FROM encounter INNER JOIN combatant ON combatant.encounter_uid = encounter.uid"
+	dbQueryStr += " WHERE DATETIME(end_time) > DATETIME(start_time)"
+	dbQueryStr += " AND encounter.user_id = ?"
+	// search string
+	if query != "" {
+		dbQueryStr += " AND (zone LIKE ? OR combatant.name LIKE ?)"
+		params = append(params, "%"+query+"%", "%"+query+"%")
+	}
+	// start date
+	if start != nil {
+		dbQueryStr += " AND DATETIME(start_time) >= ?"
+		params = append(params, start)
+	} else {
+		dbQueryStr += " AND DATETIME(start_time) > '01-01-2019 00:00:00'"
+	}
+	// end date
+	if end != nil {
+		dbQueryStr += " AND DATETIME(end_time) <= ?"
+		params = append(params, end)
+	}
 	// fetch encounter counter
 	rows, err := database.Query(
-		"SELECT COUNT(*) FROM encounter WHERE DATETIME(start_time) > '01-01-2019 00:00:00' AND DATETIME(end_time) > DATETIME(start_time) AND user_id = ?",
-		user.ID,
+		dbQueryStr,
+		params...,
 	)
 	if err != nil {
 		return 0, err

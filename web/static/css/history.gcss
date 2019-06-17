@@ -1,5 +1,15 @@
 #encounter-content
   margin: 20px
+  .encounter-search
+    margin-bottom: 15px
+    input
+      vertical-align: middle
+      &[name=search]
+        margin-right: 15px
+        min-width: 200px
+    label
+      vertical-align: middle
+      font-size: 14px
   .encounter-item
     padding: 5px
     &.encounter-success, &.encounter-success a
@@ -17,11 +27,12 @@
       width: 15%
     .encounter-combatants
       width: 30%
-      &::after
-        display: inline
-        content: ", "
-      &:last-child::after
-        content: ""
+      .encounter-combatant
+        &::after
+          display: inline
+          content: ", "
+        &:last-child::after
+          content: ""
     .encounter-pagination
       margin-top: 15px
       font-size: 20px

@@ -70,6 +70,10 @@ type templateData struct {
 	EncounterTotalPage      int
 	EncounterNextPageOffset int
 	EncounterPrevPageOffset int
+	QueryString             template.URL
+	HistorySearchQuery      string
+	HistoryStartDate        string
+	HistoryEndDate          string
 }
 
 // websocketConnection - Websocket connection data associated with user data
@@ -168,7 +172,7 @@ func HTTPStartServer(port uint16, userManager *user.Manager, actManager *act.Man
 		// relay previous encounter data if encounter id was provided
 		if encounterUID != "" && (actData == nil || encounterUID != actData.EncounterCollector.Encounter.UID) {
 			log.Println("Load previous encounter data (EncounterUID:", encounterUID, ", UserID:", userData.ID, ")")
-			previousEncounter, err := act.GetPreviousEncounter(userData, encounterUID, true)
+			previousEncounter, err := act.GetPreviousEncounter(userData, encounterUID)
 			if err != nil {
 				log.Println("Error when retreiving previous encounter", encounterUID, "for user", userData.ID, ",", err)
 				return
@@ -294,9 +298,81 @@ func HTTPStartServer(port uint16, userManager *user.Manager, actManager *act.Man
 			offset = 0
 		}
 		// get encounters
-		td.Encounters, err = act.GetPreviousEncounters(userData, int(offset))
+		td.HistorySearchQuery = r.URL.Query().Get("search")
+		td.HistoryStartDate = r.URL.Query().Get("start")
+		td.HistoryEndDate = r.URL.Query().Get("end")
+		tzOffsetStr := r.URL.Query().Get("tz")
+		td.QueryString = template.URL(
+			fmt.Sprintf(
+				"search=%s&start=%s&end=%s&tz=%s",
+				td.HistorySearchQuery,
+				td.HistoryStartDate,
+				td.HistoryEndDate,
+				tzOffsetStr,
+			),
+		)
+		tzOffset := 0
+		if tzOffsetStr != "" {
+			tzOffset, err = strconv.Atoi(tzOffsetStr)
+			if err != nil {
+				displayError(
+					w,
+					"Error parsing time zone \""+tzOffsetStr+".\"",
+					http.StatusInternalServerError,
+				)
+				log.Println("Error when parsing time zone", tzOffsetStr, ",", err)
+				return
+			}
+		}
+		var startTime *time.Time
+		if td.HistoryStartDate != "" {
+			_startTime, err := time.Parse(
+				time.RFC3339,
+				fmt.Sprintf(td.HistoryStartDate+"T00:00:00-%02d:00", tzOffset/60),
+			)
+			startTime = &_startTime
+			if err != nil {
+				displayError(
+					w,
+					"Error parsing start date \""+td.HistoryStartDate+".\"",
+					http.StatusInternalServerError,
+				)
+				log.Println("Error when parsing start date", td.HistoryStartDate, ",", err)
+				return
+			}
+			log.Println(startTime.Format(time.RFC3339))
+		}
+		var endTime *time.Time
+		if td.HistoryEndDate != "" {
+			_endTime, err := time.Parse(
+				time.RFC3339,
+				fmt.Sprintf(td.HistoryEndDate+"T00:00:00-%02d:00", tzOffset/60),
+			)
+			endTime = &_endTime
+			if err != nil {
+				displayError(
+					w,
+					"Error parsing end date \""+td.HistoryEndDate+".\"",
+					http.StatusInternalServerError,
+				)
+				log.Println("Error when parsing end date", td.HistoryEndDate, ",", err)
+				return
+			}
+		}
+		td.Encounters, err = act.GetPreviousEncounters(
+			userData,
+			int(offset),
+			td.HistorySearchQuery,
+			startTime,
+			endTime,
+		)
 		if err == nil {
-			totalEncounterCount, err := act.GetPreviousEncounterCount(userData)
+			totalEncounterCount, err := act.GetPreviousEncounterCount(
+				userData,
+				td.HistorySearchQuery,
+				startTime,
+				endTime,
+			)
 			if err == nil {
 				td.EncounterTotalPage = int(math.Floor(float64(totalEncounterCount)/float64(act.PastEncounterFetchLimit))) + 1
 				if offset > totalEncounterCount-act.PastEncounterFetchLimit {
@@ -317,7 +393,7 @@ func HTTPStartServer(port uint16, userManager *user.Manager, actManager *act.Man
 			return
 		}
 		// render encounters template
-		htmlTemplates["encounters.tmpl"].ExecuteTemplate(w, "base.tmpl", td)
+		htmlTemplates["history.tmpl"].ExecuteTemplate(w, "base.tmpl", td)
 	})
 	// setup main page/index
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
