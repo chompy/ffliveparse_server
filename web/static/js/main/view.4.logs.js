@@ -35,6 +35,7 @@ class ViewLogs extends ViewBase
         this.reset();
         this.encounter = null;
         var t = this;
+        this.tickTimeout = null;
         setTimeout(function() {
             t.onResize();
         }, 100);
@@ -53,6 +54,26 @@ class ViewLogs extends ViewBase
         this.offset = 0;
         this.lastAddedAction = null;
         this.logContainerElement.innerHTML = "";
+    }
+
+    tick()
+    {
+        clearTimeout(this.tickTimeout);
+        var t = this;
+        var actions = this.actionCollector.findByOffset(
+            this.offset,
+            -1
+        );
+        this.offset += actions.length;
+        for (var i in actions) {
+            this.addLogLineElement(actions[i]);
+        }
+        this.tickTimeout = setTimeout(
+            function() {
+                t.tick();
+            },
+            1000
+        );
     }
 
     /**
@@ -179,26 +200,13 @@ class ViewLogs extends ViewBase
 
         this.logContainerElement.appendChild(logElement);
         this.lastAddedAction = action;
-
-    }
-
-    onReady()
-    {
-        this.reset();
-        var actions = this.actionCollector.findByOffset(
-            this.offset,
-            -1
-        );
-        this.offset += actions.length;
-        for (var i in actions) {
-            this.addLogLineElement(actions[i]);
-        }
     }
 
     onEncounter(encounter)
     {
         this.encounter = encounter;
         this.reset();
+        this.tick();
     }
 
     onResize()
