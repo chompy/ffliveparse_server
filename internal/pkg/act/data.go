@@ -35,20 +35,8 @@ import (
 	_ "github.com/mattn/go-sqlite3" // sqlite driver
 )
 
-// lastUpdateInactiveTime - Time in ms between last data update before data is considered inactive
-const lastUpdateInactiveTime = 1800000 // 30 minutes
-
-// minEncounterSaveLength - Length encounter must be in order to save encounter data
-const minEncounterSaveLength = 20000 // 20 seconds
-
 // logLineRetainCount - Number of log lines to retain in memory before dumping to temp file
 const logLineRetainCount = 1000
-
-// PastEncounterFetchLimit - Max number of past encounters to fetch in one request
-const PastEncounterFetchLimit = 10
-
-// encounterCleanUpDays - Number of days that should pass before deleting encounter logs
-const encounterCleanUpDays = 90
 
 // Data - data about an ACT session
 type Data struct {
@@ -255,7 +243,7 @@ func (d *Data) SaveEncounter() error {
 	}
 	// ensure encounter meets min encounter length
 	duration := d.EncounterCollector.Encounter.EndTime.Sub(d.EncounterCollector.Encounter.StartTime)
-	if duration < minEncounterSaveLength*time.Millisecond {
+	if duration < app.MinEncounterSaveLength*time.Millisecond {
 		return nil
 	}
 	// get database
@@ -493,7 +481,7 @@ func GetPreviousEncounters(user user.Data, offset int, query string, start *time
 	}
 	// limit, offset
 	dbQueryStr += " ORDER BY DATETIME(start_time) DESC LIMIT ? OFFSET ?"
-	params = append(params, PastEncounterFetchLimit, offset)
+	params = append(params, app.PastEncounterFetchLimit, offset)
 	// fetch encounters
 	rows, err := database.Query(
 		dbQueryStr,
@@ -584,7 +572,7 @@ func GetPreviousEncounterCount(user user.Data, query string, start *time.Time, e
 // IsActive - Check if data is actively being updated (i.e. active ACT connection)
 func (d *Data) IsActive() bool {
 	dur := time.Now().Sub(d.LastUpdate)
-	return int64(dur/time.Millisecond) < lastUpdateInactiveTime
+	return int64(dur/time.Millisecond) < app.LastUpdateInactiveTime
 }
 
 // CleanUpEncounters - delete log files for old encounters
@@ -596,7 +584,7 @@ func CleanUpEncounters() (int, error) {
 		return 0, err
 	}
 	defer database.Close()
-	cleanUpDate := time.Now().Add(time.Duration(-encounterCleanUpDays*24) * time.Hour)
+	cleanUpDate := time.Now().Add(time.Duration(-app.EncounterCleanUpDays*24) * time.Hour)
 	// fetch encounters
 	rows, err := database.Query(
 		"SELECT uid FROM encounter WHERE DATETIME(start_time) < ?",

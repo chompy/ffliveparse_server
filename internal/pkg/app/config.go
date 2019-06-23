@@ -43,6 +43,18 @@ const TickRate = 3000
 // LogTickRate - how often log line data should be sent to web user in ms
 const LogTickRate = 1000
 
+// LastUpdateInactiveTime - Time in ms between last data update before data is considered inactive
+const LastUpdateInactiveTime = 1800000 // 30 minutes
+
+// MinEncounterSaveLength - Length encounter must be in order to save encounter data
+const MinEncounterSaveLength = 20000 // 20 seconds
+
+// PastEncounterFetchLimit - Max number of past encounters to fetch in one request
+const PastEncounterFetchLimit = 10
+
+// EncounterCleanUpDays - Number of days that should pass before deleting encounter logs
+const EncounterCleanUpDays = 90
+
 // GetVersionString - get version as string in format X.XX
 func GetVersionString() string {
 	return fmt.Sprintf("%.2f", float32(VersionNumber)/100.0)

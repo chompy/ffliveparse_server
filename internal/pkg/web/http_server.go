@@ -374,13 +374,13 @@ func HTTPStartServer(port uint16, userManager *user.Manager, actManager *act.Man
 				endTime,
 			)
 			if err == nil {
-				td.EncounterTotalPage = int(math.Floor(float64(totalEncounterCount)/float64(act.PastEncounterFetchLimit))) + 1
-				if offset > totalEncounterCount-act.PastEncounterFetchLimit {
-					offset = (td.EncounterTotalPage - 1) * act.PastEncounterFetchLimit
+				td.EncounterTotalPage = int(math.Floor(float64(totalEncounterCount)/float64(app.PastEncounterFetchLimit))) + 1
+				if offset > totalEncounterCount-app.PastEncounterFetchLimit {
+					offset = (td.EncounterTotalPage - 1) * app.PastEncounterFetchLimit
 				}
-				td.EncounterCurrentPage = 1 + int(math.Floor(float64(offset)/float64(act.PastEncounterFetchLimit)))
-				td.EncounterNextPageOffset = int(offset) + act.PastEncounterFetchLimit
-				td.EncounterPrevPageOffset = int(offset) - act.PastEncounterFetchLimit
+				td.EncounterCurrentPage = 1 + int(math.Floor(float64(offset)/float64(app.PastEncounterFetchLimit)))
+				td.EncounterNextPageOffset = int(offset) + app.PastEncounterFetchLimit
+				td.EncounterPrevPageOffset = int(offset) - app.PastEncounterFetchLimit
 			}
 		}
 		if err != nil {
@@ -586,6 +586,15 @@ func globalWsWriter(websocketConnections *[]websocketConnection, events *emitter
 					websocketConnection.connection,
 					event.Args[1],
 				)
+			}
+		}
+		for event := range events.On("stat:snapshot") {
+			statSnapshot := event.Args[0].(*app.StatSnapshot)
+			for _, websocketConnection := range *websocketConnections {
+				if websocketConnection.connection == nil || event.Args[0] != websocketConnection.userData.ID {
+					continue
+				}
+				statSnapshot.Connections.Web[websocketConnection.userData.ID]++
 			}
 		}
 	}

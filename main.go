@@ -34,6 +34,11 @@ func main() {
 	// create event emitter
 	events := emitter.Emitter{}
 
+	// create stat collector
+	statCollector := app.NewStatCollector(&events)
+	statCollector.TakeSnapshot()
+	go statCollector.Start()
+
 	// create user manager
 	userManager, err := user.NewManager()
 	defer userManager.Close()
