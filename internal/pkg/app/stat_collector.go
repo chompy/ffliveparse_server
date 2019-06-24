@@ -40,7 +40,7 @@ type StatSnapshot struct {
 	LogLinesPerMinute int       `json:"log_lines_per_minutes"`
 	Connections       struct {
 		Web map[int64]int `json:"web"`
-		ACT []int         `json:"act"`
+		ACT []int64       `json:"act"`
 	} `json:"connections"`
 }
 
@@ -76,7 +76,7 @@ func (s *StatCollector) TakeSnapshot() {
 	snapshot := StatSnapshot{
 		Time: time.Now(),
 	}
-	snapshot.Connections.ACT = make([]int, 0)
+	snapshot.Connections.ACT = make([]int64, 0)
 	snapshot.Connections.Web = map[int64]int{}
 	s.Snapshots = append(s.Snapshots, snapshot)
 	go s.events.Emit(

@@ -612,7 +612,6 @@ func snapshotListener(websocketConnections *[]websocketConnection, events *emitt
 		for event := range events.On("stat:snapshot") {
 			statSnapshot := event.Args[0].(*app.StatSnapshot)
 			statSnapshot.PageLoads = *pageLoads
-
 			if websocketConnections == nil {
 				break
 			}

@@ -299,6 +299,26 @@ func (m *Manager) doLogTick(userID int64) {
 	}
 }
 
+func (m *Manager) snapshotListener() {
+	for {
+		for event := range m.events.On("stat:snapshot") {
+			statSnapshot := event.Args[0].(*app.StatSnapshot)
+			logLineCount := 0
+			for _, data := range m.data {
+				logLineCount += data.LogLineCounter
+				statSnapshot.Connections.ACT = append(statSnapshot.Connections.ACT, data.User.ID)
+			}
+			statSnapshot.LogLinesPerMinute = logLineCount
+			encounterCount, _ := GetTotalEncounterCount()
+			combatantCount, _ := GetTotalCombatantCount()
+			userCount, _ := GetTotalUserCount()
+			statSnapshot.TotalEncounters = encounterCount
+			statSnapshot.TotalCombatants = combatantCount
+			statSnapshot.TotalUsers = userCount
+		}
+	}
+}
+
 // GetDataWithAddr - retrieve data with UDP address
 func (m *Manager) GetDataWithAddr(addr *net.UDPAddr) *Data {
 	for index, data := range m.data {

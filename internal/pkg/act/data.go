@@ -49,6 +49,7 @@ type Data struct {
 	NewTickData        bool
 	HasValidSession    bool
 	HasLogs            bool
+	LogLineCounter     int
 }
 
 // NewData - create new ACT session data
@@ -69,6 +70,7 @@ func NewData(session Session, user user.Data) (Data, error) {
 		CombatantCollector: NewCombatantCollector(&user),
 		LastUpdate:         time.Now(),
 		HasValidSession:    false,
+		LogLineCounter:     0,
 	}, nil
 }
 
@@ -112,6 +114,7 @@ func (d *Data) GetLogPath() string {
 
 // UpdateLogLine - Add log line to buffer
 func (d *Data) UpdateLogLine(logLine LogLine) {
+	d.LogLineCounter++
 	// update log last update flag
 	d.LastUpdate = time.Now()
 	// parse out log line details
@@ -657,4 +660,91 @@ func CleanUpEncounters() (int, error) {
 	rows.Close()
 	log.Println("[CLEAN] Completed. Removed", cleanUpCount, "log(s).")
 	return cleanUpCount, nil
+}
+
+// GetTotalEncounterCount - get total number of encounters
+func GetTotalEncounterCount() (int, error) {
+	// get database
+	database, err := getDatabase()
+	if err != nil {
+		return 0, err
+	}
+	defer database.Close()
+	// fetch encounters
+	rows, err := database.Query(
+		"SELECT COUNT(DISTINCT(uid)) FROM encounter WHERE DATETIME(start_time) > '01-01-2019 00:00:00'",
+	)
+	if err != nil {
+		return 0, err
+	}
+	// retrieve count
+	var count int
+	for rows.Next() {
+		err = rows.Scan(
+			&count,
+		)
+		if err != nil {
+			return 0, err
+		}
+	}
+	rows.Close()
+	return count, nil
+}
+
+// GetTotalCombatantCount - get total number of combatants
+func GetTotalCombatantCount() (int, error) {
+	// get database
+	database, err := getDatabase()
+	if err != nil {
+		return 0, err
+	}
+	defer database.Close()
+	// fetch combatants
+	rows, err := database.Query(
+		"SELECT COUNT(*) FROM combatant",
+	)
+	if err != nil {
+		return 0, err
+	}
+	// retrieve count
+	var count int
+	for rows.Next() {
+		err = rows.Scan(
+			&count,
+		)
+		if err != nil {
+			return 0, err
+		}
+	}
+	rows.Close()
+	return count, nil
+}
+
+// GetTotalUserCount - get total number of users
+func GetTotalUserCount() (int, error) {
+	// get database
+	database, err := getDatabase()
+	if err != nil {
+		return 0, err
+	}
+	defer database.Close()
+	// fetch users
+	rows, err := database.Query(
+		"SELECT COUNT(*) FROM user",
+	)
+	if err != nil {
+		return 0, err
+	}
+	// retrieve count
+	var count int
+	for rows.Next() {
+		err = rows.Scan(
+			&count,
+		)
+		if err != nil {
+			return 0, err
+		}
+	}
+	rows.Close()
+	return count, nil
 }
