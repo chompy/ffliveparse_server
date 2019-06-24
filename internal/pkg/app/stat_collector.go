@@ -76,6 +76,8 @@ func (s *StatCollector) TakeSnapshot() {
 	snapshot := StatSnapshot{
 		Time: time.Now(),
 	}
+	snapshot.Connections.ACT = make([]int, 0)
+	snapshot.Connections.Web = map[int64]int{}
 	s.Snapshots = append(s.Snapshots, snapshot)
 	go s.events.Emit(
 		"stat:snapshot",

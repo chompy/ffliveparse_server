@@ -1,4 +1,4 @@
-{{ define "title" }} :: Stats{{ end }}
+{{ define "title" }} :: History{{ end }}
 
 {{ define "headerLeft" }}
 <div id="web-id"><a href="/{{ .WebIDString }}">{{ .WebIDString }}</a></div>
@@ -29,6 +29,7 @@
         </div>
 
         <div class="encounter-item">
+            <div class="encounter-flags"><strong>Flags</strong></div>
             <div class="encounter-time"><strong>Start Time</strong></div>
             <div class="encounter-zone"><strong>Zone</strong></div>
             <div class="encounter-length"><strong>Length</strong></div>
@@ -37,6 +38,10 @@
 
         {{ range $val := .Encounters }}
         <div class="encounter-item{{ if eq $val.EncounterCollector.Encounter.SuccessLevel 1 }} encounter-success{{ end }}">
+            <div class="encounter-flags">
+                {{ if eq $val.EncounterCollector.Encounter.SuccessLevel 1 }}<span class="encounter-flag encounter-flag-success" title="Cleared">C</span>{{ end }}
+                {{ if eq $val.HasLogs true }}<span class="encounter-flag encounter-flag-logs" title="Log Data Available">L</span>{{ end }}
+            </div>
             <div class="encounter-time" data-timestamp="{{ $val.EncounterCollector.Encounter.StartTime.Unix }}"><a href="/{{ $val.User.GetWebIDString }}/{{ $val.EncounterCollector.Encounter.UID }}">?</a></div>
             <div class="encounter-zone">{{ $val.EncounterCollector.Encounter.Zone }}</div>
             <div class="encounter-length">{{ $val.EncounterCollector.Encounter.EndTime.Sub $val.EncounterCollector.Encounter.StartTime }}</div>

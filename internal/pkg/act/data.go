@@ -48,6 +48,7 @@ type Data struct {
 	LastUpdate         time.Time
 	NewTickData        bool
 	HasValidSession    bool
+	HasLogs            bool
 }
 
 // NewData - create new ACT session data
@@ -356,6 +357,59 @@ func (d *Data) ClearEncounter() {
 	d.CombatantCollector.Reset()
 }
 
+// getEncounterCombatants - fetch all combatants in an encounter
+func getEncounterCombatants(database *sql.DB, user user.Data, encounterUID string) (CombatantCollector, error) {
+	dbQueryStr := "SELECT id, parent_id, encounter_uid, name, act_name, world_name, job, damage,"
+	dbQueryStr += " damage_taken, damage_healed, deaths, hits, heals, kills FROM combatant"
+	dbQueryStr += " WHERE user_id = ? AND encounter_uid = ?"
+	rows, err := database.Query(
+		dbQueryStr,
+		user.ID,
+		encounterUID,
+	)
+	if err != nil {
+		return CombatantCollector{}, err
+	}
+	combatantCollector := NewCombatantCollector(&user)
+	var parentID sql.NullInt64
+	var worldName sql.NullString
+	var actName sql.NullString
+	for rows.Next() {
+		combatant := Combatant{}
+		err := rows.Scan(
+			&combatant.ID,
+			&parentID,
+			&combatant.EncounterUID,
+			&combatant.Name,
+			&actName,
+			&worldName,
+			&combatant.Job,
+			&combatant.Damage,
+			&combatant.DamageTaken,
+			&combatant.DamageHealed,
+			&combatant.Deaths,
+			&combatant.Hits,
+			&combatant.Heals,
+			&combatant.Kills,
+		)
+		if parentID.Valid {
+			combatant.ParentID = int32(parentID.Int64)
+		}
+		if worldName.Valid {
+			combatant.World = worldName.String
+		}
+		if actName.Valid {
+			combatant.ActName = actName.String
+		}
+		if err != nil {
+			return CombatantCollector{}, err
+		}
+		combatantCollector.UpdateCombatantTracker(combatant)
+	}
+	rows.Close()
+	return combatantCollector, nil
+}
+
 // GetPreviousEncounter - retrieve previous encounter data from database
 func GetPreviousEncounter(user user.Data, encounterUID string) (Data, error) {
 	// get database
@@ -391,51 +445,14 @@ func GetPreviousEncounter(user user.Data, encounterUID string) (Data, error) {
 	}
 	rows.Close()
 	// fetch combatants
-	rows, err = database.Query(
-		"SELECT id, parent_id, encounter_uid, name, act_name, world_name, job, damage, damage_taken, damage_healed, deaths, hits, heals, kills FROM combatant WHERE user_id = ? AND encounter_uid = ?",
-		user.ID,
+	combatantCollector, err := getEncounterCombatants(
+		database,
+		user,
 		encounterUID,
 	)
 	if err != nil {
 		return Data{}, err
 	}
-	combatantCollector := NewCombatantCollector(&user)
-	var parentID sql.NullInt64
-	var worldName sql.NullString
-	var actName sql.NullString
-	for rows.Next() {
-		combatant := Combatant{}
-		err := rows.Scan(
-			&combatant.ID,
-			&parentID,
-			&combatant.EncounterUID,
-			&combatant.Name,
-			&actName,
-			&worldName,
-			&combatant.Job,
-			&combatant.Damage,
-			&combatant.DamageTaken,
-			&combatant.DamageHealed,
-			&combatant.Deaths,
-			&combatant.Hits,
-			&combatant.Heals,
-			&combatant.Kills,
-		)
-		if parentID.Valid {
-			combatant.ParentID = int32(parentID.Int64)
-		}
-		if worldName.Valid {
-			combatant.World = worldName.String
-		}
-		if actName.Valid {
-			combatant.ActName = actName.String
-		}
-		if err != nil {
-			return Data{}, err
-		}
-		combatantCollector.UpdateCombatantTracker(combatant)
-	}
-	rows.Close()
 	// build encounter collector
 	encounterCollector := NewEncounterCollector(&user)
 	encounterCollector.Encounter = encounter
@@ -459,7 +476,8 @@ func GetPreviousEncounters(user user.Data, offset int, query string, start *time
 	// build query
 	params := make([]interface{}, 1)
 	params[0] = user.ID
-	dbQueryStr := "SELECT DISTINCT(uid) FROM encounter INNER JOIN combatant ON combatant.encounter_uid = encounter.uid"
+	dbQueryStr := "SELECT DISTINCT(uid), act_id, start_time, end_time, zone, encounter.damage, success_level"
+	dbQueryStr += " FROM encounter INNER JOIN combatant ON combatant.encounter_uid = encounter.uid"
 	dbQueryStr += " WHERE DATETIME(end_time) > DATETIME(start_time)"
 	dbQueryStr += " AND encounter.user_id = ?"
 	// search string
@@ -490,28 +508,51 @@ func GetPreviousEncounters(user user.Data, offset int, query string, start *time
 	if err != nil {
 		return nil, err
 	}
-	// fetch encounter uids
-	uidList := make([]string, 0)
+	// build encounter datas
+	encounters := make([]Data, 0)
 	for rows.Next() {
-		var encounterUID string
-		err = rows.Scan(
-			&encounterUID,
+		// build encounter
+		encounter := Encounter{}
+		err := rows.Scan(
+			&encounter.UID,
+			&encounter.ActID,
+			&encounter.StartTime,
+			&encounter.EndTime,
+			&encounter.Zone,
+			&encounter.Damage,
+			&encounter.SuccessLevel,
 		)
-		uidList = append(uidList, encounterUID)
 		if err != nil {
 			return nil, err
 		}
+		// determine if log file exists
+		hasLogs := true
+		logPath := getPermanentLogPath(encounter.UID)
+		if _, err := os.Stat(logPath); os.IsNotExist(err) {
+			hasLogs = false
+		}
+		// build collectors
+		encounterCollector := NewEncounterCollector(&user)
+		encounterCollector.Encounter = encounter
+		combatantCollector, err := getEncounterCombatants(
+			database,
+			user,
+			encounter.UID,
+		)
+		if err != nil {
+			return nil, err
+		}
+		// build data object
+		data := Data{
+			User:               user,
+			EncounterCollector: encounterCollector,
+			CombatantCollector: combatantCollector,
+			HasLogs:            hasLogs,
+		}
+		encounters = append(encounters, data)
+
 	}
 	rows.Close()
-	// get full encounter data with each uid
-	encounters := make([]Data, 0)
-	for _, encounterUID := range uidList {
-		prevEncounter, err := GetPreviousEncounter(user, encounterUID)
-		if err != nil {
-			return nil, err
-		}
-		encounters = append(encounters, prevEncounter)
-	}
 	return encounters, nil
 }
 

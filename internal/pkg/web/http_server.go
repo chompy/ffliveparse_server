@@ -20,6 +20,7 @@ package web
 import (
 	"bufio"
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"html/template"
 	"io/ioutil"
@@ -83,7 +84,7 @@ type websocketConnection struct {
 }
 
 // HTTPStartServer - Start HTTP server
-func HTTPStartServer(port uint16, userManager *user.Manager, actManager *act.Manager, events *emitter.Emitter, devMode bool) {
+func HTTPStartServer(port uint16, userManager *user.Manager, actManager *act.Manager, events *emitter.Emitter, statCollector *app.StatCollector, devMode bool) {
 	// load html templates
 	var err error
 	htmlTemplates, err = getTemplates()
@@ -157,7 +158,7 @@ func HTTPStartServer(port uint16, userManager *user.Manager, actManager *act.Man
 		// fetch user data
 		userData, err := userManager.LoadFromWebIDString(userID)
 		if err != nil {
-			log.Println("Error when attempting to retreive user", userID, ",", err)
+			log.Println("[ERROR] Error when attempting to retreive user", userID, ",", err)
 			return
 		}
 		// log
@@ -166,7 +167,7 @@ func HTTPStartServer(port uint16, userManager *user.Manager, actManager *act.Man
 		// get act data from web ID
 		actData, err := actManager.GetDataWithWebID(userID)
 		if err != nil {
-			log.Println("Error when attempting to retreive user", userID, ",", err)
+			log.Println("[ERROR] Error when attempting to retreive user", userID, ",", err)
 			return
 		}
 		// relay previous encounter data if encounter id was provided
@@ -174,7 +175,7 @@ func HTTPStartServer(port uint16, userManager *user.Manager, actManager *act.Man
 			log.Println("Load previous encounter data (EncounterUID:", encounterUID, ", UserID:", userData.ID, ")")
 			previousEncounter, err := act.GetPreviousEncounter(userData, encounterUID)
 			if err != nil {
-				log.Println("Error when retreiving previous encounter", encounterUID, "for user", userData.ID, ",", err)
+				log.Println("[ERROR] Error when retreiving previous encounter", encounterUID, "for user", userData.ID, ",", err)
 				return
 			}
 			sendInitData(ws, &previousEncounter)
@@ -182,7 +183,7 @@ func HTTPStartServer(port uint16, userManager *user.Manager, actManager *act.Man
 			// get act data from web ID
 			actData, err := actManager.GetDataWithWebID(userID)
 			if err != nil {
-				log.Println("Error when retreiving encounter", encounterUID, "for user", userData.ID, ",", err)
+				log.Println("[ERROR] Error when retreiving encounter", encounterUID, "for user", userData.ID, ",", err)
 				return
 			}
 			// send init data
@@ -216,7 +217,7 @@ func HTTPStartServer(port uint16, userManager *user.Manager, actManager *act.Man
 		// create a new user
 		userData, err := userManager.New()
 		if err != nil {
-			log.Println("Error occured while creating a new user,", err)
+			log.Println("[ERROR] Error occured while creating a new user,", err)
 			displayError(
 				w,
 				"An error occured while creating a new user ID.",
@@ -242,6 +243,22 @@ func HTTPStartServer(port uint16, userManager *user.Manager, actManager *act.Man
 		td.StatPageLoads = pageLoads
 		// render stats template
 		htmlTemplates["stats.tmpl"].ExecuteTemplate(w, "base.tmpl", td)
+	})
+	// display json stats
+	http.HandleFunc("/_stats_json", func(w http.ResponseWriter, r *http.Request) {
+		// set resposne headers
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+		jsonBytes, err := json.Marshal(statCollector)
+		if err != nil {
+			log.Println("[ERROR] Error occured while displaying stats,", err)
+			displayError(
+				w,
+				"An error occured while displaying stats",
+				http.StatusInternalServerError,
+			)
+			return
+		}
+		w.Write(jsonBytes)
 	})
 	// display past encounters
 	http.HandleFunc("/history/", func(w http.ResponseWriter, r *http.Request) {
@@ -274,7 +291,7 @@ func HTTPStartServer(port uint16, userManager *user.Manager, actManager *act.Man
 				"Unable to find session for user \""+webUID+".\"",
 				http.StatusNotFound,
 			)
-			log.Println("Error when attempting to retreive user", webUID, ",", err)
+			log.Println("[ERROR] Error when attempting to retreive user", webUID, ",", err)
 			return
 		}
 		addUserToTemplateData(&td, userData)
@@ -320,7 +337,7 @@ func HTTPStartServer(port uint16, userManager *user.Manager, actManager *act.Man
 					"Error parsing time zone \""+tzOffsetStr+".\"",
 					http.StatusInternalServerError,
 				)
-				log.Println("Error when parsing time zone", tzOffsetStr, ",", err)
+				log.Println("[ERROR] Error when parsing time zone", tzOffsetStr, ",", err)
 				return
 			}
 		}
@@ -337,10 +354,9 @@ func HTTPStartServer(port uint16, userManager *user.Manager, actManager *act.Man
 					"Error parsing start date \""+td.HistoryStartDate+".\"",
 					http.StatusInternalServerError,
 				)
-				log.Println("Error when parsing start date", td.HistoryStartDate, ",", err)
+				log.Println("[ERROR] Error when parsing start date", td.HistoryStartDate, ",", err)
 				return
 			}
-			log.Println(startTime.Format(time.RFC3339))
 		}
 		var endTime *time.Time
 		if td.HistoryEndDate != "" {
@@ -355,7 +371,7 @@ func HTTPStartServer(port uint16, userManager *user.Manager, actManager *act.Man
 					"Error parsing end date \""+td.HistoryEndDate+".\"",
 					http.StatusInternalServerError,
 				)
-				log.Println("Error when parsing end date", td.HistoryEndDate, ",", err)
+				log.Println("[ERROR] Error when parsing end date", td.HistoryEndDate, ",", err)
 				return
 			}
 		}
@@ -389,7 +405,7 @@ func HTTPStartServer(port uint16, userManager *user.Manager, actManager *act.Man
 				"Unable to fetch past encounters.",
 				http.StatusInternalServerError,
 			)
-			log.Println("Error when fetching patch encounter for", webUID, ",", err)
+			log.Println("[ERROR] Error when fetching patch encounter for", webUID, ",", err)
 			return
 		}
 		// render encounters template
@@ -420,7 +436,7 @@ func HTTPStartServer(port uint16, userManager *user.Manager, actManager *act.Man
 					"Unable to find session for user \""+webID+".\"",
 					http.StatusNotFound,
 				)
-				log.Println("Error when attempting to retreive user", webID, ",", err)
+				log.Println("[ERROR] Error when attempting to retreive user", webID, ",", err)
 				return
 			}
 			addUserToTemplateData(&td, userData)
@@ -443,6 +459,8 @@ func HTTPStartServer(port uint16, userManager *user.Manager, actManager *act.Man
 	})
 	// start thread for sending handling act events and sending data back to ws clients
 	go globalWsWriter(&websocketConnections, events)
+	// listen for snapshot events
+	go snapshotListener(&websocketConnections, events, &pageLoads)
 	// start http server
 	http.ListenAndServe(":"+strconv.Itoa(int(port)), nil)
 }
@@ -470,7 +488,7 @@ func getTemplates() (map[string]*template.Template, error) {
 
 // compileJavascript - Compile all javascript in to single string that can be served from memory
 func compileJavascript() (map[string]string, error) {
-	log.Println("Compiling and minifying javascript...")
+	log.Println("[COMPILE] Compiling and minifying javascript.")
 	jsDirs := make(map[string]string)
 	jsDirs["app.js"] = "./web/static/js/main"
 	jsDirs["worker.js"] = "./web/static/js/worker"
@@ -500,13 +518,12 @@ func compileJavascript() (map[string]string, error) {
 		}
 		output[jsFile] = compiledJs
 	}
-	log.Println("...Done.")
 	return output, nil
 }
 
 // compileGCSS - Compile all GCSS in to single string that can be served from memory
 func compileGCSS() (map[string]string, error) {
-	log.Println("Compiling and minifying [g]css...")
+	log.Println("[COMPILE] Compiling and minifying [g]css.")
 	cssDirs := make(map[string]string)
 	cssDirs["app.min.css"] = "./web/static/css"
 	output := make(map[string]string)
@@ -551,7 +568,6 @@ func compileGCSS() (map[string]string, error) {
 		}
 		output[cssFile] = compiledCSS
 	}
-	log.Println("...Done.")
 	return output, nil
 }
 
@@ -563,7 +579,7 @@ func wsReader(ws *websocket.Conn, actManager *act.Manager) {
 		var data []byte
 		err := websocket.Message.Receive(ws, &data)
 		if err != nil {
-			log.Println("Error occured while reading web socket message,", err)
+			log.Println("[ERROR] Error occured while reading web socket message,", err)
 			break
 		}
 		// nothing todo
@@ -588,10 +604,20 @@ func globalWsWriter(websocketConnections *[]websocketConnection, events *emitter
 				)
 			}
 		}
+	}
+}
+
+func snapshotListener(websocketConnections *[]websocketConnection, events *emitter.Emitter, pageLoads *int) {
+	for {
 		for event := range events.On("stat:snapshot") {
 			statSnapshot := event.Args[0].(*app.StatSnapshot)
+			statSnapshot.PageLoads = *pageLoads
+
+			if websocketConnections == nil {
+				break
+			}
 			for _, websocketConnection := range *websocketConnections {
-				if websocketConnection.connection == nil || event.Args[0] != websocketConnection.userData.ID {
+				if websocketConnection.connection == nil {
 					continue
 				}
 				statSnapshot.Connections.Web[websocketConnection.userData.ID]++
@@ -657,7 +683,7 @@ func sendInitData(ws *websocket.Conn, data *act.Data) {
 	// compress
 	compressData, err := act.CompressBytes(dataBytes)
 	if err != nil {
-		log.Println("Error when compressing init data,", err)
+		log.Println("[ERROR] Error when compressing init data,", err)
 		return
 	}
 	websocket.Message.Send(ws, compressData)
@@ -666,14 +692,14 @@ func sendInitData(ws *websocket.Conn, data *act.Data) {
 		logPath := data.GetLogPath()
 		logBytes, err := ioutil.ReadFile(logPath)
 		if err != nil {
-			log.Println("Error when opening log line file,", err)
+			log.Println("[ERROR] Error when opening log line file,", err)
 			return
 		}
 		// compress if from temp path
 		if logPath == data.GetLogTempPath() {
 			logBytes, err = act.CompressBytes(logBytes)
 			if err != nil {
-				log.Println("Error when compressing log line data,", err)
+				log.Println("[ERROR] Error when compressing log line data,", err)
 			}
 		}
 		websocket.Message.Send(ws, logBytes)

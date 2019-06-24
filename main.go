@@ -54,7 +54,7 @@ func main() {
 	act.CleanUpEncounters()
 
 	// start http server
-	go web.HTTPStartServer(uint16(*httpPort), &userManager, &actManager, &events, *devModePtr)
+	go web.HTTPStartServer(uint16(*httpPort), &userManager, &actManager, &events, &statCollector, *devModePtr)
 
 	// start act listen server
 	act.Listen(uint16(*actPort), &actManager)
