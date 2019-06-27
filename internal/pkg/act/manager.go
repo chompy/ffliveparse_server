@@ -299,16 +299,25 @@ func (m *Manager) doLogTick(userID int64) {
 	}
 }
 
-func (m *Manager) snapshotListener() {
+// SnapshotListener - listen for snapshot event and update snapshot data
+func (m *Manager) SnapshotListener() {
+	startTime := time.Now()
 	for {
 		for event := range m.events.On("stat:snapshot") {
+			currentTime := time.Now()
+			timeDiff := int(currentTime.Sub(startTime).Minutes())
 			statSnapshot := event.Args[0].(*app.StatSnapshot)
 			logLineCount := 0
 			for _, data := range m.data {
 				logLineCount += data.LogLineCounter
-				statSnapshot.Connections.ACT = append(statSnapshot.Connections.ACT, data.User.ID)
+				userIDString, err := data.User.GetWebIDString()
+				if err == nil {
+					statSnapshot.Connections.ACT[userIDString]++
+				}
 			}
-			statSnapshot.LogLinesPerMinute = logLineCount
+			if timeDiff > 0 {
+				statSnapshot.LogLinesPerMinute = logLineCount / timeDiff
+			}
 			encounterCount, _ := GetTotalEncounterCount()
 			combatantCount, _ := GetTotalCombatantCount()
 			userCount, _ := GetTotalUserCount()

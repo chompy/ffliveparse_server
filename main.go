@@ -48,6 +48,7 @@ func main() {
 
 	// create act manager
 	actManager := act.NewManager(&events, &userManager, *devModePtr)
+	go actManager.SnapshotListener()
 	defer actManager.ClearAllData()
 
 	// clean up old encounters

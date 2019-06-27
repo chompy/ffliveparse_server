@@ -49,6 +49,9 @@ const LastUpdateInactiveTime = 1800000 // 30 minutes
 // MinEncounterSaveLength - Length encounter must be in order to save encounter data
 const MinEncounterSaveLength = 20000 // 20 seconds
 
+// MaxEncounterSaveLength - Maximum length an encounter can be
+const MaxEncounterSaveLength = 1500000 // 25 minutes
+
 // PastEncounterFetchLimit - Max number of past encounters to fetch in one request
 const PastEncounterFetchLimit = 20
 

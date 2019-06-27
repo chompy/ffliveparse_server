@@ -619,7 +619,10 @@ func snapshotListener(websocketConnections *[]websocketConnection, events *emitt
 				if websocketConnection.connection == nil {
 					continue
 				}
-				statSnapshot.Connections.Web[websocketConnection.userData.ID]++
+				userIDString, err := websocketConnection.userData.GetWebIDString()
+				if err == nil {
+					statSnapshot.Connections.Web[userIDString]++
+				}
 			}
 		}
 	}
