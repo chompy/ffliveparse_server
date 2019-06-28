@@ -71,7 +71,7 @@ func (s *StatCollector) Start() {
 func (s *StatCollector) TakeSnapshot() {
 	log.Println("[STAT] Snapshot.")
 	if len(s.Snapshots) >= StatMaxSnapshots {
-		s.Snapshots = s.Snapshots[len(s.Snapshots)-StatMaxSnapshots-1 : len(s.Snapshots)-1]
+		s.Snapshots = s.Snapshots[len(s.Snapshots)-StatMaxSnapshots:]
 	}
 	snapshot := StatSnapshot{
 		Time: time.Now(),
