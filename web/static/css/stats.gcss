@@ -8,3 +8,9 @@
       margin-right: 10px
     .stat-value
       display: inline-block
+    &.stat-graph
+      background: #fff
+      width: 75%
+      margin: auto
+      padding: 20px
+      margin-bottom: 20px

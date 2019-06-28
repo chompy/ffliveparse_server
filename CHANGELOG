@@ -1,7 +1,9 @@
-DEVELOPMENT
+1.21
 - Log file clean up function.
 - Fixed timing delay issue with all trigger functions that supported delay.
 - Added support to import triggers in YAML.
+- Stat collector to track usage.
+- History search with date range selector.
 
 1.20
 - Added ability to import and export compressed base64 triggers.
