@@ -529,11 +529,12 @@ func GetPreviousEncounters(user user.Data, offset int, query string, start *time
 			return nil, err
 		}
 		// determine if log file exists
-		hasLogs := true
-		logPath := getPermanentLogPath(encounter.UID)
+		hasLogs := false
+		// temp removed, too slow with s3fs
+		/*logPath := getPermanentLogPath(encounter.UID)
 		if _, err := os.Stat(logPath); os.IsNotExist(err) {
 			hasLogs = false
-		}
+		}*/
 		// build collectors
 		encounterCollector := NewEncounterCollector(&user)
 		encounterCollector.Encounter = encounter

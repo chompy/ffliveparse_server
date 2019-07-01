@@ -1,6 +1,8 @@
-DEVELOPMENT
+1.22
 - Fix bug in stat collector.
 - Log clean up goroutine.
+- Add DNC/GNB icons.
+- Remove check for logs in history because of slowness.
 
 1.21
 - Log file clean up function.
