@@ -20,6 +20,7 @@ package act
 import (
 	"fmt"
 	"log"
+	"regexp"
 	"strings"
 	"time"
 
@@ -55,6 +56,7 @@ type EncounterCollector struct {
 	PlayerTeam       uint8
 	CurrentZone      string
 	LastReportTime   time.Time
+	CompletionFlag   bool
 }
 
 // NewEncounterCollector - Create new encounter collector
@@ -83,6 +85,7 @@ func (ec *EncounterCollector) Reset() {
 	ec.CombatantTracker = make([]encounterCollectorCombatantTracker, 0)
 	ec.PlayerTeam = 0
 	ec.LastReportTime = time.Now()
+	ec.CompletionFlag = false
 }
 
 // UpdateEncounter - Sync encounter data from ACT
@@ -296,8 +299,8 @@ func (ec *EncounterCollector) ReadLogLine(l *LogLineData) {
 	case LogTypeGameLog:
 		{
 
-			switch l.SubType {
-			case LogSubTypeWorldName:
+			switch l.Color {
+			case LogColorCharacterWorldName:
 				{
 					if ec.PlayerTeam > 0 {
 						break
@@ -313,14 +316,33 @@ func (ec *EncounterCollector) ReadLogLine(l *LogLineData) {
 						}
 					}
 				}
-			case LogSubTypeJobChange:
+			case LogColorObtainItem:
 				{
-					//ec.endEncounter()
+					// if message about tomestones is recieved then that should mean the encounter is over
+					re, err := regexp.Compile("00:083e:You obtain .* Allagan tomestones of")
+					if err != nil {
+						break
+					}
+					// end encounter if match
+					if re.MatchString(l.Raw) {
+						ec.CompletionFlag = true
+					}
+					break
+				}
+			case LogColorCompletionTime:
+				{
+					// if message about completion time then that should mean the encounter is over
+					re, err := regexp.Compile("00:0840:.* completion time: ")
+					if err != nil {
+						break
+					}
+					// end encounter if match
+					if re.MatchString(l.Raw) {
+						ec.CompletionFlag = true
+					}
 					break
 				}
 			}
-
-			break
 		}
 	}
 	// log encounter report
@@ -348,9 +370,16 @@ func (ec *EncounterCollector) CheckInactive() {
 	if !ec.Encounter.Active {
 		return
 	}
+	// recieved tomestones
+	if ec.CompletionFlag {
+		ec.Encounter.SuccessLevel = 1
+		ec.endEncounter()
+		return
+	}
 	// check if new zone
 	if ec.CurrentZone != ec.Encounter.Zone && ec.Encounter.Zone != "" {
 		log.Println("[", ec.userIDHash, "][ Encounter", ec.Encounter.UID, "] New zone detected.", ec.CurrentZone, ec.Encounter.Zone)
+		ec.Encounter.SuccessLevel = 0
 		ec.endEncounter()
 		return
 	}
@@ -365,31 +394,24 @@ func (ec *EncounterCollector) CheckInactive() {
 			combatantCount++
 		}
 	}
-	if combatantCount < 2 {
+	if combatantCount < 2 || ec.PlayerTeam <= 0 {
 		return
 	}
-	// check to see if a team is dead, if so encounter should be considered inactive
+	// check to see if player team is dead
 	combatantTimeoutTime := time.Now().Add(time.Duration(-combatantTimeout) * time.Millisecond)
-	for team := 1; team <= 2; team++ {
-		teamDead := true
-		for _, ct := range ec.CombatantTracker {
-			// if combatant on same team, is flagged as alive, and was either attacked by something previously
-			// or has not timed out then team is still alive
-			if ct.Team == uint8(team) && ct.IsAlive && (ct.WasAttacked || combatantTimeoutTime.Before(ct.LastActionTime)) {
-				teamDead = false
-				break
-			}
+	teamDead := true
+	for _, ct := range ec.CombatantTracker {
+		// if combatant on same team, is flagged as alive, and was either attacked by something previously
+		// or has not timed out then team is still alive
+		if ct.Team == ec.PlayerTeam && ct.IsAlive && (ct.WasAttacked || combatantTimeoutTime.Before(ct.LastActionTime)) {
+			teamDead = false
+			break
 		}
-		if teamDead {
-			// set success level
-			// clear
-			ec.Encounter.SuccessLevel = 1
-			if uint8(team) == ec.PlayerTeam {
-				// wipe
-				ec.Encounter.SuccessLevel = 2
-			}
-			ec.endEncounter()
-			return
-		}
+	}
+	if teamDead {
+		// set wipe
+		ec.Encounter.SuccessLevel = 2
+		ec.endEncounter()
+		return
 	}
 }

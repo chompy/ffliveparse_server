@@ -102,8 +102,8 @@ func (c *CombatantCollector) ReadLogLine(l *LogLineData) {
 		}
 	case LogTypeGameLog:
 		{
-			switch l.SubType {
-			case LogSubTypeWorldName:
+			switch l.Color {
+			case LogColorCharacterWorldName:
 				{
 					if l.TargetName != "" && l.AttackerName != "" {
 						// sync world

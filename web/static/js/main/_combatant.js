@@ -17,7 +17,7 @@ along with FFLiveParse.  If not, see <https://www.gnu.org/licenses/>.
 
 var combatantDefaultRoleClass = "dps";
 var combatantRoleClasses = {
-    "tank"    : ["WAR", "DRK", "PLD", "GLA", "MRD"],
+    "tank"    : ["WAR", "DRK", "PLD", "GLA", "MRD", "GNB"],
     "healer"  : ["SCH", "WHM", "AST", "CNJ"],
     "pet"     : ["PET"],
     "enemy"   : ["ENEMY"]

@@ -119,11 +119,14 @@ const LogFlagParry = 7
 // LogFlagInstantDeath - Log flag, instant death
 const LogFlagInstantDeath = 8
 
-// LogSubTypeWorldName - Log sub type, world name identify
-const LogSubTypeWorldName = 1
+// LogColorCharacterWorldName - Log message color for message with character world name
+const LogColorCharacterWorldName = 0x102b
 
-// LogSubTypeJobChange = Log sub type, job change
-const LogSubTypeJobChange = 2
+// LogColorObtainItem - Log message color for message about obtaining item
+const LogColorObtainItem = 0x083e
+
+// LogColorCompletionTime - Log message color for message bout encounter completion
+const LogColorCompletionTime = 0x0840
 
 // logShiftValues
 var logShiftValues = [...]int{0x3E, 0x113, 0x213, 0x313}
@@ -131,7 +134,7 @@ var logShiftValues = [...]int{0x3E, 0x113, 0x213, 0x313}
 // LogLineData - Data retrieved by parsing a log line
 type LogLineData struct {
 	Type              int
-	SubType           int
+	Color             int
 	Raw               string
 	AttackerID        int
 	AttackerName      string
@@ -203,7 +206,6 @@ func ParseLogLine(logLine LogLine) (LogLineData, error) {
 			// UNKNOWN: Can these two happen at the same time?
 			flagsInt, err := hexToInt(fields[LogFieldFlags])
 			if err != nil {
-				log.Println("1", logLineString)
 				return data, err
 			}
 			for _, shiftValue := range logShiftValues {
@@ -220,7 +222,6 @@ func ParseLogLine(logLine LogLine) (LogLineData, error) {
 				// Get the left two bytes as damage.
 				damage, err = hexToInt(fields[LogFieldDamage][0:4])
 				if err != nil {
-					log.Println("2", logLineString)
 					return data, err
 				}
 			}
@@ -229,7 +230,6 @@ func ParseLogLine(logLine LogLine) (LogLineData, error) {
 				// Wrap in the 4th byte as extra damage.  See notes above.
 				rightDamage, err := hexToInt(fields[LogFieldDamage][damageFieldLength-2 : damageFieldLength])
 				if err != nil {
-					log.Println("3", logLineString)
 					return data, err
 				}
 				damage = damage - rightDamage + (rightDamage << 16)
@@ -238,7 +238,6 @@ func ParseLogLine(logLine LogLine) (LogLineData, error) {
 			// attacker id
 			attackerID, err := hexToInt(fields[LogFieldAttackerID])
 			if err != nil {
-				log.Println("4", logLineString)
 				return data, err
 			}
 			data.AttackerID = int(attackerID)
@@ -247,7 +246,7 @@ func ParseLogLine(logLine LogLine) (LogLineData, error) {
 			// ability id
 			abilityID, err := hexToInt(fields[LogFieldAbilityID])
 			if err != nil {
-				log.Println("5", logLineString)
+
 				return data, err
 			}
 			data.AbilityID = int(abilityID)
@@ -258,7 +257,6 @@ func ParseLogLine(logLine LogLine) (LogLineData, error) {
 			// target id
 			targetID, err := hexToInt(fields[LogFieldTargetID])
 			if err != nil {
-				log.Println("6", logLineString)
 				return data, err
 			}
 			data.TargetID = int(targetID)
@@ -268,7 +266,6 @@ func ParseLogLine(logLine LogLine) (LogLineData, error) {
 			if len(fields)-1 >= LogFieldTargetCurrentHP && fields[LogFieldTargetCurrentHP] != "" {
 				targetCurrentHP, err := strconv.ParseInt(fields[LogFieldTargetCurrentHP], 10, 64)
 				if err != nil {
-					log.Println("7", logLineString)
 					return data, err
 				}
 				data.TargetCurrentHP = int(targetCurrentHP)
@@ -277,7 +274,6 @@ func ParseLogLine(logLine LogLine) (LogLineData, error) {
 			if len(fields)-1 >= LogFieldTargetMaxHP && fields[LogFieldTargetMaxHP] != "" {
 				targetMaxHP, err := strconv.ParseInt(fields[LogFieldTargetMaxHP], 10, 64)
 				if err != nil {
-					log.Println("8", logLineString)
 					return data, err
 				}
 				data.TargetMaxHP = int(targetMaxHP)
@@ -286,7 +282,6 @@ func ParseLogLine(logLine LogLine) (LogLineData, error) {
 			if len(fields)-1 >= LogFieldAttackerCurrentHP && fields[LogFieldAttackerCurrentHP] != "" {
 				attackerCurrentHP, err := strconv.ParseInt(fields[LogFieldAttackerCurrentHP], 10, 64)
 				if err != nil {
-					log.Println("7B", logLineString)
 					return data, err
 				}
 				data.AttackerCurrentHP = int(attackerCurrentHP)
@@ -295,7 +290,6 @@ func ParseLogLine(logLine LogLine) (LogLineData, error) {
 			if len(fields)-1 >= LogFieldAttackerMaxHP && fields[LogFieldAttackerMaxHP] != "" {
 				attackerMaxHP, err := strconv.ParseInt(fields[LogFieldAttackerMaxHP], 10, 64)
 				if err != nil {
-					log.Println("8B", logLineString)
 					return data, err
 				}
 				data.AttackerMaxHP = int(attackerMaxHP)
@@ -306,7 +300,6 @@ func ParseLogLine(logLine LogLine) (LogLineData, error) {
 		{
 			re, err := regexp.Compile(" 19:([a-zA-Z0-9'\\- ]*) was defeated by ([a-zA-Z0-9'\\- ]*)")
 			if err != nil {
-				log.Println("9", logLineString)
 				return data, err
 			}
 			match := re.FindStringSubmatch(logLineString)
@@ -321,7 +314,6 @@ func ParseLogLine(logLine LogLine) (LogLineData, error) {
 		{
 			re, err := regexp.Compile(" 01:Changed Zone to (.*)\\.")
 			if err != nil {
-				log.Println("11", logLineString)
 				return data, err
 			}
 			match := re.FindStringSubmatch(logLineString)
@@ -336,7 +328,6 @@ func ParseLogLine(logLine LogLine) (LogLineData, error) {
 		{
 			re, err := regexp.Compile(" 04:Removing combatant ([a-zA-Z0-9'\\- ]*)\\.  Max HP: ([0-9]*)\\.")
 			if err != nil {
-				log.Println("12", logLineString)
 				return data, err
 			}
 			match := re.FindStringSubmatch(logLineString)
@@ -346,7 +337,6 @@ func ParseLogLine(logLine LogLine) (LogLineData, error) {
 			data.TargetName = match[1]
 			maxHP, err := strconv.ParseInt(match[2], 10, 64)
 			if err != nil {
-				log.Println("12", logLineString)
 				return data, err
 			}
 			data.TargetMaxHP = int(maxHP)
@@ -375,15 +365,18 @@ func ParseLogLine(logLine LogLine) (LogLineData, error) {
 			if len(fields) <= 2 {
 				break
 			}
-
-			switch fields[1] {
-			// get world name
-			case "102b":
+			// get log message color
+			logMessageColor, err := strconv.ParseInt(fields[1], 16, 16)
+			if err != nil {
+				return data, err
+			}
+			data.Color = int(logMessageColor)
+			switch data.Color {
+			// try to strip out world name from message
+			case LogColorCharacterWorldName:
 				{
-					data.SubType = LogSubTypeWorldName
 					re, err := regexp.Compile("102b:([a-zA-Z'\\-]*) ([A-Z'])([a-z'\\-]*)([A-Z])([a-z]*)")
 					if err != nil {
-						log.Println("10", logLineString)
 						return data, err
 					}
 					match := re.FindStringSubmatch(logLineString)
@@ -395,12 +388,6 @@ func ParseLogLine(logLine LogLine) (LogLineData, error) {
 					data.AttackerName = attackerName
 					// special case, target name is world name
 					data.TargetName = worldName
-					break
-				}
-			// job change
-			case "0839":
-				{
-					data.SubType = LogSubTypeJobChange
 					break
 				}
 			}

@@ -146,7 +146,7 @@ class EncounterDisplay
                 }
                 default:
                 {
-                    this.encounterStatusElement.innerText = "";
+                    this.encounterStatusElement.innerText = "Ended";
                 }
             }
             
