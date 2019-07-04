@@ -491,14 +491,14 @@ func GetPreviousEncounters(user user.Data, offset int, query string, start *time
 	// start date
 	if start != nil {
 		dbQueryStr += " AND DATETIME(start_time) >= ?"
-		params = append(params, start)
+		params = append(params, start.UTC())
 	} else {
 		dbQueryStr += " AND DATETIME(start_time) > '01-01-2019 00:00:00'"
 	}
 	// end date
 	if end != nil {
 		dbQueryStr += " AND DATETIME(end_time) <= ?"
-		params = append(params, end)
+		params = append(params, end.UTC())
 	}
 	// limit, offset
 	dbQueryStr += " ORDER BY DATETIME(start_time) DESC LIMIT ? OFFSET ?"
@@ -529,32 +529,23 @@ func GetPreviousEncounters(user user.Data, offset int, query string, start *time
 			return nil, err
 		}
 		// determine if log file exists
-		hasLogs := false
+		hasLogs := true
 		// temp removed, too slow with s3fs
-		/*logPath := getPermanentLogPath(encounter.UID)
+		logPath := getPermanentLogPath(encounter.UID)
 		if _, err := os.Stat(logPath); os.IsNotExist(err) {
 			hasLogs = false
-		}*/
+		}
 		// build collectors
 		encounterCollector := NewEncounterCollector(&user)
 		encounterCollector.Encounter = encounter
-		combatantCollector, err := getEncounterCombatants(
-			database,
-			user,
-			encounter.UID,
-		)
-		if err != nil {
-			return nil, err
-		}
 		// build data object
 		data := Data{
 			User:               user,
 			EncounterCollector: encounterCollector,
-			CombatantCollector: combatantCollector,
+			CombatantCollector: CombatantCollector{},
 			HasLogs:            hasLogs,
 		}
 		encounters = append(encounters, data)
-
 	}
 	rows.Close()
 	return encounters, nil
@@ -568,7 +559,6 @@ func GetPreviousEncounterCount(user user.Data, query string, start *time.Time, e
 		return 0, err
 	}
 	defer database.Close()
-
 	// build query
 	params := make([]interface{}, 1)
 	params[0] = user.ID
@@ -583,14 +573,14 @@ func GetPreviousEncounterCount(user user.Data, query string, start *time.Time, e
 	// start date
 	if start != nil {
 		dbQueryStr += " AND DATETIME(start_time) >= ?"
-		params = append(params, start)
+		params = append(params, start.UTC())
 	} else {
 		dbQueryStr += " AND DATETIME(start_time) > '01-01-2019 00:00:00'"
 	}
 	// end date
 	if end != nil {
 		dbQueryStr += " AND DATETIME(end_time) <= ?"
-		params = append(params, end)
+		params = append(params, end.UTC())
 	}
 	// fetch encounter counter
 	rows, err := database.Query(

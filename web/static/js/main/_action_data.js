@@ -81,7 +81,7 @@ class ActionData
 function fetchActionData()
 {
     var request = new XMLHttpRequest();
-    request.open("GET", ACTION_DATA_BASE_URL + ACTION_DATA_JSON, true);
+    request.open("GET", ACTION_DATA_BASE_URL + ACTION_DATA_JSON + "?v=2", true);
     request.send();
     request.addEventListener("load", function(e) {
         console.log(">> Action data fetched.");

@@ -33,7 +33,6 @@
             <div class="encounter-time"><strong>Start Time</strong></div>
             <div class="encounter-zone"><strong>Zone</strong></div>
             <div class="encounter-length"><strong>Length</strong></div>
-            <div class="encounter-combatants"><strong>Combatants</strong></div>
         </div>
 
         {{ range $val := .Encounters }}
@@ -43,15 +42,8 @@
                 {{ if eq $val.HasLogs true }}<span class="encounter-flag encounter-flag-logs" title="Log Data Available">L</span>{{ end }}
             </div>
             <div class="encounter-time" data-timestamp="{{ $val.EncounterCollector.Encounter.StartTime.Unix }}"><a href="/{{ $val.User.GetWebIDString }}/{{ $val.EncounterCollector.Encounter.UID }}">?</a></div>
-            <div class="encounter-zone">{{ $val.EncounterCollector.Encounter.Zone }}</div>
-            <div class="encounter-length">{{ $val.EncounterCollector.Encounter.EndTime.Sub $val.EncounterCollector.Encounter.StartTime }}</div>
-            <div class="encounter-combatants">
-            {{ range $combatant := $val.CombatantCollector.GetCombatants }}
-            {{ if ne $combatant.Job ""}}
-            <span class="encounter-combatant">{{ $combatant.Name }}</span>
-            {{ end }}
-            {{ end }}
-            </div>
+            <div class="encounter-zone" title="{{ $val.EncounterCollector.Encounter.Zone }}">{{ $val.EncounterCollector.Encounter.Zone }}</div>
+            <div class="encounter-length" title="{{ $val.EncounterCollector.Encounter.EndTime.Sub $val.EncounterCollector.Encounter.StartTime }}">{{ $val.EncounterCollector.Encounter.EndTime.Sub $val.EncounterCollector.Encounter.StartTime }}</div>
         </div>
         {{ end }}
 
@@ -77,6 +69,7 @@
         if (!timestamp) { continue; }
         var date = new Date(timestamp * 1000);
         encounterTimeElements[i].getElementsByTagName("a")[0].innerText = date.toLocaleString();
+        encounterTimeElements[i].getElementsByTagName("a")[0].setAttribute("title", date.toLocaleString());
     }
 </script>
 {{ end }}

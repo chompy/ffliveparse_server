@@ -16,25 +16,18 @@
       color: #06ea06
     div
       display: inline-block
-      white-space: nowrap
+      white-space: normal
       overflow: hidden
       text-overflow: ellipsis
+      vertical-align: top
     .encounter-flags
-      width: 5%
+      width: 10%
     .encounter-time
-      width: 15%
+      width: 25%
     .encounter-zone
-      width: 30%
+      width: 40%
     .encounter-length
-      width: 15%
-    .encounter-combatants
-      width: 29%
-      .encounter-combatant
-        &::after
-          display: inline
-          content: ", "
-        &:last-child::after
-          content: ""
+      width: 20%
   .encounter-pagination
     margin-top: 15px
     font-size: 20px

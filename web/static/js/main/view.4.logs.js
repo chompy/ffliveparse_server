@@ -133,7 +133,6 @@ class ViewLogs extends ViewBase
             action.data.actionName == this.lastAddedAction.data.actionName &&
             action.time.getTime() == this.lastAddedAction.time.getTime()
         ) {
-            console.log(action.data.actionId);
             return;
         }
 

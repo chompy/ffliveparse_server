@@ -61,7 +61,7 @@ class StatusData
 function fetchStatusData()
 {
     var request = new XMLHttpRequest();
-    request.open("GET", STATUS_DATA_BASE_URL + STATUS_DATA_JSON, true);
+    request.open("GET", STATUS_DATA_BASE_URL + STATUS_DATA_JSON + "?v=2", true);
     request.send();
     request.addEventListener("load", function(e) {
         console.log(">> Status data fetched.");

@@ -362,7 +362,7 @@ func HTTPStartServer(port uint16, userManager *user.Manager, actManager *act.Man
 		if td.HistoryEndDate != "" {
 			_endTime, err := time.Parse(
 				time.RFC3339,
-				fmt.Sprintf(td.HistoryEndDate+"T00:00:00-%02d:00", tzOffset/60),
+				fmt.Sprintf(td.HistoryEndDate+"T23:59:59-%02d:00", tzOffset/60),
 			)
 			endTime = &_endTime
 			if err != nil {

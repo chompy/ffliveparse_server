@@ -557,7 +557,10 @@ class ViewTimeline extends ViewBase
             for (var i = 1; i < words.length; i++) {
                 var word = words[i];
                 var width = ctx.measureText(currentLine + " " + word).width;
-                if (width < maxWidth) {
+                if (word.indexOf("\n") != -1) {
+                    lines.push(currentLine);
+                    currentLine = word;
+                } else if (width < maxWidth) {
                     currentLine += " " + word;
                 } else {
                     lines.push(currentLine);
@@ -747,9 +750,9 @@ class ViewTimeline extends ViewBase
         var actionImageSrc = "/static/img/enemy.png";
         if (!actionData && action.type == ACTION_TYPE_DEATH) {
             actionImageSrc = "/static/img/death.png";
-        } else if (actionData && actionData.name == "Attack") {
+        } else if (actionData && ["attack", "shot"].indexOf(actionData.name.toLowerCase()) != -1) {
             actionImageSrc = "/static/img/attack.png";
-        } else if (!actionData && ["Attack", "Shot"].indexOf(action.data.actionName) != -1) {
+        } else if (!actionData && typeof(action.data.actionName) != "undefined" && ["attack", "shot"].indexOf(action.data.actionName.toLowerCase()) != -1) {
             actionImageSrc = "/static/img/attack.png";
         } else if (actionData && actionData.icon) {
             actionImageSrc = ACTION_DATA_BASE_URL + actionData.icon;

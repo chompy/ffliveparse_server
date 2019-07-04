@@ -1,7 +1,8 @@
-DEV
+1.23
 - Added GNB to tank group (so they'll appear with blue background).
-- Tweaks to encounter detection, simply and use "you obtained tomestones" message to flag clear.
+- Tweaks to encounter detection, simply to use "you obtained tomestones" message to flag clear.
 - Added 'Ended' status for encounters with unknown status (zone change, etc).
+- Fixed date range offset for history.
 
 1.22
 - Fix bug in stat collector.
