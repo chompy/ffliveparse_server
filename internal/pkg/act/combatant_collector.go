@@ -24,15 +24,15 @@ import (
 	"../user"
 )
 
-// combatantCollectorCombatantTracker - Track combatant data and
-type combatantCollectorCombatantTracker struct {
-	Start Combatant
-	Data  []Combatant
+// combatantTracker - Data used to track combatant
+type combatantTracker struct {
+	Combatant  Combatant
+	LastUpdate Combatant
 }
 
 // CombatantCollector - Combatant data collector
 type CombatantCollector struct {
-	CombatantTrackers []combatantCollectorCombatantTracker
+	CombatantTrackers []combatantTracker
 	userIDHash        string
 }
 
@@ -48,7 +48,7 @@ func NewCombatantCollector(user *user.Data) CombatantCollector {
 
 // Reset - reset combatant collector
 func (c *CombatantCollector) Reset() {
-	c.CombatantTrackers = make([]combatantCollectorCombatantTracker, 0)
+	c.CombatantTrackers = make([]combatantTracker, 0)
 }
 
 // UpdateCombatantTracker - Sync ACT combatant data
@@ -59,24 +59,68 @@ func (c *CombatantCollector) UpdateCombatantTracker(combatant Combatant) {
 	}
 	// update existing
 	for index := range c.CombatantTrackers {
-		if c.CombatantTrackers[index].Start.ID == combatant.ID {
-			for cIndex := range c.CombatantTrackers[index].Data {
-				// update existing encounter combatant
-				if c.CombatantTrackers[index].Data[cIndex].ActEncounterID == combatant.ActEncounterID {
-					c.CombatantTrackers[index].Data[cIndex] = combatant
-					return
-				}
+		if c.CombatantTrackers[index].Combatant.ID == combatant.ID {
+			// reset combatant if new encounter
+			if c.CombatantTrackers[index].LastUpdate.EncounterUID != combatant.EncounterUID {
+				c.CombatantTrackers[index].Combatant = combatant
 			}
-			// add new combatant encounter
-			c.CombatantTrackers[index].Data = append(c.CombatantTrackers[index].Data, combatant)
+			// check for new ACT encounter and update
+			newEncounter := false
+			if c.CombatantTrackers[index].LastUpdate.ActEncounterID != combatant.ActEncounterID {
+				newEncounter = true
+			}
+			// damage dealt
+			if !newEncounter && c.CombatantTrackers[index].LastUpdate.Damage <= combatant.Damage {
+				c.CombatantTrackers[index].Combatant.Damage += combatant.Damage - c.CombatantTrackers[index].LastUpdate.Damage
+			} else if newEncounter {
+				c.CombatantTrackers[index].Combatant.Damage += combatant.Damage
+			}
+			// healing
+			if !newEncounter && c.CombatantTrackers[index].LastUpdate.DamageHealed <= combatant.DamageHealed {
+				c.CombatantTrackers[index].Combatant.DamageHealed += combatant.DamageHealed - c.CombatantTrackers[index].LastUpdate.DamageHealed
+			} else if newEncounter {
+				c.CombatantTrackers[index].Combatant.DamageHealed += combatant.DamageHealed
+			}
+			// damage recieved
+			if !newEncounter && c.CombatantTrackers[index].LastUpdate.DamageTaken <= combatant.DamageTaken {
+				c.CombatantTrackers[index].Combatant.DamageTaken += combatant.DamageTaken - c.CombatantTrackers[index].LastUpdate.DamageTaken
+			} else if newEncounter {
+				c.CombatantTrackers[index].Combatant.DamageTaken += combatant.DamageTaken
+			}
+			// deaths
+			if !newEncounter && c.CombatantTrackers[index].LastUpdate.Deaths <= combatant.Deaths {
+				c.CombatantTrackers[index].Combatant.Deaths += combatant.Deaths - c.CombatantTrackers[index].LastUpdate.Deaths
+			} else if newEncounter {
+				c.CombatantTrackers[index].Combatant.Deaths += combatant.Deaths
+			}
+			// heal count
+			if !newEncounter && c.CombatantTrackers[index].LastUpdate.Heals <= combatant.Heals {
+				c.CombatantTrackers[index].Combatant.Heals += combatant.Heals - c.CombatantTrackers[index].LastUpdate.Heals
+			} else if newEncounter {
+				c.CombatantTrackers[index].Combatant.Heals += combatant.Heals
+			}
+			// hit count
+			if !newEncounter && c.CombatantTrackers[index].LastUpdate.Hits <= combatant.Hits {
+				c.CombatantTrackers[index].Combatant.Hits += combatant.Hits - c.CombatantTrackers[index].LastUpdate.Hits
+			} else if newEncounter {
+				c.CombatantTrackers[index].Combatant.Hits += combatant.Hits
+			}
+			// kill count
+			if !newEncounter && c.CombatantTrackers[index].LastUpdate.Kills <= combatant.Kills {
+				c.CombatantTrackers[index].Combatant.Kills += combatant.Kills - c.CombatantTrackers[index].LastUpdate.Kills
+			} else if newEncounter {
+				c.CombatantTrackers[index].Combatant.Kills += combatant.Kills
+			}
+			// update last combatant
+			c.CombatantTrackers[index].LastUpdate = combatant
 			return
 		}
 	}
 	// create new
 	log.Println("[", c.userIDHash, "][ Combatant", combatant.ID, "] Added", combatant.Name, combatant.ID, combatant.Job)
-	ct := combatantCollectorCombatantTracker{
-		Start: combatant,
-		Data:  make([]Combatant, 0),
+	ct := combatantTracker{
+		Combatant:  combatant,
+		LastUpdate: combatant,
 	}
 	c.CombatantTrackers = append(c.CombatantTrackers, ct)
 	c.resolvePets()
@@ -90,12 +134,12 @@ func (c *CombatantCollector) ReadLogLine(l *LogLineData) {
 			// sync name
 			for index := range c.CombatantTrackers {
 				// ignore pets/non job combatants
-				if len(c.CombatantTrackers[index].Start.Job) == 0 || strings.Contains(c.CombatantTrackers[index].Start.Name, " (") {
+				if len(c.CombatantTrackers[index].Combatant.Job) == 0 || strings.Contains(c.CombatantTrackers[index].Combatant.Name, " (") {
 					continue
 				}
-				if c.CombatantTrackers[index].Start.ID == int32(l.AttackerID) && c.CombatantTrackers[index].Start.Name != l.AttackerName {
-					c.CombatantTrackers[index].Start.Name = l.AttackerName
-					log.Println("[", c.userIDHash, "][ Combatant", c.CombatantTrackers[index].Start.ID, "] Set name", l.AttackerName)
+				if c.CombatantTrackers[index].Combatant.ID == int32(l.AttackerID) && c.CombatantTrackers[index].Combatant.Name != l.AttackerName {
+					c.CombatantTrackers[index].Combatant.Name = l.AttackerName
+					log.Println("[", c.userIDHash, "][ Combatant", c.CombatantTrackers[index].Combatant.ID, "] Set name", l.AttackerName)
 				}
 			}
 			break
@@ -108,9 +152,9 @@ func (c *CombatantCollector) ReadLogLine(l *LogLineData) {
 					if l.TargetName != "" && l.AttackerName != "" {
 						// sync world
 						for index := range c.CombatantTrackers {
-							if c.CombatantTrackers[index].Start.Name == l.AttackerName && c.CombatantTrackers[index].Start.World != l.TargetName {
-								c.CombatantTrackers[index].Start.World = l.TargetName
-								log.Println("[", c.userIDHash, "][ Combatant", c.CombatantTrackers[index].Start.ID, "] Set world name", l.TargetName)
+							if c.CombatantTrackers[index].Combatant.Name == l.AttackerName && c.CombatantTrackers[index].Combatant.World != l.TargetName {
+								c.CombatantTrackers[index].Combatant.World = l.TargetName
+								log.Println("[", c.userIDHash, "][ Combatant", c.CombatantTrackers[index].Combatant.ID, "] Set world name", l.TargetName)
 								break
 							}
 						}
@@ -127,18 +171,18 @@ func (c *CombatantCollector) ReadLogLine(l *LogLineData) {
 func (c *CombatantCollector) resolvePets() {
 	for index, ct := range c.CombatantTrackers {
 		// > 1000000000 ID seems to be player summoned entities
-		if ct.Start.ID >= 1000000000 && ct.Start.ParentID == 0 {
-			if strings.Contains(ct.Start.Name, " (") {
+		if ct.Combatant.ID >= 1000000000 && ct.Combatant.ParentID == 0 {
+			if strings.Contains(ct.Combatant.Name, " (") {
 				// is pet, fix
-				nameSplit := strings.Split(ct.Start.Name, " (")
+				nameSplit := strings.Split(ct.Combatant.Name, " (")
 				ownerName := nameSplit[1][:len(nameSplit[1])-1]
 				hasParent := false
 				for _, ownerCt := range c.CombatantTrackers {
-					if ownerCt.Start.ID < 1000000000 && ownerName == ownerCt.Start.Name {
+					if ownerCt.Combatant.ID < 1000000000 && ownerName == ownerCt.Combatant.Name {
 						hasParent = true
-						c.CombatantTrackers[index].Start.Name = nameSplit[0]
-						c.CombatantTrackers[index].Start.ParentID = ownerCt.Start.ID
-						c.CombatantTrackers[index].Start.Job = "Pet"
+						c.CombatantTrackers[index].Combatant.Name = nameSplit[0]
+						c.CombatantTrackers[index].Combatant.ParentID = ownerCt.Combatant.ID
+						c.CombatantTrackers[index].Combatant.Job = "Pet"
 						break
 					}
 				}
@@ -155,27 +199,8 @@ func (c *CombatantCollector) resolvePets() {
 // GetCombatants - Compile all combatants
 func (c *CombatantCollector) GetCombatants() []Combatant {
 	combatants := make([]Combatant, 0)
-	for _, ct := range c.CombatantTrackers {
-		combatant := ct.Start
-		for _, ctData := range ct.Data {
-			combatant.Damage += ctData.Damage
-			combatant.DamageHealed += ctData.DamageHealed
-			combatant.DamageTaken += ctData.DamageTaken
-			combatant.Deaths += ctData.Deaths
-			combatant.Heals += ctData.Heals
-			combatant.Hits += ctData.Hits
-			combatant.Kills += ctData.Kills
-		}
-		if len(ct.Data) > 0 {
-			combatant.Damage -= ct.Start.Damage
-			combatant.DamageHealed -= ct.Start.DamageHealed
-			combatant.DamageTaken -= ct.Start.DamageTaken
-			combatant.Deaths -= ct.Start.Deaths
-			combatant.Heals -= ct.Start.Heals
-			combatant.Hits -= ct.Start.Hits
-			combatant.Kills -= ct.Start.Kills
-		}
-		combatants = append(combatants, combatant)
+	for index := range c.CombatantTrackers {
+		combatants = append(combatants, c.CombatantTrackers[index].Combatant)
 	}
 	return combatants
 }
