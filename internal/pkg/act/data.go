@@ -530,7 +530,6 @@ func GetPreviousEncounters(user user.Data, offset int, query string, start *time
 		}
 		// determine if log file exists
 		hasLogs := true
-		// temp removed, too slow with s3fs
 		logPath := getPermanentLogPath(encounter.UID)
 		if _, err := os.Stat(logPath); os.IsNotExist(err) {
 			hasLogs = false

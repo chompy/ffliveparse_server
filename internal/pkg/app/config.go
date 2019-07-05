@@ -20,7 +20,7 @@ package app
 import "fmt"
 
 // VersionNumber - version number
-const VersionNumber int32 = 123
+const VersionNumber int32 = 124
 
 // ActPluginMinVersionNumber - act plugin min version
 const ActPluginMinVersionNumber int32 = 5
@@ -53,7 +53,7 @@ const MinEncounterSaveLength = 20000 // 20 seconds
 const MaxEncounterSaveLength = 1500000 // 25 minutes
 
 // PastEncounterFetchLimit - Max number of past encounters to fetch in one request
-const PastEncounterFetchLimit = 50
+const PastEncounterFetchLimit = 30
 
 // EncounterCleanUpDays - Number of days that should pass before deleting encounter logs
 const EncounterCleanUpDays = 90

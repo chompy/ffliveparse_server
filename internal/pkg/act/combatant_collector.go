@@ -59,7 +59,7 @@ func (c *CombatantCollector) UpdateCombatantTracker(combatant Combatant) {
 	}
 	// update existing
 	for index := range c.CombatantTrackers {
-		if c.CombatantTrackers[index].Combatant.ID == combatant.ID {
+		if c.CombatantTrackers[index].Combatant.ID == combatant.ID && c.CombatantTrackers[index].Combatant.ActName == combatant.ActName {
 			// reset combatant if new encounter
 			if c.CombatantTrackers[index].LastUpdate.EncounterUID != combatant.EncounterUID {
 				c.CombatantTrackers[index].Combatant = combatant
