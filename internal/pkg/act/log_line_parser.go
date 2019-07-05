@@ -90,10 +90,10 @@ const LogFieldTargetCurrentHP = 23
 const LogFieldTargetMaxHP = 24
 
 // LogFieldAttackerCurrentHP - Log field identifier, attacker current hp
-const LogFieldAttackerCurrentHP = 32
+const LogFieldAttackerCurrentHP = 33
 
 // LogFieldAttackerMaxHP - Log field identifier, attacker max hp
-const LogFieldAttackerMaxHP = 33
+const LogFieldAttackerMaxHP = 34
 
 // LogFlagDamage - Log flag, damage
 const LogFlagDamage = 1
@@ -219,7 +219,7 @@ func ParseLogLine(logLine LogLine) (LogLineData, error) {
 			damageFieldLength := len(fields[LogFieldDamage])
 			damage := 0
 			if damageFieldLength >= 4 {
-				// Get the left two bytes as damage.
+				// Get the left four bytes as damage.
 				damage, err = hexToInt(fields[LogFieldDamage][0:4])
 				if err != nil {
 					return data, err
