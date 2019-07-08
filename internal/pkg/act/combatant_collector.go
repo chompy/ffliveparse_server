@@ -28,6 +28,7 @@ import (
 type combatantTracker struct {
 	Combatant  Combatant
 	LastUpdate Combatant
+	Offset     Combatant
 }
 
 // CombatantCollector - Combatant data collector
@@ -51,6 +52,30 @@ func (c *CombatantCollector) Reset() {
 	c.CombatantTrackers = make([]combatantTracker, 0)
 }
 
+// combatantAdd - add the values of two combatants together
+func combatantAdd(c1 Combatant, c2 Combatant) Combatant {
+	c1.Damage += c2.Damage
+	c1.DamageHealed += c2.DamageHealed
+	c1.DamageTaken += c2.DamageTaken
+	c1.Deaths += c2.Deaths
+	c1.Heals += c2.Heals
+	c1.Hits += c2.Hits
+	c1.Kills += c2.Kills
+	return c1
+}
+
+// combatantSub - subtract the values of two combatants
+func combatantSub(c1 Combatant, c2 Combatant) Combatant {
+	c1.Damage -= c2.Damage
+	c1.DamageHealed -= c2.DamageHealed
+	c1.DamageTaken -= c2.DamageTaken
+	c1.Deaths -= c2.Deaths
+	c1.Heals -= c2.Heals
+	c1.Hits -= c2.Hits
+	c1.Kills -= c2.Kills
+	return c1
+}
+
 // UpdateCombatantTracker - Sync ACT combatant data
 func (c *CombatantCollector) UpdateCombatantTracker(combatant Combatant) {
 	// ignore invalid combatants
@@ -63,53 +88,22 @@ func (c *CombatantCollector) UpdateCombatantTracker(combatant Combatant) {
 			// reset combatant if new encounter
 			if c.CombatantTrackers[index].LastUpdate.EncounterUID != combatant.EncounterUID {
 				c.CombatantTrackers[index].Combatant = combatant
-			}
-			// check for new ACT encounter and update
-			newEncounter := false
-			if c.CombatantTrackers[index].LastUpdate.ActEncounterID != combatant.ActEncounterID {
-				newEncounter = true
-			}
-			// damage dealt
-			if !newEncounter && c.CombatantTrackers[index].LastUpdate.Damage <= combatant.Damage {
-				c.CombatantTrackers[index].Combatant.Damage += combatant.Damage - c.CombatantTrackers[index].LastUpdate.Damage
-			} else if newEncounter {
-				c.CombatantTrackers[index].Combatant.Damage += combatant.Damage
-			}
-			// healing
-			if !newEncounter && c.CombatantTrackers[index].LastUpdate.DamageHealed <= combatant.DamageHealed {
-				c.CombatantTrackers[index].Combatant.DamageHealed += combatant.DamageHealed - c.CombatantTrackers[index].LastUpdate.DamageHealed
-			} else if newEncounter {
-				c.CombatantTrackers[index].Combatant.DamageHealed += combatant.DamageHealed
-			}
-			// damage recieved
-			if !newEncounter && c.CombatantTrackers[index].LastUpdate.DamageTaken <= combatant.DamageTaken {
-				c.CombatantTrackers[index].Combatant.DamageTaken += combatant.DamageTaken - c.CombatantTrackers[index].LastUpdate.DamageTaken
-			} else if newEncounter {
-				c.CombatantTrackers[index].Combatant.DamageTaken += combatant.DamageTaken
-			}
-			// deaths
-			if !newEncounter && c.CombatantTrackers[index].LastUpdate.Deaths <= combatant.Deaths {
-				c.CombatantTrackers[index].Combatant.Deaths += combatant.Deaths - c.CombatantTrackers[index].LastUpdate.Deaths
-			} else if newEncounter {
-				c.CombatantTrackers[index].Combatant.Deaths += combatant.Deaths
-			}
-			// heal count
-			if !newEncounter && c.CombatantTrackers[index].LastUpdate.Heals <= combatant.Heals {
-				c.CombatantTrackers[index].Combatant.Heals += combatant.Heals - c.CombatantTrackers[index].LastUpdate.Heals
-			} else if newEncounter {
-				c.CombatantTrackers[index].Combatant.Heals += combatant.Heals
-			}
-			// hit count
-			if !newEncounter && c.CombatantTrackers[index].LastUpdate.Hits <= combatant.Hits {
-				c.CombatantTrackers[index].Combatant.Hits += combatant.Hits - c.CombatantTrackers[index].LastUpdate.Hits
-			} else if newEncounter {
-				c.CombatantTrackers[index].Combatant.Hits += combatant.Hits
-			}
-			// kill count
-			if !newEncounter && c.CombatantTrackers[index].LastUpdate.Kills <= combatant.Kills {
-				c.CombatantTrackers[index].Combatant.Kills += combatant.Kills - c.CombatantTrackers[index].LastUpdate.Kills
-			} else if newEncounter {
-				c.CombatantTrackers[index].Combatant.Kills += combatant.Kills
+				c.CombatantTrackers[index].Offset = combatant
+				c.CombatantTrackers[index].LastUpdate = combatant
+			} else if c.CombatantTrackers[index].LastUpdate.ActEncounterID == combatant.ActEncounterID {
+				// perform action depending if ACT encounter id has updated
+				// no update, update combatant stats with diff between last one and new one
+				combatantDiff := combatantSub(combatant, c.CombatantTrackers[index].LastUpdate)
+				c.CombatantTrackers[index].Combatant = combatantAdd(
+					c.CombatantTrackers[index].Combatant,
+					combatantDiff,
+				)
+			} else {
+				// update, add new one to old one
+				c.CombatantTrackers[index].Combatant = combatantAdd(
+					c.CombatantTrackers[index].Combatant,
+					combatant,
+				)
 			}
 			// update last combatant
 			c.CombatantTrackers[index].LastUpdate = combatant
@@ -121,6 +115,7 @@ func (c *CombatantCollector) UpdateCombatantTracker(combatant Combatant) {
 	ct := combatantTracker{
 		Combatant:  combatant,
 		LastUpdate: combatant,
+		Offset:     combatant,
 	}
 	c.CombatantTrackers = append(c.CombatantTrackers, ct)
 	c.resolvePets()
@@ -200,7 +195,10 @@ func (c *CombatantCollector) resolvePets() {
 func (c *CombatantCollector) GetCombatants() []Combatant {
 	combatants := make([]Combatant, 0)
 	for index := range c.CombatantTrackers {
-		combatants = append(combatants, c.CombatantTrackers[index].Combatant)
+		combatants = append(
+			combatants,
+			combatantSub(c.CombatantTrackers[index].Combatant, c.CombatantTrackers[index].Offset),
+		)
 	}
 	return combatants
 }

@@ -1,3 +1,8 @@
+1.25
+- Fixed further issues with DPS calculation.
+- Dungeon sub bosses are now split in to seperate encounters.
+- Fixed bug with importing ACT triggers.
+
 1.24
 - Fixed issues with DPS calculation.
 - Tweak history page for speed.

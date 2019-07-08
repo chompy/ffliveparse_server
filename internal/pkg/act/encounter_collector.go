@@ -57,6 +57,7 @@ type EncounterCollector struct {
 	CurrentZone      string
 	LastReportTime   time.Time
 	CompletionFlag   bool
+	NextSubArea      string
 }
 
 // NewEncounterCollector - Create new encounter collector
@@ -93,11 +94,13 @@ func (ec *EncounterCollector) UpdateEncounter(encounter Encounter) {
 	if !ec.Encounter.Active {
 		return
 	}
-	if ec.Encounter.Zone == "" {
+	if ec.Encounter.Zone == "" && encounter.Zone != "" {
 		ec.Encounter.Zone = encounter.Zone
-		ec.CurrentZone = encounter.Zone
-	} else if ec.Encounter.Zone != encounter.Zone {
-		ec.CurrentZone = encounter.Zone
+		if ec.NextSubArea != "" {
+			ec.Encounter.Zone += " - " + ec.NextSubArea
+			ec.NextSubArea = ""
+		}
+		ec.CurrentZone = ec.Encounter.Zone
 	}
 }
 
@@ -341,6 +344,44 @@ func (ec *EncounterCollector) ReadLogLine(l *LogLineData) {
 						ec.CompletionFlag = true
 					}
 					break
+				}
+			case LogColorSealed:
+				{
+					// has begun
+					re, err := regexp.Compile("00:0839:(.*) has begun")
+					if err != nil {
+						break
+					}
+					match := re.FindStringSubmatch(l.Raw)
+					if len(match) > 1 {
+						log.Println("[", ec.userIDHash, "][ Encounter", ec.Encounter.UID, "] Enter instance", match[1]+".")
+						ec.CompletionFlag = true
+						break
+					}
+					// arena sealed off
+					re, err = regexp.Compile("00:0839:(.*) will be sealed off ")
+					if err != nil {
+						break
+					}
+					match = re.FindStringSubmatch(l.Raw)
+					if len(match) > 1 {
+						log.Println("[", ec.userIDHash, "][ Encounter", ec.Encounter.UID, "] Seal ", match[1]+".")
+						ec.NextSubArea = match[1]
+						ec.CompletionFlag = true
+						break
+					}
+					// arena unsealed
+					re, err = regexp.Compile("00:0839:(.*) is no longer sealed")
+					if err != nil {
+						break
+					}
+					match = re.FindStringSubmatch(l.Raw)
+					if len(match) > 1 {
+						log.Println("[", ec.userIDHash, "][ Encounter", ec.Encounter.UID, "] Unseal ", match[1]+".")
+						ec.NextSubArea = ""
+						ec.CompletionFlag = true
+						break
+					}
 				}
 			}
 		}

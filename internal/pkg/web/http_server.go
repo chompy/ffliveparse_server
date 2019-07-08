@@ -667,11 +667,12 @@ func sendInitData(ws *websocket.Conn, data *act.Data) {
 	// send encounter
 	if data != nil && data.EncounterCollector.Encounter.UID != "" {
 		encounterUID := data.EncounterCollector.Encounter.UID
-		log.Println("Send encounter data for", encounterUID, "(TotalCombatants:", len(data.CombatantCollector.GetCombatants()), ")")
+		combatants := data.CombatantCollector.GetCombatants()
+		log.Println("Send encounter data for", encounterUID, "(TotalCombatants:", len(combatants), ")")
 		// add encounter
 		dataBytes = append(dataBytes, act.EncodeEncounterBytes(&data.EncounterCollector.Encounter)...)
 		// add combatants
-		for _, combatant := range data.CombatantCollector.GetCombatants() {
+		for _, combatant := range combatants {
 			combatant.EncounterUID = encounterUID
 			dataBytes = append(dataBytes, act.EncodeCombatantBytes(&combatant)...)
 		}

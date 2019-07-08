@@ -397,9 +397,14 @@ class ViewTriggers extends ViewBase
                     data = LZString.decompressFromBase64(data)
                 }
                 try {
+                    var oData = data;
                     data = YAML.parse(data);
+                    if (data == oData) {
+                        throw "Could not parse YAML.";
+                    }
                     break;
                 } catch (e) {
+                    
                     try {
                         data = this.convertActXML(data);
                         break;
@@ -418,7 +423,6 @@ class ViewTriggers extends ViewBase
         // itterate triggers
         var importNewCount = 0;
         var importUpdateCount = 0;
-
         for (var i in data) {
             var trigger = new Trigger(data[i], new Vm());
             if (!trigger.isValid()) {
