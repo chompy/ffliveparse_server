@@ -1,3 +1,6 @@
+DEV
+- Fixed bug with importing ACT triggers with trailing spaces.
+
 1.25
 - Fixed further issues with DPS calculation.
 - Dungeon sub bosses are now split in to seperate encounters.
