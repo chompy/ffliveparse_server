@@ -79,13 +79,13 @@ func combatantSub(c1 Combatant, c2 Combatant) Combatant {
 // UpdateCombatantTracker - Sync ACT combatant data
 func (c *CombatantCollector) UpdateCombatantTracker(combatant Combatant) {
 	// ignore invalid combatants
-	if combatant.ID > 1000000000 && combatant.Job != "" && combatant.ParentID == 0 {
+	if combatant.ID > 1000000000 || combatant.Job == "" {
 		return
 	}
 	// update existing
 	for index := range c.CombatantTrackers {
 		if c.CombatantTrackers[index].Combatant.ID == combatant.ID && c.CombatantTrackers[index].Combatant.ActName == combatant.ActName {
-			// reset combatant if new encounter
+			// get combatant if new encounter
 			if c.CombatantTrackers[index].LastUpdate.EncounterUID != combatant.EncounterUID {
 				c.CombatantTrackers[index].Combatant = combatant
 				c.CombatantTrackers[index].Offset = combatant
@@ -118,7 +118,6 @@ func (c *CombatantCollector) UpdateCombatantTracker(combatant Combatant) {
 		Offset:     combatant,
 	}
 	c.CombatantTrackers = append(c.CombatantTrackers, ct)
-	c.resolvePets()
 }
 
 // ReadLogLine - Parse log line and update combatant(s)
@@ -158,35 +157,6 @@ func (c *CombatantCollector) ReadLogLine(l *LogLineData) {
 				}
 			}
 			break
-		}
-	}
-}
-
-// resolvePets - Link pets to their owners
-func (c *CombatantCollector) resolvePets() {
-	for index, ct := range c.CombatantTrackers {
-		// > 1000000000 ID seems to be player summoned entities
-		if ct.Combatant.ID >= 1000000000 && ct.Combatant.ParentID == 0 {
-			if strings.Contains(ct.Combatant.Name, " (") {
-				// is pet, fix
-				nameSplit := strings.Split(ct.Combatant.Name, " (")
-				ownerName := nameSplit[1][:len(nameSplit[1])-1]
-				hasParent := false
-				for _, ownerCt := range c.CombatantTrackers {
-					if ownerCt.Combatant.ID < 1000000000 && ownerName == ownerCt.Combatant.Name {
-						hasParent = true
-						c.CombatantTrackers[index].Combatant.Name = nameSplit[0]
-						c.CombatantTrackers[index].Combatant.ParentID = ownerCt.Combatant.ID
-						c.CombatantTrackers[index].Combatant.Job = "Pet"
-						break
-					}
-				}
-				// cannot find an owner
-				if !hasParent {
-					//c.CombatantTrackers = append(c.CombatantTrackers[:index], c.CombatantTrackers[index+1])
-					return
-				}
-			}
 		}
 	}
 }
