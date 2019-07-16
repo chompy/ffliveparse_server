@@ -1,5 +1,8 @@
-DEV
+1.26
 - Fixed bug with importing ACT triggers with trailing spaces.
+- Fixed issue where past encounters showed zero for all stats.</li>
+- Fixed issue where one combatant was missing from past encounters (needs testing).
+- Add combatant table indexes.
 
 1.25
 - Fixed further issues with DPS calculation.

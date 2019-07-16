@@ -226,7 +226,9 @@ func initDatabase(database *sql.DB) error {
 			hits INTEGER,
 			heals INTEGER,
 			kills INTEGER,
-			CONSTRAINT encounter_unique UNIQUE (id, user_id, encounter_uid)
+			CONSTRAINT encounter_unique UNIQUE (id, user_id, encounter_uid),
+			CONSTRAINT combatant_id (id),
+			CONSTRAINT combatant_encounter_uid (encounter_uid)
 		)
 	`)
 	if err != nil {
