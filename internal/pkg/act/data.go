@@ -410,6 +410,9 @@ func getEncounterCombatants(database *sql.DB, user user.Data, encounterUID strin
 			return CombatantCollector{}, err
 		}
 		combatantCollector.UpdateCombatantTracker(combatant)
+		for index := range combatantCollector.CombatantTrackers {
+			combatantCollector.CombatantTrackers[index].Offset = Combatant{}
+		}
 	}
 	rows.Close()
 	return combatantCollector, nil
