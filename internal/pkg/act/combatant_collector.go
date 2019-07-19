@@ -115,7 +115,7 @@ func (c *CombatantCollector) UpdateCombatantTracker(combatant Combatant) {
 	ct := combatantTracker{
 		Combatant:  combatant,
 		LastUpdate: combatant,
-		Offset:     combatant,
+		Offset:     combatantSub(combatant, combatant),
 	}
 	c.CombatantTrackers = append(c.CombatantTrackers, ct)
 }

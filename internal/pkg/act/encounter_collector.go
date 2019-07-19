@@ -95,6 +95,9 @@ func (ec *EncounterCollector) UpdateEncounter(encounter Encounter) {
 		return
 	}
 	if ec.Encounter.Zone == "" && encounter.Zone != "" {
+		if encounter.StartTime.Before(ec.Encounter.StartTime) {
+			ec.Encounter.StartTime = encounter.StartTime
+		}
 		ec.Encounter.ActID = encounter.ActID
 		ec.Encounter.Zone = encounter.Zone
 		if ec.NextSubArea != "" {

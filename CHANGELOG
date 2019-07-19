@@ -1,5 +1,6 @@
-DEV
+1.27
 - Tweaked user data active check, believe it was incorrect and causing encounters to end mid fight.
+- Fixed issue that caused initial combatant stats to be dropped.
 
 1.26
 - Fixed bug with importing ACT triggers with trailing spaces.
