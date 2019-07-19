@@ -95,6 +95,7 @@ func (ec *EncounterCollector) UpdateEncounter(encounter Encounter) {
 		return
 	}
 	if ec.Encounter.Zone == "" && encounter.Zone != "" {
+		ec.Encounter.ActID = encounter.ActID
 		ec.Encounter.Zone = encounter.Zone
 		if ec.NextSubArea != "" {
 			ec.Encounter.Zone += " - " + ec.NextSubArea
@@ -365,7 +366,7 @@ func (ec *EncounterCollector) ReadLogLine(l *LogLineData) {
 					}
 					match = re.FindStringSubmatch(l.Raw)
 					if len(match) > 1 {
-						log.Println("[", ec.userIDHash, "][ Encounter", ec.Encounter.UID, "] Seal ", match[1]+".")
+						log.Println("[", ec.userIDHash, "][ Encounter", ec.Encounter.UID, "] Seal", match[1]+".")
 						ec.NextSubArea = match[1]
 						ec.CompletionFlag = true
 						break
@@ -377,7 +378,7 @@ func (ec *EncounterCollector) ReadLogLine(l *LogLineData) {
 					}
 					match = re.FindStringSubmatch(l.Raw)
 					if len(match) > 1 {
-						log.Println("[", ec.userIDHash, "][ Encounter", ec.Encounter.UID, "] Unseal ", match[1]+".")
+						log.Println("[", ec.userIDHash, "][ Encounter", ec.Encounter.UID, "] Unseal", match[1]+".")
 						ec.NextSubArea = ""
 						ec.CompletionFlag = true
 						break

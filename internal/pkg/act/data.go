@@ -609,7 +609,7 @@ func GetPreviousEncounterCount(user user.Data, query string, start *time.Time, e
 // IsActive - Check if data is actively being updated (i.e. active ACT connection)
 func (d *Data) IsActive() bool {
 	dur := time.Now().Sub(d.LastUpdate)
-	return int64(dur/time.Millisecond) < app.LastUpdateInactiveTime
+	return dur < time.Duration(app.LastUpdateInactiveTime*time.Millisecond)
 }
 
 // CleanUpEncounters - delete log files for old encounters

@@ -69,7 +69,7 @@ func (m *Manager) ParseDataString(dataStr []byte, addr *net.UDPAddr) (*Data, err
 				for index, existingData := range m.data {
 					if existingData.User.ID == user.ID {
 						m.data[index].Session = session
-						log.Println("Updated ACT session for user", existingData.User.ID, "from", addr, "(LoadedDataCount:", len(m.data), ")")
+						log.Println("[ USER", m.data[index].User.ID, "] Updated ACT session for user", existingData.User.ID, "from", addr, "(LoadedDataCount:", len(m.data), ")")
 						return &m.data[index], nil
 					}
 				}
@@ -87,7 +87,7 @@ func (m *Manager) ParseDataString(dataStr []byte, addr *net.UDPAddr) (*Data, err
 				go m.doLogTick(actData.User.ID)
 				// save user data, update accessed time
 				m.userManager.Save(user)
-				log.Println("Loaded ACT session for use ", user.ID, "from", addr, "(LoadedDataCount:", len(m.data), ")")
+				log.Println("[ USER", actData.User.ID, "] Loaded ACT session for use ", user.ID, "from", addr, "(LoadedDataCount:", len(m.data), ")")
 				// emit act active event
 				activeFlag := Flag{Name: "active", Value: true}
 				activeFlagBytes, err := CompressBytes(EncodeFlagBytes(&activeFlag))
@@ -105,7 +105,7 @@ func (m *Manager) ParseDataString(dataStr []byte, addr *net.UDPAddr) (*Data, err
 			m.userManager.Save(dataObj.User)
 			// update existing data
 			dataObj.Session = session
-			log.Println("Updated ACT session for user", dataObj.User.ID, "from", addr, "(LoadedDataCount:", len(m.data), ")")
+			log.Println("[ USER", dataObj.User.ID, "] Updated ACT session for user", dataObj.User.ID, "from", addr, "(LoadedDataCount:", len(m.data), ")")
 			break
 		}
 	case DataTypeEncounter:
@@ -203,11 +203,13 @@ func (m *Manager) doTick(userID int64) {
 	for range time.Tick(app.TickRate * time.Millisecond) {
 		data := m.GetDataWithUserID(userID)
 		if data == nil {
-			log.Println("Tick with no session data, killing thread.")
+			log.Println("[ USER", userID, "] Tick with no session data, killing thread.")
 			return
 		}
 		// clear session if no longer active
 		if !data.IsActive() {
+			webIDStr, _ := data.User.GetWebIDString()
+			log.Println("[", webIDStr, "] Session inactive.")
 			m.ClearData(data)
 			return
 		}
@@ -231,7 +233,7 @@ func (m *Manager) doTick(userID int64) {
 		// gz compress encounter data and emit event
 		compressData, err := CompressBytes(EncodeEncounterBytes(&data.EncounterCollector.Encounter))
 		if err != nil {
-			log.Println("Error while compressing encounter data,", err)
+			log.Println("[ USER", userID, "] Error while compressing encounter data,", err)
 			continue
 		}
 		go m.events.Emit(
@@ -248,7 +250,7 @@ func (m *Manager) doTick(userID int64) {
 		if len(sendBytes) > 0 {
 			compressData, err := CompressBytes(sendBytes)
 			if err != nil {
-				log.Println("Error while compressing combatant data,", err)
+				log.Println("[ USER", userID, "] Error while compressing combatant data,", err)
 				continue
 			}
 			go m.events.Emit(
@@ -265,7 +267,7 @@ func (m *Manager) doLogTick(userID int64) {
 	for range time.Tick(app.LogTickRate * time.Millisecond) {
 		data := m.GetDataWithUserID(userID)
 		if data == nil {
-			log.Println("Log tick with no session data, killing thread.")
+			log.Println("[ USER", userID, "] Log tick with no session data, killing thread.")
 			return
 		}
 		if len(data.LogLineBuffer) == 0 {
@@ -280,13 +282,13 @@ func (m *Manager) doLogTick(userID int64) {
 			// dump log buffer
 			err := data.DumpLogLineBuffer()
 			if err != nil {
-				log.Println("Error while dumping log lines,", err)
+				log.Println("[ USER", userID, "] Error while dumping log lines,", err)
 				continue
 			}
 			// compress log lines and send
 			compressData, err := CompressBytes(sendBytes)
 			if err != nil {
-				log.Println("Error while compressing log line data,", err)
+				log.Println("[ USER", userID, "] Error while compressing log line data,", err)
 				continue
 			}
 			go m.events.Emit(
@@ -377,7 +379,8 @@ func (m *Manager) ClearData(d *Data) {
 				d.SaveEncounter()
 				d.ClearEncounter()
 			}
-			log.Println("Remove ACT session for user", d.User.ID, "(LoadedDataCount:", len(m.data), ")")
+			webIDStr, _ := d.User.GetWebIDString()
+			log.Println("[", webIDStr, "] Remove ACT session for user (LoadedDataCount:", len(m.data), ")")
 			break
 		}
 	}

@@ -1,3 +1,6 @@
+DEV
+- Tweaked user data active check, believe it was incorrect and causing encounters to end mid fight.
+
 1.26
 - Fixed bug with importing ACT triggers with trailing spaces.
 - Fixed issue where past encounters showed zero for all stats.</li>
