@@ -60,6 +60,7 @@ type Combatant struct {
 type Encounter struct {
 	UID          string
 	ActID        uint32
+	CompareHash  string
 	StartTime    time.Time
 	EndTime      time.Time
 	Zone         string

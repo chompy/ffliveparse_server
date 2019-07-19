@@ -20,6 +20,7 @@ package act
 import (
 	"bufio"
 	"compress/gzip"
+	"crypto/md5"
 	"database/sql"
 	"fmt"
 	"io"
@@ -27,6 +28,8 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"sort"
+	"strconv"
 	"time"
 
 	"../app"
@@ -191,6 +194,7 @@ func initDatabase(database *sql.DB) error {
 		(
 			uid VARCHAR(32),
 			act_id INTEGER,
+			compare_hash VARCHAR(32),
 			user_id INTEGER,
 			start_time DATETIME,
 			end_time DATETIME,
@@ -256,11 +260,25 @@ func (d *Data) SaveEncounter() error {
 		return err
 	}
 	defer database.Close()
+	// get sorted combatants
+	combatants := d.CombatantCollector.GetCombatants()
+	sort.Slice(combatants, func(i, j int) bool {
+		return combatants[i].ID < combatants[j].ID
+	})
+	// build encounter compare hash
+	// this is used to determine if two different user's encounters
+	// are actually the same encounter
+	h := md5.New()
+	io.WriteString(h, d.EncounterCollector.Encounter.StartTime.UTC().String())
+	for _, combatant := range combatants {
+		io.WriteString(h, strconv.Itoa(int(combatant.ID)))
+	}
+	compareHash := fmt.Sprintf("%x", h.Sum(nil))
 	// insert in to encounter table
 	stmt, err := database.Prepare(`
 		REPLACE INTO encounter
-		(uid, act_id, user_id, start_time, end_time, zone, damage, success_level) VALUES
-		(?, ?, ?, ?, ?, ?, ?, ?)
+		(uid, act_id, compare_hash, user_id, start_time, end_time, zone, damage, success_level) VALUES
+		(?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`)
 	if err != nil {
 		return err
@@ -268,6 +286,7 @@ func (d *Data) SaveEncounter() error {
 	_, err = stmt.Exec(
 		d.EncounterCollector.Encounter.UID,
 		d.EncounterCollector.Encounter.ActID,
+		compareHash,
 		d.User.ID,
 		d.EncounterCollector.Encounter.StartTime,
 		d.EncounterCollector.Encounter.EndTime,
@@ -280,7 +299,7 @@ func (d *Data) SaveEncounter() error {
 	}
 	stmt.Close()
 	// insert in to combatant table
-	for _, combatant := range d.CombatantCollector.GetCombatants() {
+	for _, combatant := range combatants {
 		stmt, err := database.Prepare(`
 			REPLACE INTO combatant
 			(id, parent_id, encounter_uid, user_id, name, act_name, world_name, job, damage, damage_taken, damage_healed, deaths, hits, heals, kills) VALUES
