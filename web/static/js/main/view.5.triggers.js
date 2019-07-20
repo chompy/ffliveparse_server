@@ -399,7 +399,7 @@ class ViewTriggers extends ViewBase
                 try {
                     var oData = data.trim();
                     data = YAML.parse(data);
-                    if (data.trim() == oData) {
+                    if (typeof(data) == "string" && data.trim() == oData) {
                         throw "Could not parse YAML.";
                     }
                     break;
