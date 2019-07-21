@@ -317,9 +317,8 @@ func (d *Data) SaveEncounter() error {
 	stmt.Close()
 	// insert in to combatant+player tables
 	for _, combatantSnapshots := range combatants {
-		// insert combatant2
+		// insert combatant
 		for _, combatant := range combatantSnapshots {
-
 			stmt, err := database.Prepare(`
 				REPLACE INTO combatant
 				(user_id, encounter_uid, player_id, time, job, damage, damage_taken, damage_healed, deaths, hits, heals, kills) VALUES
@@ -349,7 +348,7 @@ func (d *Data) SaveEncounter() error {
 		}
 		// insert player
 		stmt, err = database.Prepare(`
-			REPLACE INTO player
+			INSERT OR IGNORE INTO player
 			(id, name, act_name) VALUES
 			(?, ?, ?)
 		`)
