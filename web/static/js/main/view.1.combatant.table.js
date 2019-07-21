@@ -207,10 +207,10 @@ class ViewCombatantTable extends ViewBase
         this.tableBody.innerHTML = "";
         // display elements
         for (var i in combatants) {
-            if (typeof(this.combatantElements[combatants[i].data.Name]) == "undefined") {
+            if (typeof(this.combatantElements[combatants[i].getLastSnapshot().Name]) == "undefined") {
                 continue;
             }
-            var element = this.combatantElements[combatants[i].data.Name];
+            var element = this.combatantElements[combatants[i].getLastSnapshot().Name];
             this.tableBody.appendChild(element);
         }
     }
@@ -224,22 +224,15 @@ class ViewCombatantTable extends ViewBase
 
     onCombatant(combatant)
     {
-        if (!combatant.data.Job) {
+        if (!combatant.getLastSnapshot().Job) {
             return;
         }
         var isNew = false;
-        if (typeof(this.combatantElements[combatant.data.Name]) == "undefined") {
-            this.combatantElements[combatant.data.Name] = this.buildCombatantElement();
+        if (typeof(this.combatantElements[combatant.getLastSnapshot().Name]) == "undefined") {
+            this.combatantElements[combatant.getLastSnapshot().Name] = this.buildCombatantElement();
             isNew = true;
         }
-        this.updateCombatantElement(combatant, this.combatantElements[combatant.data.Name]);
-        // update parent combatant
-        if (combatant.data.ParentID) {
-            var parentCombatant = this.combatantCollector.find(combatant.data.ParentID);
-            if (parentCombatant) {
-                this.updateCombatantElement(parentCombatant, this.combatantElements[parentCombatant.data.Name]);
-            }
-        }
+        this.updateCombatantElement(combatant, this.combatantElements[combatant.getLastSnapshot().Name]);
         this.displayCombatants();
         if (isNew) {
             // TODO find a way to make this automatic?

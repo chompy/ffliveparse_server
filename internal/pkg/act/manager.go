@@ -243,7 +243,8 @@ func (m *Manager) doTick(userID int64) {
 		)
 		// emit combatant events
 		sendBytes := make([]byte, 0)
-		for _, combatant := range data.CombatantCollector.GetCombatants() {
+		for _, combatantSnapshots := range data.CombatantCollector.GetCombatants() {
+			combatant := combatantSnapshots[len(combatantSnapshots)-1]
 			combatant.EncounterUID = data.EncounterCollector.Encounter.UID
 			sendBytes = append(sendBytes, EncodeCombatantBytes(&combatant)...)
 		}

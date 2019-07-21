@@ -349,44 +349,6 @@ func (ec *EncounterCollector) ReadLogLine(l *LogLineData) {
 					}
 					break
 				}
-			case LogColorSealed:
-				{
-					// has begun
-					re, err := regexp.Compile("00:0839:(.*) has begun")
-					if err != nil {
-						break
-					}
-					match := re.FindStringSubmatch(l.Raw)
-					if len(match) > 1 {
-						log.Println("[", ec.userIDHash, "][ Encounter", ec.Encounter.UID, "] Enter instance", match[1]+".")
-						ec.CompletionFlag = true
-						break
-					}
-					// arena sealed off
-					re, err = regexp.Compile("00:0839:(.*) will be sealed off ")
-					if err != nil {
-						break
-					}
-					match = re.FindStringSubmatch(l.Raw)
-					if len(match) > 1 {
-						log.Println("[", ec.userIDHash, "][ Encounter", ec.Encounter.UID, "] Seal", match[1]+".")
-						ec.NextSubArea = match[1]
-						ec.CompletionFlag = true
-						break
-					}
-					// arena unsealed
-					re, err = regexp.Compile("00:0839:(.*) is no longer sealed")
-					if err != nil {
-						break
-					}
-					match = re.FindStringSubmatch(l.Raw)
-					if len(match) > 1 {
-						log.Println("[", ec.userIDHash, "][ Encounter", ec.Encounter.UID, "] Unseal", match[1]+".")
-						ec.NextSubArea = ""
-						ec.CompletionFlag = true
-						break
-					}
-				}
 			}
 		}
 	}

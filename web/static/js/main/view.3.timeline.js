@@ -300,7 +300,7 @@ class ViewTimeline extends ViewBase
         var combatantCount = -1;
         for (var i = 0; i < combatants.length; i++) {
             var combatant = combatants[i];
-            if (combatant.isEnemy() || !combatant.data.Job) {
+            if (combatant.isEnemy() || !combatant.getLastSnapshot().Job) {
                 continue;
             }
             combatantCount++;
@@ -313,8 +313,8 @@ class ViewTimeline extends ViewBase
                 this._ES("combatant_height")
             );
             // draw role icon
-            var jobIconSrc = "/static/img/job/" + combatant.data.Job.toLowerCase() + ".png";
-            if (combatant.data.Job == "enemy") {
+            var jobIconSrc = "/static/img/job/" + combatant.getLastSnapshot().Job.toLowerCase() + ".png";
+            if (combatant.getLastSnapshot().Job == "enemy") {
                 var jobIconSrc = "/static/img/enemy.png";
             }
             this.drawImage(
@@ -686,14 +686,20 @@ class ViewTimeline extends ViewBase
         this.combatants = [];
         // enemy combatant
         this.combatants.push(new Combatant());
-        this.combatants[0].data = {
+        this.combatants[0].data = [{
             "Job"       : "enemy",
-            "Name"      : "Enemy Combatant(s)"
-        }
+            "Name"      : "Enemies"
+        }];
+        // pet combatant
+        this.combatants.push(new Combatant());
+        this.combatants[1].data = [{
+            "Job"       : "pet",
+            "Name"      : "Pets"
+        }];
         // get combatant list
         var fetchedCombatants = this.combatantCollector.getSortedCombatants("role");
         for (var i in fetchedCombatants) {
-            if (!fetchedCombatants[i].isEnemy() && fetchedCombatants[i].data.Job) {
+            if (!fetchedCombatants[i].isEnemy() && fetchedCombatants[i].getLastSnapshot().Job) {
                 this.combatants.push(fetchedCombatants[i]);
             }
         }
@@ -850,8 +856,8 @@ class ViewTimeline extends ViewBase
             var combatant = combatants[i];
             // get job icon
             var jobIconSrc = "/static/img/enemy.png";
-            if (combatant && combatant.data.Job && combatant.data.Job != "enemy") {
-                var jobIconSrc = "/static/img/job/" + combatant.data.Job.toLowerCase() + ".png";
+            if (combatant && combatant.getLastSnapshot().Job && combatant.getLastSnapshot().Job != "enemy") {
+                var jobIconSrc = "/static/img/job/" + combatant.getLastSnapshot().Job.toLowerCase() + ".png";
             }
             this.drawImage(
                 jobIconSrc,

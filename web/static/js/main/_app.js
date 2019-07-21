@@ -56,7 +56,11 @@ class Application
         // loading progress element
         this.loadingProgressElement = document.getElementById("loading-progress");
         // error overlay element
-        this.errorOverlayElement = document.getElementById("error-overlay")
+        this.errorOverlayElement = document.getElementById("error-overlay");
+        // error overlay message elment
+        this.errorOverlayMessageElement = document.getElementById("error-overlay-message");
+        // ping refresh timeout
+        this.pingRefreshTimeout = null;
     }
 
     /**
@@ -255,10 +259,13 @@ class Application
         };
         socket.onclose = function(event) {
             t.errorOverlayElement.classList.remove("hide");
+            t.errorOverlayMessageElement.innerHTML = "Connection lost.";
             console.log(">> Connection closed,", event);
+            setTimeout(function() { t._pingRefresh(); }, 5000);
         };
         socket.onerror = function(event) {
             t.errorOverlayElement.classList.remove("hide");
+            t.errorOverlayMessageElement.innerHTML = "An error has occured.";
             console.log(">> An error has occured,", event);
         };    
         // log incoming data
@@ -375,6 +382,33 @@ class Application
             USER_CONFIG_LOCAL_STORAGE_KEY,
             JSON.stringify(this.userConfig)
         );
+    }
+
+    /**
+     * Ping server until connection is made. Once connection is made
+     * refresh the current page.
+     */
+    _pingRefresh()
+    {
+        console.log(">> Check connection.");
+        clearTimeout(this.pingRefreshTimeout);
+        var request = new XMLHttpRequest();
+        request.open("GET", "/ping", true);
+        request.send();
+        request.addEventListener("load", function(e) {
+            window.location.reload();
+        });
+        var t = this;
+        request.addEventListener("error", function(e) {
+            t.pingRefreshTimeout = setTimeout(function() {
+                t._pingRefresh();
+            }, 5000);
+        });
+        request.addEventListener("abort", function(e) {
+            t.pingRefreshTimeout = setTimeout(function() {
+                t._pingRefresh();
+            }, 5000);
+        });
     }
 
 }

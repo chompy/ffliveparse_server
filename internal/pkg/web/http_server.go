@@ -411,6 +411,12 @@ func HTTPStartServer(port uint16, userManager *user.Manager, actManager *act.Man
 		// render encounters template
 		htmlTemplates["history.tmpl"].ExecuteTemplate(w, "base.tmpl", td)
 	})
+	// ping
+	http.HandleFunc("/ping", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		output := "OK"
+		w.Write([]byte(output))
+	})
 	// setup main page/index
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		// inc page load count
@@ -672,9 +678,11 @@ func sendInitData(ws *websocket.Conn, data *act.Data) {
 		// add encounter
 		dataBytes = append(dataBytes, act.EncodeEncounterBytes(&data.EncounterCollector.Encounter)...)
 		// add combatants
-		for _, combatant := range combatants {
-			combatant.EncounterUID = encounterUID
-			dataBytes = append(dataBytes, act.EncodeCombatantBytes(&combatant)...)
+		for _, combatantSnapshots := range combatants {
+			for _, combatant := range combatantSnapshots {
+				combatant.EncounterUID = encounterUID
+				dataBytes = append(dataBytes, act.EncodeCombatantBytes(&combatant)...)
+			}
 		}
 	}
 	// add flag indicating if ACT is active

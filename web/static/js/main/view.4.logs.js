@@ -90,8 +90,8 @@ class ViewLogs extends ViewBase
         combatantElement.classList.add("action-combatant");
         // get job icon
         var jobIconSrc = "/static/img/enemy.png";
-        if (combatant && combatant.data.Job != "enemy") {
-            jobIconSrc = "/static/img/job/" + combatant.data.Job.toLowerCase() + ".png";
+        if (combatant && combatant.getLastSnapshot().Job != "enemy") {
+            jobIconSrc = "/static/img/job/" + combatant.getLastSnapshot().Job.toLowerCase() + ".png";
         }
         // create job icon element
         var combatantImgElement = document.createElement("img");

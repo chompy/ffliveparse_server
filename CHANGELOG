@@ -1,3 +1,6 @@
+vDEV
+- Web app now attempts to reconnect after connection lost.
+
 1.27
 - Tweaked user data active check, believe it was incorrect and causing encounters to end mid fight.
 - Fixed issue that caused initial combatant stats to be dropped.

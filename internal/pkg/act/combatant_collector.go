@@ -19,16 +19,15 @@ package act
 
 import (
 	"log"
-	"strings"
 
 	"../user"
 )
 
 // combatantTracker - Data used to track combatant
 type combatantTracker struct {
-	Combatant  Combatant
-	LastUpdate Combatant
-	Offset     Combatant
+	Player    Player
+	Snapshots []Combatant // combatant data captured at points in time
+	Offset    Combatant
 }
 
 // CombatantCollector - Combatant data collector
@@ -79,44 +78,45 @@ func combatantSub(c1 Combatant, c2 Combatant) Combatant {
 // UpdateCombatantTracker - Sync ACT combatant data
 func (c *CombatantCollector) UpdateCombatantTracker(combatant Combatant) {
 	// ignore invalid combatants
-	if combatant.ID > 1000000000 || combatant.Job == "" {
+	if combatant.Player.ID > 1000000000 || combatant.Job == "" {
 		return
 	}
 	// update existing
 	for index := range c.CombatantTrackers {
-		if c.CombatantTrackers[index].Combatant.ID == combatant.ID && c.CombatantTrackers[index].Combatant.ActName == combatant.ActName {
-			// get combatant if new encounter
-			if c.CombatantTrackers[index].LastUpdate.EncounterUID != combatant.EncounterUID {
-				c.CombatantTrackers[index].Combatant = combatant
-				c.CombatantTrackers[index].Offset = combatant
-				c.CombatantTrackers[index].LastUpdate = combatant
-			} else if c.CombatantTrackers[index].LastUpdate.ActEncounterID == combatant.ActEncounterID {
-				// perform action depending if ACT encounter id has updated
-				// no update, update combatant stats with diff between last one and new one
-				combatantDiff := combatantSub(combatant, c.CombatantTrackers[index].LastUpdate)
-				c.CombatantTrackers[index].Combatant = combatantAdd(
-					c.CombatantTrackers[index].Combatant,
-					combatantDiff,
+		player := &c.CombatantTrackers[index].Player
+		lastSnapshot := c.CombatantTrackers[index].Snapshots[len(c.CombatantTrackers[index].Snapshots)-1]
+		if player.ID == combatant.Player.ID && player.ActName == combatant.Player.ActName {
+			if lastSnapshot.EncounterUID != combatant.EncounterUID {
+				// if act still has previous encounter but we want a new encounter in
+				// live parse create an offset with the last snapshot as a negative offset
+				c.CombatantTrackers[index].Offset = combatantSub(
+					Combatant{},
+					lastSnapshot,
 				)
-			} else {
-				// update, add new one to old one
-				c.CombatantTrackers[index].Combatant = combatantAdd(
-					c.CombatantTrackers[index].Combatant,
-					combatant,
-				)
+			} else if lastSnapshot.ActEncounterID != combatant.ActEncounterID {
+				// if act has a new encounter but we want to continue an encounter in
+				// live parse then create an offset with last snapshot
+				c.CombatantTrackers[index].Offset = lastSnapshot
 			}
-			// update last combatant
-			c.CombatantTrackers[index].LastUpdate = combatant
+			// update last combatant with offset
+			c.CombatantTrackers[index].Snapshots = append(
+				c.CombatantTrackers[index].Snapshots,
+				combatantAdd(
+					combatant,
+					c.CombatantTrackers[index].Offset,
+				),
+			)
 			return
 		}
 	}
 	// create new
-	log.Println("[", c.userIDHash, "][ Combatant", combatant.ID, "] Added", combatant.Name, combatant.ID, combatant.Job)
+	log.Println("[", c.userIDHash, "][ Combatant", combatant.Player.ID, "] Added", combatant.Player.Name, "(", combatant.Job, ")")
 	ct := combatantTracker{
-		Combatant:  combatant,
-		LastUpdate: combatant,
-		Offset:     combatantSub(combatant, combatant),
+		Player:    combatant.Player,
+		Snapshots: make([]Combatant, 0),
+		Offset:    Combatant{},
 	}
+	ct.Snapshots = append(ct.Snapshots, combatant)
 	c.CombatantTrackers = append(c.CombatantTrackers, ct)
 }
 
@@ -127,13 +127,10 @@ func (c *CombatantCollector) ReadLogLine(l *LogLineData) {
 		{
 			// sync name
 			for index := range c.CombatantTrackers {
-				// ignore pets/non job combatants
-				if len(c.CombatantTrackers[index].Combatant.Job) == 0 || strings.Contains(c.CombatantTrackers[index].Combatant.Name, " (") {
-					continue
-				}
-				if c.CombatantTrackers[index].Combatant.ID == int32(l.AttackerID) && c.CombatantTrackers[index].Combatant.Name != l.AttackerName {
-					c.CombatantTrackers[index].Combatant.Name = l.AttackerName
-					log.Println("[", c.userIDHash, "][ Combatant", c.CombatantTrackers[index].Combatant.ID, "] Set name", l.AttackerName)
+				player := &c.CombatantTrackers[index].Player
+				if player.ID == int32(l.AttackerID) && player.Name != l.AttackerName {
+					player.Name = l.AttackerName
+					log.Println("[", c.userIDHash, "][ Combatant", player.ID, "] Set name", l.AttackerName)
 				}
 			}
 			break
@@ -146,9 +143,10 @@ func (c *CombatantCollector) ReadLogLine(l *LogLineData) {
 					if l.TargetName != "" && l.AttackerName != "" {
 						// sync world
 						for index := range c.CombatantTrackers {
-							if c.CombatantTrackers[index].Combatant.Name == l.AttackerName && c.CombatantTrackers[index].Combatant.World != l.TargetName {
-								c.CombatantTrackers[index].Combatant.World = l.TargetName
-								log.Println("[", c.userIDHash, "][ Combatant", c.CombatantTrackers[index].Combatant.ID, "] Set world name", l.TargetName)
+							player := &c.CombatantTrackers[index].Player
+							if player.Name == l.AttackerName && player.World != l.TargetName {
+								player.World = l.TargetName
+								log.Println("[", c.userIDHash, "][ Combatant", player.ID, "] Set world name", l.TargetName)
 								break
 							}
 						}
@@ -162,12 +160,17 @@ func (c *CombatantCollector) ReadLogLine(l *LogLineData) {
 }
 
 // GetCombatants - Compile all combatants
-func (c *CombatantCollector) GetCombatants() []Combatant {
-	combatants := make([]Combatant, 0)
-	for index := range c.CombatantTrackers {
+func (c *CombatantCollector) GetCombatants() [][]Combatant {
+	combatants := make([][]Combatant, 0)
+	for _, ct := range c.CombatantTrackers {
+		snapshots := make([]Combatant, 0)
+		for _, snapshot := range ct.Snapshots {
+			snapshot.Player = ct.Player
+			snapshots = append(snapshots, snapshot)
+		}
 		combatants = append(
 			combatants,
-			combatantSub(c.CombatantTrackers[index].Combatant, c.CombatantTrackers[index].Offset),
+			snapshots,
 		)
 	}
 	return combatants

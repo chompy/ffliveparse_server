@@ -211,17 +211,34 @@ func initDatabase(database *sql.DB) error {
 	if err != nil {
 		return err
 	}
+	// create player table if not exist
+	stmt, err = database.Prepare(`
+		CREATE TABLE IF NOT EXISTS player
+		(
+			id INTEGER,
+			name VARCHAR(256),
+			act_name VARCHAR(256),
+			world_name VARCHAR(256),
+			CONSTRAINT player_id UNIQUE (id),
+			CONSTRAINT player_unique UNIQUE (id, name)
+		)
+	`)
+	if err != nil {
+		return err
+	}
+	_, err = stmt.Exec()
+	if err != nil {
+		return err
+	}
+
 	// create combatant table if not exist
 	stmt, err = database.Prepare(`
 		CREATE TABLE IF NOT EXISTS combatant
 		(
-			id INTEGER,
-			parent_id INTEGER,
 			user_id INTEGER,
 			encounter_uid VARCHAR(32),
-			name VARCHAR(256),
-			act_name VARCHAR(256),
-			world_name VARCHAR(256),
+			player_id INTEGER,
+			time DATETIME,
 			job VARCHAR(3),
 			damage INTEGER,
 			damage_taken INTEGER,
@@ -230,7 +247,7 @@ func initDatabase(database *sql.DB) error {
 			hits INTEGER,
 			heals INTEGER,
 			kills INTEGER,
-			CONSTRAINT encounter_unique UNIQUE (id, user_id, encounter_uid)
+			CONSTRAINT combatant_unique UNIQUE (user_id, encounter_uid, player_id, time)
 		)
 	`)
 	if err != nil {
@@ -263,7 +280,7 @@ func (d *Data) SaveEncounter() error {
 	// get sorted combatants
 	combatants := d.CombatantCollector.GetCombatants()
 	sort.Slice(combatants, func(i, j int) bool {
-		return combatants[i].ID < combatants[j].ID
+		return combatants[i][0].Player.ID < combatants[j][0].Player.ID
 	})
 	// build encounter compare hash
 	// this is used to determine if two different user's encounters
@@ -271,7 +288,7 @@ func (d *Data) SaveEncounter() error {
 	h := md5.New()
 	io.WriteString(h, d.EncounterCollector.Encounter.StartTime.UTC().String())
 	for _, combatant := range combatants {
-		io.WriteString(h, strconv.Itoa(int(combatant.ID)))
+		io.WriteString(h, strconv.Itoa(int(combatant[0].Player.ID)))
 	}
 	compareHash := fmt.Sprintf("%x", h.Sum(nil))
 	// insert in to encounter table
@@ -298,37 +315,72 @@ func (d *Data) SaveEncounter() error {
 		return err
 	}
 	stmt.Close()
-	// insert in to combatant table
-	for _, combatant := range combatants {
-		stmt, err := database.Prepare(`
-			REPLACE INTO combatant
-			(id, parent_id, encounter_uid, user_id, name, act_name, world_name, job, damage, damage_taken, damage_healed, deaths, hits, heals, kills) VALUES
-			(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	// insert in to combatant+player tables
+	for _, combatantSnapshots := range combatants {
+		// insert combatant2
+		for _, combatant := range combatantSnapshots {
+
+			stmt, err := database.Prepare(`
+				REPLACE INTO combatant
+				(user_id, encounter_uid, player_id, time, job, damage, damage_taken, damage_healed, deaths, hits, heals, kills) VALUES
+				(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			`)
+			if err != nil {
+				return err
+			}
+			_, err = stmt.Exec(
+				d.User.ID,
+				d.EncounterCollector.Encounter.UID,
+				combatant.Player.ID,
+				combatant.Time,
+				combatant.Job,
+				combatant.Damage,
+				combatant.DamageTaken,
+				combatant.DamageHealed,
+				combatant.Deaths,
+				combatant.Hits,
+				combatant.Heals,
+				combatant.Kills,
+			)
+			if err != nil {
+				return err
+			}
+			stmt.Close()
+		}
+		// insert player
+		stmt, err = database.Prepare(`
+			REPLACE INTO player
+			(id, name, act_name) VALUES
+			(?, ?, ?)
 		`)
 		if err != nil {
 			return err
 		}
 		_, err = stmt.Exec(
-			combatant.ID,
-			combatant.ParentID,
-			d.EncounterCollector.Encounter.UID,
-			d.User.ID,
-			combatant.Name,
-			combatant.ActName,
-			combatant.World,
-			combatant.Job,
-			combatant.Damage,
-			combatant.DamageTaken,
-			combatant.DamageHealed,
-			combatant.Deaths,
-			combatant.Hits,
-			combatant.Heals,
-			combatant.Kills,
+			combatantSnapshots[0].Player.ID,
+			combatantSnapshots[0].Player.Name,
+			combatantSnapshots[0].Player.ActName,
 		)
 		if err != nil {
 			return err
 		}
 		stmt.Close()
+		if combatantSnapshots[0].Player.World != "" {
+			stmt, err := database.Prepare(`
+				UPDATE player SET world_name = ? WHERE id = ?
+			`)
+			if err != nil {
+				return err
+			}
+			_, err = stmt.Exec(
+				combatantSnapshots[0].Player.World,
+				combatantSnapshots[0].Player.ID,
+			)
+			if err != nil {
+				return err
+			}
+			stmt.Close()
+		}
 	}
 	// dump log lines
 	err = d.DumpLogLineBuffer()
@@ -381,9 +433,10 @@ func (d *Data) ClearEncounter() {
 
 // getEncounterCombatants - fetch all combatants in an encounter
 func getEncounterCombatants(database *sql.DB, user user.Data, encounterUID string) (CombatantCollector, error) {
-	dbQueryStr := "SELECT id, parent_id, encounter_uid, name, act_name, world_name, job, damage,"
-	dbQueryStr += " damage_taken, damage_healed, deaths, hits, heals, kills FROM combatant"
-	dbQueryStr += " WHERE user_id = ? AND encounter_uid = ?"
+	dbQueryStr := "SELECT player_id, job, damage, damage_taken, damage_healed, deaths, hits, heals, kills,"
+	dbQueryStr += " player.name, player.act_name, player.world_name FROM combatant"
+	dbQueryStr += " INNER JOIN player ON player.id = combatant.player_id WHERE user_id = ? AND encounter_uid = ?"
+	dbQueryStr += " ORDER BY DATETIME(time) ASC"
 	rows, err := database.Query(
 		dbQueryStr,
 		user.ID,
@@ -393,18 +446,14 @@ func getEncounterCombatants(database *sql.DB, user user.Data, encounterUID strin
 		return CombatantCollector{}, err
 	}
 	combatantCollector := NewCombatantCollector(&user)
-	var parentID sql.NullInt64
 	var worldName sql.NullString
 	var actName sql.NullString
 	for rows.Next() {
+		player := Player{}
 		combatant := Combatant{}
+		combatant.EncounterUID = encounterUID
 		err := rows.Scan(
-			&combatant.ID,
-			&parentID,
-			&combatant.EncounterUID,
-			&combatant.Name,
-			&actName,
-			&worldName,
+			&player.ID,
 			&combatant.Job,
 			&combatant.Damage,
 			&combatant.DamageTaken,
@@ -413,19 +462,20 @@ func getEncounterCombatants(database *sql.DB, user user.Data, encounterUID strin
 			&combatant.Hits,
 			&combatant.Heals,
 			&combatant.Kills,
+			&player.Name,
+			&actName,
+			&worldName,
 		)
-		if parentID.Valid {
-			combatant.ParentID = int32(parentID.Int64)
-		}
 		if worldName.Valid {
-			combatant.World = worldName.String
+			player.World = worldName.String
 		}
 		if actName.Valid {
-			combatant.ActName = actName.String
+			player.ActName = actName.String
 		}
 		if err != nil {
 			return CombatantCollector{}, err
 		}
+		combatant.Player = player
 		combatantCollector.UpdateCombatantTracker(combatant)
 		for index := range combatantCollector.CombatantTrackers {
 			combatantCollector.CombatantTrackers[index].Offset = Combatant{}

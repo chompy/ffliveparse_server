@@ -37,15 +37,21 @@ const DataTypeLogLine byte = 5
 // DataTypeFlag - Data type, boolean flag
 const DataTypeFlag byte = 99
 
+// Player - Data about a player
+type Player struct {
+	ID      int32
+	UID     string
+	Name    string
+	ActName string
+	World   string
+}
+
 // Combatant - Data about a combatant
 type Combatant struct {
+	Player         Player
 	EncounterUID   string
 	ActEncounterID uint32
-	ID             int32
-	ParentID       int32
-	Name           string
-	ActName        string
-	World          string
+	Time           time.Time
 	Job            string
 	Damage         int32
 	DamageTaken    int32

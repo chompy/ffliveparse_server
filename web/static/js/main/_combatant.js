@@ -79,22 +79,17 @@ class CombatantCollector
     }
 
     /**
-     * Get total damage for combatant, combining all child combatants.
+     * Get total damage for combatant.
      * @param {Combatant} combatant 
      * @return float
      */
     getCombatantTotalDamage(combatant)
     {
-        var damage = combatant.data.Damage;
-        for (var i in this.combatants) {
-            if (combatant.compare(parseInt(this.combatants[i].data.ParentID))) {
-                damage += this.combatants[i].data.Damage;
-            }
+        var value = combatant.getLastSnapshot().Damage;
+        if (!this._isValidParseNumber(value)) {
+            value = 0;
         }
-        if (!this._isValidParseNumber(damage)) {
-            damage = 0;
-        }
-        return damage;
+        return value;  
     }
 
     /**
@@ -104,16 +99,11 @@ class CombatantCollector
      */    
     getCombatantTotalHealing(combatant)
     {
-        var healing = combatant.data.DamageHealed;
-        for (var i in this.combatants) {
-            if (combatant.compare(parseInt(this.combatants[i].data.ParentID))) {
-                healing += this.combatants[i].data.DamageHealed;
-            }
+        var value = combatant.getLastSnapshot().DamageHealed;
+        if (!this._isValidParseNumber(value)) {
+            value = 0;
         }
-        if (!this._isValidParseNumber(healing)) {
-            healing = 0;
-        }
-        return healing;        
+        return value;        
     }
 
     /**
@@ -140,27 +130,12 @@ class CombatantCollector
         // make combatant list
         var combatants = [];
         for (var i in this.combatants) {
-            // skip pets
-            if (this.combatants[i].data.ParentID) {
-                continue;
-            }
             combatants.push(this.combatants[i]);
         }
         // sort combatant list
         var t = this;
         var sort = sort;
         combatants.sort(function(a, b) {
-            // keep pet with their owner
-            if (b.data.ParentID) {
-                if (a.data.ParentID && a.data.ParentID == b.data.ParentID) {
-                    return a.data.Name.localeCompare(b.data.Name);
-                }                
-                if (!a.compare(b.data.ParentID)) {
-                    return 1;
-                }
-                return 0;
-            }
-
             // sort by user config sort option
             switch (sort)
             {
@@ -170,15 +145,15 @@ class CombatantCollector
                 }
                 case "deaths":
                 {
-                    return b.data.Deaths - a.data.Deaths;
+                    return b.getLastSnapshot().Deaths - a.getLastSnapshot().Deaths;
                 }
                 case "name":
                 {
-                    return a.data.Name.localeCompare(b.data.Name);
+                    return a.data[0].Name.localeCompare(b.data[0].Name);
                 }
                 case "job":
                 {
-                    return a.data.Job.localeCompare(b.data.Job);
+                    return a.data[0].Job.localeCompare(b.data[0].Job);
                 }
                 case "role":
                 {
@@ -187,8 +162,8 @@ class CombatantCollector
                         ["SCH", "WHM", "AST", "CNJ"]   // healers
                     ];
                     for (var i in jobCats) {
-                        var indexA = jobCats[i].indexOf(a.data.Job.toUpperCase());
-                        var indexB = jobCats[i].indexOf(b.data.Job.toUpperCase());
+                        var indexA = jobCats[i].indexOf(a.data[0].Job.toUpperCase());
+                        var indexB = jobCats[i].indexOf(b.data[0].Job.toUpperCase());
                         if (indexA != -1 && indexB == -1) {
                             return -1;
                         } else if (indexA == -1 && indexB != -1) {
@@ -204,17 +179,6 @@ class CombatantCollector
                 }
             }
         });
-        // add pets under their owner
-        for (var i in this.combatants) {
-            if (!this.combatants[i].data.ParentID) {
-                continue;
-            }
-            for (var j in combatants) {
-                if (combatants[j].compare(this.combatants[i].data.ParentID)) {
-                    combatants.splice(j, 1, combatants[j], this.combatants[i]);
-                }
-            }
-        }
         return combatants;
     }
 
@@ -228,7 +192,7 @@ class Combatant
 
     constructor()
     {
-        this.data = null;
+        this.data = [];
         this.ids = [];
         this.names = [];
     }
@@ -239,15 +203,38 @@ class Combatant
      */
     update(data)
     {
-        if (!this.data || data.Job || !this.data.Job) {
-            this.data = data;
+        if (!this.data || data.Job || !this.data[0].Job) {
+            this.data.push(data);
         }
-        if (this.ids.indexOf(this.data.ID) == -1) {
-            this.ids.push(this.data.ID);
+        if (this.ids.indexOf(data.ID) == -1) {
+            this.ids.push(data.ID);
         }
-        if (this.names.indexOf(this.data.Name) == -1) {
-            this.names.push(this.data.Name);
+        if (this.names.indexOf(data.Name) == -1) {
+            this.names.push(data.Name);
         }
+    }
+
+    /**
+     * Get data snapshot closest to given time
+     * @param Date time
+     * @return {object} 
+     */
+    getSnapshot(time)
+    {
+        for (var i in this.data) {
+            if (!time || time < this.data[i].Time) {
+                return this.data[i];
+            }
+        }
+    }
+
+    /**
+     * Get last data snapshot. (Should reflect final results of encounter.)
+     * @return {object}
+     */
+    getLastSnapshot()
+    {
+        return this.data[this.data.length - 1];
     }
 
     /**
@@ -260,30 +247,22 @@ class Combatant
         if (!value) {
             return false;
         }
+        if (typeof(value.data) != "undefined") {
+            value = value.data;
+            if (typeof(value[0]) != "undefined") {
+                value = value[0];
+            }
+        }
         return (
             // compare act object
             (
                 typeof(value) == "object" &&
                 (
+                    this.ids.indexOf(value.ID) != -1 ||
                     (
-                        typeof(value.data) != "undefined" && (
-                            this.ids.indexOf(value.data.ID) != -1 ||
-                            (
-                                this.data.ParentID != 0 &&
-                                this.data.ParentID == value.data.ParentID &&
-                                this.names.indexOf(value.data.Name) != -1
-                            )
-                        )
-                    ) ||
-                    (
-                        typeof(value.ID) != "undefined" && (
-                            this.ids.indexOf(value.ID) != -1 ||
-                            (
-                                this.data.ParentID != 0 &&
-                                this.data.ParentID == value.ParentID &&
-                                this.names.indexOf(value.Name) != -1
-                            )
-                        )
+                        this.data[0].ParentID != 0 &&
+                        this.data[0].ParentID == value.ParentID &&
+                        this.names.indexOf(value.Name) != -1
                     )
                 )
             // compare id or name
@@ -304,7 +283,7 @@ class Combatant
      */
     getDisplayName()
     {
-        return this.data ? this.data.Name : "";
+        return this.data ? this.data[0].Name : "";
     }
 
     /**
@@ -313,37 +292,46 @@ class Combatant
      */
     isEnemy()
     {
-        // right now enemies are non pet combatants that do not have a defined job
-        return this.data && this.data.ParentID == 0 && this.data.Job == "";
+        return this.data && this.data.Job == "";
     }
 
     /**
      * Get value for given table column.
      * @param {string} name 
+     * @param Date time
      * @return {string|float}
      */
-    getTableCol(name)
+    getTableCol(name, time)
     {
+        // get data snapshot
+        var data = this.getLastSnapshot();
+        if (time) {
+            data = this.getSnapshot(time);
+        }
         switch(name) {
             case "name":
             {
                 return this.getDisplayName();
             }
+            case "world":
+            {
+                return data.World;
+            }
             case "job":
             {
-                return this.data.Job.toLowerCase();
+                return data.Job.toLowerCase();
             }
             case "damage":
             {
-                return this.data.Damage;
+                return data.Damage;
             }
             case "healing":
             {
-                return this.data.DamageHealed;
+                return data.DamageHealed;
             }
             case "deaths":
             {
-                return this.data.Deaths;
+                return data.Deaths;
             }
         }
         return "";
@@ -355,7 +343,7 @@ class Combatant
      */
     getRole()
     {
-        var job = this.data.Job.toUpperCase();
+        var job = this.data[0].Job.toUpperCase();
         for (var role in combatantRoleClasses) {
             if (combatantRoleClasses[role].indexOf(job) != -1) {
                 return role;
