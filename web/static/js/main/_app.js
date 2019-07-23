@@ -72,6 +72,7 @@ class Application
         // loaded dynamically and user should be able to load their own views in
         this.views = [
             new ViewCombatantTable(this.combatantCollector, this.actionCollector),
+            new ViewCombatantGraph(this.combatantCollector, this.actionCollector),
             new ViewCombatantStream(this.combatantCollector, this.actionCollector),
             new ViewTimeline(this.combatantCollector, this.actionCollector),
             new ViewLogs(this.combatantCollector, this.actionCollector),
@@ -261,7 +262,7 @@ class Application
             t.errorOverlayElement.classList.remove("hide");
             t.errorOverlayMessageElement.innerHTML = "Connection lost.";
             console.log(">> Connection closed,", event);
-            setTimeout(function() { t._pingRefresh(); }, 5000);
+            t.pingRefreshTimeout = setTimeout(function() { t._pingRefresh(); }, 5000);
         };
         socket.onerror = function(event) {
             t.errorOverlayElement.classList.remove("hide");
@@ -358,6 +359,9 @@ class Application
             for (var i in t.views) {
                 t.views[i].onResize();
             }            
+        });
+        window.addEventListener("onbeforeunload", function(e) {
+            clearTimeout(t.pingRefreshTimeout)
         });
     }    
 

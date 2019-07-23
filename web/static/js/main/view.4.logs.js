@@ -124,7 +124,7 @@ class ViewLogs extends ViewBase
      */
     addLogLineElement(action)
     {      
-        if (!action.displayAction || !action.type) {
+        if (!action.displayAction || !action.type || !this.actionData) {
             return;
         }
         if (

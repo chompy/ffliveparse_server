@@ -15,51 +15,50 @@ You should have received a copy of the GNU General Public License
 along with FFLiveParse.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-var TIMELINE_PIXELS_PER_MILLISECOND = .125; // how many pixels represents a millisecond in timeline
-var TIMELINE_PIXEL_OFFSET = TIMELINE_PIXELS_PER_MILLISECOND * 1000;
 var GAIN_EFFECT_REGEX = /1A\:([a-zA-Z0-9` ']*) gains the effect of ([a-zA-Z0-9` ']*) from ([a-zA-Z0-9` ']*) for ([0-9]*)\.00 Seconds\./;
 var LOSE_EFFECT_REGEX = /1E\:([a-zA-Z0-9` ']*) loses the effect of ([a-zA-Z0-9` ']*) from ([a-zA-Z0-9` ']*)\./;
-
 // define sizes of different elements at different break points
-var TIMELINE_BREAKPOINT_FULL = 99999;
-var TIMELINE_BREAKPOINT_MOBILE = 768;
 var TIMELINE_ELEMENT_SIZES = {
     "key_height" : {
-        [TIMELINE_BREAKPOINT_FULL] : 24
+        [GRID_BREAKPOINT_FULL] : 24
     },
     "combatant_height" : {
-        [TIMELINE_BREAKPOINT_FULL] : 64
+        [GRID_BREAKPOINT_FULL] : 64
     },
     "combatant_width" : {
-        [TIMELINE_BREAKPOINT_FULL] : 256,
-        [TIMELINE_BREAKPOINT_MOBILE] : 64,
+        [GRID_BREAKPOINT_FULL] : 256,
+        [GRID_BREAKPOINT_MOBILE] : 64,
+    },
+    "key_width" : {
+        [GRID_BREAKPOINT_FULL] : 256,
+        [GRID_BREAKPOINT_MOBILE] : 64,
     },
     "job_icon_width" : {
-        [TIMELINE_BREAKPOINT_FULL] : 48
+        [GRID_BREAKPOINT_FULL] : 48
     },
     "job_icon_height" : {
-        [TIMELINE_BREAKPOINT_FULL] : 48
+        [GRID_BREAKPOINT_FULL] : 48
     },
     "job_icon_width_small" : {
-        [TIMELINE_BREAKPOINT_FULL] : 24
+        [GRID_BREAKPOINT_FULL] : 24
     },
     "job_icon_height_small" : {
-        [TIMELINE_BREAKPOINT_FULL] : 24
+        [GRID_BREAKPOINT_FULL] : 24
     },
     "combatant_name_font" : {
-        [TIMELINE_BREAKPOINT_FULL] : 16
+        [GRID_BREAKPOINT_FULL] : 16
     },
     "action_icon_normal_width" : {
-        [TIMELINE_BREAKPOINT_FULL] : 40
+        [GRID_BREAKPOINT_FULL] : 40
     },
     "action_icon_normal_height" : {
-        [TIMELINE_BREAKPOINT_FULL] : 40
+        [GRID_BREAKPOINT_FULL] : 40
     },
     "action_icon_status_width" : {
-        [TIMELINE_BREAKPOINT_FULL] : 24
+        [GRID_BREAKPOINT_FULL] : 24
     },
     "action_icon_status_height" : {
-        [TIMELINE_BREAKPOINT_FULL] : 32
+        [GRID_BREAKPOINT_FULL] : 32
     }
 }
 var TIMELINE_ROLE_COLORS = {
@@ -76,7 +75,7 @@ var TIMELINE_ACTION_ICON_SIZE_KEYS = {
     [ACTION_TYPE_DEATH]: ["action_icon_normal_width", "action_icon_normal_width"]
 };
 
-class ViewTimeline extends ViewBase
+class ViewTimeline extends ViewGridBase
 {
 
     getName()
@@ -92,27 +91,7 @@ class ViewTimeline extends ViewBase
     init()
     {
         super.init();
-        this.reset();
-        this.buildBaseElements();
-        this.onResize();
-        this.tick();
         var t = this;
-        // horizontal scrolling
-        function hScrollTimeline(e) {
-            var delta = Math.max(-1, Math.min(1, (e.wheelDelta || -e.detail)));
-            t.addSeek(delta * 800);
-        }
-        this.canvasElement.addEventListener("mousewheel", hScrollTimeline);
-        this.canvasElement.addEventListener("DOMMouseScroll", hScrollTimeline);
-        // drag scroll timeline
-        this.mouseIsDown = false;
-        this.mouseIsDrag = false;
-        this.canvasElement.addEventListener("mousedown", function(e) {
-            t.mouseIsDown = true;
-        });
-        this.canvasElement.addEventListener("touchstart", function(e) {
-            t.mouseIsDown = true;
-        });
         var mouseOverAction = function(e) {
             var mousePos = t._getCursorPosition(e);
             for (var i = t.actionPositions.length - 1; i >= 0; i--) {
@@ -147,16 +126,11 @@ class ViewTimeline extends ViewBase
             }
         }
         window.addEventListener("mouseup", function(e) {
-            t.mouseIsDown = false;
             displayOverlay(e);
-            t.mouseIsDrag = false;
-            t.lastTouchPos = null;
         });
         window.addEventListener("touchend", function(e) {
-            t.mouseIsDown = false;
             displayOverlay(e);
-            t.mouseIsDrag = false;
-            t.lastTouchPos = null;
+
         });
         var scrollTimeline = function(movement) {
             if (!t.mouseIsDown) {
@@ -180,7 +154,6 @@ class ViewTimeline extends ViewBase
             }
         };
         this.canvasElement.addEventListener("mousemove", function(e) {
-            scrollTimeline([e.movementX, e.movementY]);
             t.mousePos = [e.x, e.y];
             if (t.mouseIsDrag) {
                 t.canvasElement.classList.remove("action-over");
@@ -193,59 +166,33 @@ class ViewTimeline extends ViewBase
                 t.canvasElement.classList.remove("action-over");
             }
         });
-        this.lastTouchPos = null;
-        this.canvasElement.addEventListener("touchmove", function(e) {
-            if (!t.lastTouchPos) {
-                t.lastTouchPos = [e.touches[0].clientX, e.touches[0].clientY];
-                return;
-            }
-            scrollTimeline([e.touches[0].clientX - t.lastTouchPos[0], e.touches[0].clientY - t.lastTouchPos[1]]);
-            t.lastTouchPos = null;
-        });
     }
 
     reset()
     {
+        super.reset();
         this.encounter = null;
-        this.needRedraw = true;
         this.seek = null;
         this.vOffset = 0;
-        this.tickTimeout = null;
         this.images = {};
-        this.elementSizes = {};
         this.combatants =[];
         this.actionPositions = [];
         this.overlayAction = null;
-    }
-
-    buildBaseElements()
-    {
-        var element = this.getElement();
-        this.canvasElement = document.createElement("canvas");
-        this.canvasContext = this.canvasElement.getContext("2d");
-        element.appendChild(this.canvasElement);
-    }
-
-    onResize()
-    {
-        this.elementSizes = {};
-        if (this.canvasElement) {
-            this.canvasElement.width = this.getViewWidth();
-            this.canvasElement.height = this.getViewHeight();
-            this.redraw();
-        }
+        this.addElementSizes(TIMELINE_ELEMENT_SIZES);
     }
 
     onCombatant(combatant)
     {
         this.combatants = [];
         this.needRedraw = true;
+        this.max = this.encounter.getLength();
     }
 
     onEncounter(encounter)
     {
         this.reset();
         this.encounter = encounter;
+        this.max = this.encounter.getLength();
         this.redraw();
     }
     
@@ -253,36 +200,21 @@ class ViewTimeline extends ViewBase
     {
         this.needRedraw = true;
     }
-
-    onActive()
-    {
-        super.onActive();
-        this.tick();
-        this.redraw();
-    }
     
     tick()
     {
-        if (this.tickTimeout) {
-            clearTimeout(this.tickTimeout);
-        }
         if (!this.active) {
             return;
         }
-        if (this.needRedraw) {
-            this.redraw();
-            this.needRedraw = false;
+        if (this.encounter) {
+            this.max = this.encounter.getLength();
         }
-        var t = this;
-        this.tickTimeout = setTimeout(
-            function() { t.tick(); },
-            250
-        );
+        super.tick();
     }
 
     redraw()
     {
-        this.canvasContext.clearRect(0, 0, this.canvasElement.width, this.canvasElement.height);
+        super.redraw();
         this.drawCombatants();
         this.drawActions();
         this.drawTimeKeys();
@@ -319,13 +251,13 @@ class ViewTimeline extends ViewBase
             }
             this.drawImage(
                 jobIconSrc,
-                this.getViewWidth() > TIMELINE_BREAKPOINT_MOBILE ? 16 : 8,
+                this.getViewWidth() > GRID_BREAKPOINT_MOBILE ? 16 : 8,
                 this._ES("key_height") + ((combatantCount + 1) * this._ES("combatant_height")) - ((this._ES("combatant_height") + this._ES("job_icon_width")) / 2) - this.vOffset,
                 this._ES("job_icon_width"),
                 this._ES("job_icon_height")
             );
             // draw combatant name
-            if (this.getViewWidth() > TIMELINE_BREAKPOINT_MOBILE) {
+            if (this.getViewWidth() > GRID_BREAKPOINT_MOBILE) {
                 this.canvasContext.fillStyle = TIMELINE_ROLE_COLORS[combatant.getRole()][1];
                 this.canvasContext.textBaseline = "middle";
                 this.canvasContext.fillText(
@@ -361,49 +293,7 @@ class ViewTimeline extends ViewBase
      */
     drawTimeKeys()
     {
-        if (!this.encounter) {
-            return;
-        }
-        // get time to draw from
-        var drawTime = this.encounter.getEndTime();
-        if (this.seek) {
-            drawTime = this.seek;
-        }
-        // draw background
-        this.canvasContext.fillStyle = "#404040";
-        this.canvasContext.fillRect(
-            0, 0, this.getViewWidth(), this._ES("key_height")
-        );
-        // draw line
-        this.canvasContext.fillStyle = "#fff";
-        this.canvasContext.fillRect(
-            0, this._ES("key_height") - 1, this.getViewWidth(), 1
-        );
-        // draw times
-        this.canvasContext.font = "14px sans-serif";
-        this.canvasContext.textAlign = "center";
-        this.canvasContext.textBaseline = "middle";
-        var duration = drawTime.getTime() - this.encounter.data.StartTime.getTime();
-        var offset = (duration % 1000) * TIMELINE_PIXELS_PER_MILLISECOND;
-        for (var i = 0; i < 99; i++) {
-            // draw text
-            var seconds = parseInt(duration / 1000) - i;
-            if (seconds < 0) {
-                break;
-            }
-            var timeKeyText = ((seconds / 60) < 10 ? "0" : "") + (Math.floor((seconds / 60)).toFixed(0)) + ":" + ((seconds % 60) < 10 ? "0" : "") + (seconds % 60);
-            var position = parseInt((i * 1000) * TIMELINE_PIXELS_PER_MILLISECOND) + offset;
-            if (position > this.getViewWidth() - this._ES("combatant_width")) {
-                break;
-            }
-            this.canvasContext.fillText(
-                timeKeyText,
-                position + this._ES("combatant_width"),
-                this._ES("key_height") / 2
-            );
-            // draw vertical grid line
-            this.canvasContext.fillRect(position + this._ES("combatant_width"), 25, 1, this.getViewHeight());
-        }
+        super.drawTimeKeys(this.encounter);
     }
 
     /**
@@ -417,10 +307,10 @@ class ViewTimeline extends ViewBase
         // get end time to draw from
         var drawEndTime = this.encounter.getEndTime();
         if (this.seek) {
-            drawEndTime = this.seek;
+            drawEndTime = new Date(this.encounter.data.StartTime.getTime() + this.seek);
         }    
         // get start time to draw from
-        var drawDuration = Math.ceil((this.getViewWidth() - this._ES("combatant_width")) / TIMELINE_PIXELS_PER_MILLISECOND);
+        var drawDuration = Math.ceil((this.getViewWidth() - this._ES("combatant_width")) / GRID_PIXELS_PER_MILLISECOND);
         var drawStartTime = new Date(drawEndTime.getTime() - drawDuration);
         // get actions in time frame
         var actions = this.actionCollector.findInDateRange(
@@ -438,7 +328,7 @@ class ViewTimeline extends ViewBase
             // calculate position/size
             var w = this._ES(TIMELINE_ACTION_ICON_SIZE_KEYS[action.type][0]);
             var h = this._ES(TIMELINE_ACTION_ICON_SIZE_KEYS[action.type][1]);
-            var x = this._ES("combatant_width") + parseInt((drawEndTime.getTime() - action.time.getTime()) * TIMELINE_PIXELS_PER_MILLISECOND);
+            var x = this._ES("combatant_width") + parseInt((drawEndTime.getTime() - action.time.getTime()) * GRID_PIXELS_PER_MILLISECOND);
             var y = this._ES("key_height") + (actionDrawData.vindex * this._ES("combatant_height")) + ((this._ES("combatant_height") - h) / 2);
             this.drawImage(
                 actionDrawData.icon,
@@ -466,39 +356,6 @@ class ViewTimeline extends ViewBase
             // record action positions for click overlay
             this.actionPositions.push([action, x, y - this.vOffset, w, h]);
         }
-    }
-
-    /**
-     * Draw image to canvas.
-     * @param {string} src 
-     * @param {integer} x 
-     * @param {integer} y 
-     * @param {integer} w
-     * @param {integer} h
-     */
-    drawImage(src, x, y, w, h)
-    {
-        // not yet loaded
-        if (typeof(this.images[src]) == "undefined") {
-            var image = new Image();
-            this.images[src] = image;
-            image.src = src;
-            image._loaded = false;
-            var t = this;
-            image.onload = function() {
-                image._loaded = true;
-                t.needRedraw = true;
-            };
-            this.canvasContext.fillStyle = "#e7e7e7";
-            this.canvasContext.fillRect(x, y, w, h);
-
-            return;
-        }
-        // loaded, draw
-        this.canvasContext.drawImage(
-            this.images[src],
-            x, y, w, h
-        );
     }
 
     /**
@@ -774,62 +631,6 @@ class ViewTimeline extends ViewBase
         };
     }
 
-    addSeek(offset)
-    {
-        var currentSeekTime = this.encounter.getEndTime();
-        if (this.seek) {
-            currentSeekTime = this.seek;
-        }
-        this.seek = new Date(currentSeekTime.getTime() + offset);
-        if (this.seek.getTime() > this.encounter.getEndTime().getTime()) {
-            this.seek = null;
-        }
-        this.redraw();
-    }
-
-    /**
-     * Fetch an element size for a given key.
-     * @param {string} key 
-     * @return {integer}
-     */
-    getElementSize(key)
-    {
-        // already retrieved
-        if (key in this.elementSizes) {
-            return this.elementSizes[key];
-        }
-        // retrieve and determine best breakpoint
-        if (key in TIMELINE_ELEMENT_SIZES) {
-            var currentCanvasWidth = this.getViewWidth();
-            var elementSizes = TIMELINE_ELEMENT_SIZES[key];
-            var bestBreakpoint = null;
-            for (var breakpoint in elementSizes) {
-                if (
-                    currentCanvasWidth <= breakpoint && 
-                    (!bestBreakpoint || breakpoint < bestBreakpoint)
-                ) {
-                    bestBreakpoint = breakpoint;
-                }
-            }
-            if (bestBreakpoint) {
-                this.elementSizes[key] = elementSizes[bestBreakpoint];
-                return this.elementSizes[key];
-            }
-        }
-        // key not found
-        return 0;
-    }
-
-    /**
-     * Short hand for getElementSize
-     * @param {string} key 
-     * @return {integer}
-     */
-    _ES(key)
-    {
-        return this.getElementSize(key)
-    }
-
     /**
      * Get cursor position relative to canvas.
      * @param {Event} event 
@@ -903,6 +704,29 @@ class ViewTimeline extends ViewBase
             );            
         }
 
+    }
+
+    /** @inheritdoc */
+    _scrollGrid(movement)
+    {
+        if (!this.mouseIsDown) {
+            return;
+        }
+        super._scrollGrid(movement);
+
+        this.vOffset -= movement[1];
+        if (this.vOffset < 0) {
+            this.vOffset = 0;
+            return;
+        }
+        var combatants = this.getCombatantList();
+        var maxVScroll = (combatants.length * this._ES("combatant_height")) - this.getViewHeight();
+        if (this.vOffset > maxVScroll) {
+            this.vOffset = maxVScroll;
+            if (this.vOffset < 0) {
+                this.vOffset = 0;
+            }
+        }
     }
 
 }

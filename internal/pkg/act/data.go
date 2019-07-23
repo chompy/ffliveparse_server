@@ -432,7 +432,7 @@ func (d *Data) ClearEncounter() {
 
 // getEncounterCombatants - fetch all combatants in an encounter
 func getEncounterCombatants(database *sql.DB, user user.Data, encounterUID string) (CombatantCollector, error) {
-	dbQueryStr := "SELECT player_id, job, damage, damage_taken, damage_healed, deaths, hits, heals, kills,"
+	dbQueryStr := "SELECT player_id, time, job, damage, damage_taken, damage_healed, deaths, hits, heals, kills,"
 	dbQueryStr += " player.name, player.act_name, player.world_name FROM combatant"
 	dbQueryStr += " INNER JOIN player ON player.id = combatant.player_id WHERE user_id = ? AND encounter_uid = ?"
 	dbQueryStr += " ORDER BY DATETIME(time) ASC"
@@ -453,6 +453,7 @@ func getEncounterCombatants(database *sql.DB, user user.Data, encounterUID strin
 		combatant.EncounterUID = encounterUID
 		err := rows.Scan(
 			&player.ID,
+			&combatant.Time,
 			&combatant.Job,
 			&combatant.Damage,
 			&combatant.DamageTaken,

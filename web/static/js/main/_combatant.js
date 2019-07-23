@@ -221,11 +221,21 @@ class Combatant
      */
     getSnapshot(time)
     {
-        for (var i in this.data) {
-            if (!time || time < this.data[i].Time) {
-                return this.data[i];
+        var bestIndex = 0;
+        var bestDiff = 99999;
+        if (time) {
+            for (var i in this.data) {
+                var diff = time.getTime() - this.data[i].Time.getTime();
+                if (diff < 0) {
+                    continue;
+                }
+                if (diff < bestDiff) {
+                    bestDiff = diff;
+                    bestIndex = i;
+                }
             }
         }
+        return this.data[bestIndex];
     }
 
     /**
