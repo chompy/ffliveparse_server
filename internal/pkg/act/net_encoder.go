@@ -74,23 +74,27 @@ func EncodeEncounterBytes(value *Encounter) []byte {
 	return data
 }
 
-// EncodeCombatantBytes - Create Combatant byte array
-func EncodeCombatantBytes(value *Combatant) []byte {
+// EncodeCombatantBytes - Create Combatant[s] byte array
+func EncodeCombatantBytes(value *[]Combatant) []byte {
 	data := make([]byte, 1)
 	data[0] = DataTypeCombatant
-	writeString(&data, value.EncounterUID)
-	writeInt32(&data, value.Player.ID)
-	writeString(&data, value.Player.Name)
-	writeString(&data, value.Player.World)
-	writeString(&data, value.Job)
-	writeInt32(&data, value.Damage)
-	writeInt32(&data, value.DamageTaken)
-	writeInt32(&data, value.DamageHealed)
-	writeInt32(&data, value.Deaths)
-	writeInt32(&data, value.Hits)
-	writeInt32(&data, value.Heals)
-	writeInt32(&data, value.Kills)
-	writeTime(&data, value.Time)
+	cb := *value
+	writeString(&data, cb[0].EncounterUID)
+	writeInt32(&data, cb[0].Player.ID)
+	writeString(&data, cb[0].Player.Name)
+	writeString(&data, cb[0].Player.World)
+	writeString(&data, cb[0].Job)
+	writeInt32(&data, int32(len(cb)))
+	for index := range cb {
+		writeInt32(&data, cb[index].Damage)
+		writeInt32(&data, cb[index].DamageTaken)
+		writeInt32(&data, cb[index].DamageHealed)
+		writeInt32(&data, cb[index].Deaths)
+		writeInt32(&data, cb[index].Hits)
+		writeInt32(&data, cb[index].Heals)
+		writeInt32(&data, cb[index].Kills)
+		writeTime(&data, cb[index].Time)
+	}
 	return data
 }
 

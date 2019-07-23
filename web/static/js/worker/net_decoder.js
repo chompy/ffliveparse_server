@@ -106,46 +106,24 @@ function decodeCombatantBytes(data)
     output["Name"]          = readString(data, pos); pos += readUint16(data, pos) + SIZE_INT16;
     output["World"]         = readString(data, pos); pos += readUint16(data, pos) + SIZE_INT16;
     output["Job"]           = readString(data, pos); pos += readUint16(data, pos) + SIZE_INT16;
-    output["Damage"]        = readInt32(data, pos); pos += SIZE_INT32;
-    output["DamageTaken"]   = readInt32(data, pos); pos += SIZE_INT32;
-    output["DamageHealed"]  = readInt32(data, pos); pos += SIZE_INT32;
-    output["Deaths"]        = readInt32(data, pos); pos += SIZE_INT32;
-    output["Hits"]          = readInt32(data, pos); pos += SIZE_INT32;
-    output["Heals"]         = readInt32(data, pos); pos += SIZE_INT32;
-    output["Kills" ]        = readInt32(data, pos); pos += SIZE_INT32;
-    output["Time"]          = readString(data, pos); pos += readUint16(data, pos) + SIZE_INT16;
-    output["Time"]          = new Date(output["Time"]);
+    var numberOfSnaphots    = readInt32(data, pos); pos += SIZE_INT32;
+    output["Snapshots"]     = [];
+    for (var i = 0; i < numberOfSnaphots; i++) {
+        var snapshot = {};
+        snapshot["Damage"]        = readInt32(data, pos); pos += SIZE_INT32;
+        snapshot["DamageTaken"]   = readInt32(data, pos); pos += SIZE_INT32;
+        snapshot["DamageHealed"]  = readInt32(data, pos); pos += SIZE_INT32;
+        snapshot["Deaths"]        = readInt32(data, pos); pos += SIZE_INT32;
+        snapshot["Hits"]          = readInt32(data, pos); pos += SIZE_INT32;
+        snapshot["Heals"]         = readInt32(data, pos); pos += SIZE_INT32;
+        snapshot["Kills" ]        = readInt32(data, pos); pos += SIZE_INT32;
+        snapshot["Time"]          = readString(data, pos); pos += readUint16(data, pos) + SIZE_INT16;
+        snapshot["Time"]          = new Date(snapshot["Time"]);
+        output["Snapshots"].push(snapshot);
+    }
     if (!encounterUid || output["EncounterUID"] == encounterUid) {
         postMessage({
             "type"      : "act:combatant",
-            "data"      : output
-        });
-    }
-    return pos;
-}
-
-function decodeCombatActionBytes(data)
-{
-    if (data[0] != DATA_TYPE_COMBAT_ACTION) {
-        return 0;
-    }
-    var pos = 1;
-    var output = {
-        "Type" : DATA_TYPE_COMBAT_ACTION
-    };
-    output["EncounterUID"]  = readString(data, pos); pos += readUint16(data, pos) + SIZE_INT16;
-    output["Time"]          = readString(data, pos); pos += readUint16(data, pos) + SIZE_INT16;
-    output["Sort"]          = readInt32(data, pos); pos += SIZE_INT32;
-    output["Attacker"]      = readString(data, pos); pos += readUint16(data, pos) + SIZE_INT16;
-    output["Victim"]        = readString(data, pos); pos += readUint16(data, pos) + SIZE_INT16;
-    output["Damage"]        = readInt32(data, pos); pos += SIZE_INT32;
-    output["Skill"]         = readString(data, pos); pos += readUint16(data, pos) + SIZE_INT16;
-    output["SkillType"]     = readString(data, pos); pos += readUint16(data, pos) + SIZE_INT16;
-    output["SwingType"]     = readByte(data, pos); pos += SIZE_BYTE;
-    output["Critical"]      = readByte(data, pos) != 0; pos += SIZE_BYTE;
-    if (!encounterUid || output["EncounterUID"] == encounterUid) {
-        postMessage({
-            "type"      : "act:combatAction",
             "data"      : output
         });
     }

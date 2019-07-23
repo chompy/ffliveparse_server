@@ -149,11 +149,11 @@ class CombatantCollector
                 }
                 case "name":
                 {
-                    return a.data[0].Name.localeCompare(b.data[0].Name);
+                    return a.data.Name.localeCompare(b.data.Name);
                 }
                 case "job":
                 {
-                    return a.data[0].Job.localeCompare(b.data[0].Job);
+                    return a.data.Job.localeCompare(b.data.Job);
                 }
                 case "role":
                 {
@@ -162,8 +162,8 @@ class CombatantCollector
                         ["SCH", "WHM", "AST", "CNJ"]   // healers
                     ];
                     for (var i in jobCats) {
-                        var indexA = jobCats[i].indexOf(a.data[0].Job.toUpperCase());
-                        var indexB = jobCats[i].indexOf(b.data[0].Job.toUpperCase());
+                        var indexA = jobCats[i].indexOf(a.data.Job.toUpperCase());
+                        var indexB = jobCats[i].indexOf(b.data.Job.toUpperCase());
                         if (indexA != -1 && indexB == -1) {
                             return -1;
                         } else if (indexA == -1 && indexB != -1) {
@@ -192,7 +192,7 @@ class Combatant
 
     constructor()
     {
-        this.data = [];
+        this.data = null;
         this.ids = [];
         this.names = [];
     }
@@ -203,8 +203,12 @@ class Combatant
      */
     update(data)
     {
-        if (!this.data || data.Job || !this.data[0].Job) {
-            this.data.push(data);
+        if (!this.data || !this.data.Job) {
+            this.data = data;
+        } else if (this.data) {
+            for (var i in data.Snapshots) {
+                this.data.Snapshots.push(data.Snapshots[i]);
+            }
         }
         if (this.ids.indexOf(data.ID) == -1) {
             this.ids.push(data.ID);
@@ -224,8 +228,8 @@ class Combatant
         var bestIndex = 0;
         var bestDiff = 99999;
         if (time) {
-            for (var i in this.data) {
-                var diff = time.getTime() - this.data[i].Time.getTime();
+            for (var i in this.data.Snapshots) {
+                var diff = time.getTime() - this.data.Snapshots[i].Time.getTime();
                 if (diff < 0) {
                     continue;
                 }
@@ -235,7 +239,10 @@ class Combatant
                 }
             }
         }
-        return this.data[bestIndex];
+        var data = {};
+        Object.assign(data, this.data, this.data.Snapshots[bestIndex]);
+        delete data.Snapshots;
+        return data;
     }
 
     /**
@@ -244,7 +251,13 @@ class Combatant
      */
     getLastSnapshot()
     {
-        return this.data[this.data.length - 1];
+        if (!this.data) {
+            return null;
+        }
+        var data = {};
+        Object.assign(data, this.data, this.data.Snapshots[this.data.Snapshots.length - 1]);
+        delete data.Snapshots;
+        return data;
     }
 
     /**
@@ -270,8 +283,8 @@ class Combatant
                 (
                     this.ids.indexOf(value.ID) != -1 ||
                     (
-                        this.data[0].ParentID != 0 &&
-                        this.data[0].ParentID == value.ParentID &&
+                        this.data.ParentID != 0 &&
+                        this.data.ParentID == value.ParentID &&
                         this.names.indexOf(value.Name) != -1
                     )
                 )
@@ -293,7 +306,7 @@ class Combatant
      */
     getDisplayName()
     {
-        return this.data ? this.data[0].Name : "";
+        return this.data ? this.data.Name : "";
     }
 
     /**
@@ -353,7 +366,7 @@ class Combatant
      */
     getRole()
     {
-        var job = this.data[0].Job.toUpperCase();
+        var job = this.data.Job.toUpperCase();
         for (var role in combatantRoleClasses) {
             if (combatantRoleClasses[role].indexOf(job) != -1) {
                 return role;

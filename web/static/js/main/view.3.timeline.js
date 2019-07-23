@@ -15,6 +15,7 @@ You should have received a copy of the GNU General Public License
 along with FFLiveParse.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+var NON_PLAYER_ID_COMBATANT_RANGE = 1000000000;
 var GAIN_EFFECT_REGEX = /1A\:([a-zA-Z0-9` ']*) gains the effect of ([a-zA-Z0-9` ']*) from ([a-zA-Z0-9` ']*) for ([0-9]*)\.00 Seconds\./;
 var LOSE_EFFECT_REGEX = /1E\:([a-zA-Z0-9` ']*) loses the effect of ([a-zA-Z0-9` ']*) from ([a-zA-Z0-9` ']*)\./;
 // define sizes of different elements at different break points
@@ -543,20 +544,22 @@ class ViewTimeline extends ViewGridBase
         this.combatants = [];
         // enemy combatant
         this.combatants.push(new Combatant());
-        this.combatants[0].data = [{
+        this.combatants[0].data = {
             "Job"       : "enemy",
-            "Name"      : "Enemies"
-        }];
+            "Name"      : "Enemies",
+            "Snapshots" : [{}],
+        };
         // pet combatant
         this.combatants.push(new Combatant());
-        this.combatants[1].data = [{
+        this.combatants[1].data = {
             "Job"       : "pet",
-            "Name"      : "Pets"
-        }];
+            "Name"      : "Pets",
+            "Snapshots" : [{}],
+        };
         // get combatant list
         var fetchedCombatants = this.combatantCollector.getSortedCombatants("role");
         for (var i in fetchedCombatants) {
-            if (!fetchedCombatants[i].isEnemy() && fetchedCombatants[i].getLastSnapshot().Job) {
+            if (fetchedCombatants[i].data.Job) {
                 this.combatants.push(fetchedCombatants[i]);
             }
         }
@@ -587,7 +590,23 @@ class ViewTimeline extends ViewGridBase
             }
         }
         if (combatants.indexOf(combatant) == -1) {
+            // determine if enemy or pet
             combatant = combatants[0];
+            if (
+                action.data.targetId && 
+                (
+                    (
+                        action.data.flags.indexOf("damage") != -1 &&
+                        action.data.targetId > NON_PLAYER_ID_COMBATANT_RANGE
+                    ) ||
+                    (
+                        action.data.flags.indexOf("heal") != -1 &&
+                        action.data.targetId < NON_PLAYER_ID_COMBATANT_RANGE
+                    )
+                )
+            ) {
+                combatant = combatants[1];
+            }
         }
         // get vertical index
         var vIndex = combatants.indexOf(combatant);

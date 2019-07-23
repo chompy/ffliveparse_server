@@ -68,10 +68,7 @@ class ViewGridBase extends ViewBase
         if (!this.active) {
             return;
         }
-        if (this.encounter) {
-            this.max = this.encounter.getLength();
-        }
-        if (this.needRedraw) {
+        if (this.needRedraw || (this.encounter && this.encounter.data.Active)) {
             this.redraw();
             this.needRedraw = false;
         }

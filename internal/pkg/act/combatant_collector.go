@@ -19,6 +19,7 @@ package act
 
 import (
 	"log"
+	"time"
 
 	"../user"
 )
@@ -164,9 +165,13 @@ func (c *CombatantCollector) GetCombatants() [][]Combatant {
 	combatants := make([][]Combatant, 0)
 	for _, ct := range c.CombatantTrackers {
 		snapshots := make([]Combatant, 0)
+		lastSnapshotTime := time.Time{}
 		for _, snapshot := range ct.Snapshots {
-			snapshot.Player = ct.Player
-			snapshots = append(snapshots, snapshot)
+			if snapshot.Time.Sub(lastSnapshotTime) > time.Duration(time.Second*3) {
+				snapshot.Player = ct.Player
+				snapshots = append(snapshots, snapshot)
+				lastSnapshotTime = snapshot.Time
+			}
 		}
 		combatants = append(
 			combatants,

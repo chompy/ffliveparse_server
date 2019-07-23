@@ -69,6 +69,7 @@ class ViewCombatantGraph extends ViewGridBase
         super.reset();
         this.encounter = null;
         this.maxStatValue = 0;
+        this.combatants = [];
         this.addElementSizes(GRAPH_ELEMENT_SIZES);
     }
 
@@ -76,7 +77,7 @@ class ViewCombatantGraph extends ViewGridBase
     {
         this.needRedraw = true;
         this.maxStatValue = this._getMaxValue(this.valueType);
-        this.needRedraw = true;
+        this.combatants = this.combatantCollector.getSortedCombatants("role");
     }
 
     onEncounter(encounter)
@@ -115,7 +116,7 @@ class ViewCombatantGraph extends ViewGridBase
             case "dps":
             {
                 var maxDps = 0;
-                for (var i = 1; i < Math.ceil(encounterLength / 1000); i++) {
+                for (var i = (encounterLength > 10000 ? 10 : 1); i < Math.ceil(encounterLength / 1000); i++) {
                     var timeIndex = new Date(startTimestamp + (i * 1000));
                     for (var j in this.combatantCollector.combatants) {
                         var combatant = this.combatantCollector.combatants[j];
@@ -172,12 +173,11 @@ class ViewCombatantGraph extends ViewGridBase
         }
 
         // combatant keys
-        var combatants = this.combatantCollector.getSortedCombatants(this.valueType);
-        for (var i in this.combatantCollector.getSortedCombatants(this.valueType)) {
+        for (var i in this.combatants) {
             if (i >= COMBATANT_COLORS.length) {
                 continue;
             }
-            var combatant = combatants[i]
+            var combatant = this.combatants[i]
             // draw role icon
             var jobIconSrc = "/static/img/job/" + combatant.getLastSnapshot().Job.toLowerCase() + ".png";
             if (combatant.getLastSnapshot().Job == "enemy") {
@@ -215,7 +215,6 @@ class ViewCombatantGraph extends ViewGridBase
         var plotBtm = this.getViewHeight() - 16;
         var plotSize = plotBtm - plotTop;
         var pointSize = this._ES("plot_point_size");
-        var combatants = this.combatantCollector.getSortedCombatants(this.valueType);
         var seconds = Math.ceil(this.max / 1000);
 
         // get current seek
@@ -226,21 +225,24 @@ class ViewCombatantGraph extends ViewGridBase
         // hor offset
         var hOffset = currentSeek * GRID_PIXELS_PER_MILLISECOND;
         // init last values
-        var lastHpos = 0;
+        var lastHpos = 9999;
         var lastVpos = [];
-        for (var i = 0; i < this.combatantCollector.combatants.length; i++) {
+        for (var i = 0; i < this.combatants.length; i++) {
             lastVpos.push(0);
         }
-        // itterate each second
-        for (var i = 1; i < seconds; i++) {
+        // max hor distance to draw
+        var viewMax = Math.ceil(currentSeek / 1000);
+        var viewMin = viewMax - Math.ceil((this.getViewWidth() / GRID_PIXELS_PER_MILLISECOND) / 1000) - 1;      
+        // itterate each second in viewport
+        for (var i = viewMin; i < viewMax; i++) {
             var timeIndex = new Date(this.encounter.data.StartTime.getTime() + (i * 1000));
             var hPos = hOffset - (GRID_PIXELS_PER_MILLISECOND * (i * 1000));
-            for (var j in combatants) {
+            for (var j in this.combatants) {
                 if (j >= COMBATANT_COLORS.length) {
                     continue;
                 }
                 // get combatant and snapshot for current time
-                var combatant = combatants[j];
+                var combatant = this.combatants[j];
                 var snapshot = combatant.getSnapshot(timeIndex);
                 if (!snapshot) {
                     continue;
