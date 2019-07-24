@@ -179,6 +179,7 @@ class ViewTimeline extends ViewGridBase
         this.combatants =[];
         this.actionPositions = [];
         this.overlayAction = null;
+        this.petNames = [];
         this.addElementSizes(TIMELINE_ELEMENT_SIZES);
     }
 
@@ -320,42 +321,46 @@ class ViewTimeline extends ViewGridBase
         );
         // itterate and draw actions
         this.actionPositions = [];
-        for (var i in actions) {
-            var action = actions[i];
-            var actionDrawData = this.getActionDrawData(action);
-            if (!actionDrawData || !action || !action.type || !action.displayAction) {
-                continue;
-            }
-            // calculate position/size
-            var w = this._ES(TIMELINE_ACTION_ICON_SIZE_KEYS[action.type][0]);
-            var h = this._ES(TIMELINE_ACTION_ICON_SIZE_KEYS[action.type][1]);
-            var x = this._ES("combatant_width") + parseInt((drawEndTime.getTime() - action.time.getTime()) * GRID_PIXELS_PER_MILLISECOND);
-            var y = this._ES("key_height") + (actionDrawData.vindex * this._ES("combatant_height")) + ((this._ES("combatant_height") - h) / 2);
-            this.drawImage(
-                actionDrawData.icon,
-                x,
-                y - this.vOffset,
-                w,
-                h
-            );
-
-            // draw +/- for buffs/debuffs
-            if (action.type == ACTION_TYPE_GAIN_STATUS_EFFECT || action.type == ACTION_TYPE_LOSE_STATUS_EFFECT) {
-                this.canvasContext.font = "20px sans-serif";
-                this.canvasContext.textAlign = "center";
-                this.canvasContext.fillStyle = "#6def11";
-                this.canvasContext.textBaseline = "middle";
-                var buffText = "+";
-                if (action.type == ACTION_TYPE_LOSE_STATUS_EFFECT) {
-                    buffText = "-";
+        var typeItt = [ACTION_TYPE_NORMAL, ACTION_TYPE_GAIN_STATUS_EFFECT, ACTION_TYPE_LOSE_STATUS_EFFECT, ACTION_TYPE_DEATH];
+        for (var i in typeItt) {
+            for (var j in actions) {
+                var action = actions[j];
+                if (!action || action.type != typeItt[i]) {
+                    continue;
                 }
-                this.canvasContext.fillText(
-                    buffText, x, y - this.vOffset
+                var actionDrawData = this.getActionDrawData(action);
+                if (!actionDrawData || !action || !action.type || !action.displayAction) {
+                    continue;
+                }
+                // calculate position/size
+                var w = this._ES(TIMELINE_ACTION_ICON_SIZE_KEYS[action.type][0]);
+                var h = this._ES(TIMELINE_ACTION_ICON_SIZE_KEYS[action.type][1]);
+                var x = this._ES("combatant_width") + parseInt((drawEndTime.getTime() - action.time.getTime()) * GRID_PIXELS_PER_MILLISECOND);
+                var y = this._ES("key_height") + (actionDrawData.vindex * this._ES("combatant_height")) + ((this._ES("combatant_height") - h) / 2);
+                this.drawImage(
+                    actionDrawData.icon,
+                    x,
+                    y - this.vOffset,
+                    w,
+                    h
                 );
+                // draw +/- for buffs/debuffs
+                if (action.type == ACTION_TYPE_GAIN_STATUS_EFFECT || action.type == ACTION_TYPE_LOSE_STATUS_EFFECT) {
+                    this.canvasContext.font = "20px sans-serif";
+                    this.canvasContext.textAlign = "center";
+                    this.canvasContext.fillStyle = "#6def11";
+                    this.canvasContext.textBaseline = "middle";
+                    var buffText = "+";
+                    if (action.type == ACTION_TYPE_LOSE_STATUS_EFFECT) {
+                        buffText = "-";
+                    }
+                    this.canvasContext.fillText(
+                        buffText, x, y - this.vOffset
+                    );
+                }
+                // record action positions for click overlay
+                this.actionPositions.push([action, x, y - this.vOffset, w, h]);
             }
-
-            // record action positions for click overlay
-            this.actionPositions.push([action, x, y - this.vOffset, w, h]);
         }
     }
 
@@ -580,6 +585,7 @@ class ViewTimeline extends ViewGridBase
             case ACTION_TYPE_GAIN_STATUS_EFFECT:
             case ACTION_TYPE_LOSE_STATUS_EFFECT:
             {
+                console.log(action);
                 combatant = action.targetCombatant;
                 break;
             }
@@ -592,19 +598,7 @@ class ViewTimeline extends ViewGridBase
         if (combatants.indexOf(combatant) == -1) {
             // determine if enemy or pet
             combatant = combatants[0];
-            if (
-                action.data.targetId && 
-                (
-                    (
-                        action.data.flags.indexOf("damage") != -1 &&
-                        action.data.targetId > NON_PLAYER_ID_COMBATANT_RANGE
-                    ) ||
-                    (
-                        action.data.flags.indexOf("heal") != -1 &&
-                        action.data.targetId < NON_PLAYER_ID_COMBATANT_RANGE
-                    )
-                )
-            ) {
+            if (action.sourceIsPet()) {
                 combatant = combatants[1];
             }
         }
@@ -636,7 +630,7 @@ class ViewTimeline extends ViewGridBase
             actionImageSrc = "/static/img/attack.png";
         } else if (!actionData && typeof(action.data.actionName) != "undefined" && ["attack", "shot"].indexOf(action.data.actionName.toLowerCase()) != -1) {
             actionImageSrc = "/static/img/attack.png";
-        } else if (actionData && actionData.icon) {
+        } else if (actionData && actionData.icon && combatant && combatant.data.Job != "enemy") {
             actionImageSrc = ACTION_DATA_BASE_URL + actionData.icon;
             if ([ACTION_TYPE_GAIN_STATUS_EFFECT, ACTION_TYPE_LOSE_STATUS_EFFECT].indexOf(action.type) != -1) {
                 actionImageSrc = STATUS_DATA_BASE_URL + actionData.icon;
@@ -676,8 +670,11 @@ class ViewTimeline extends ViewGridBase
             var combatant = combatants[i];
             // get job icon
             var jobIconSrc = "/static/img/enemy.png";
+            if (action.sourceIsPet()) {
+                jobIconSrc = "/static/img/job/pet.png";
+            }
             if (combatant && combatant.getLastSnapshot().Job && combatant.getLastSnapshot().Job != "enemy") {
-                var jobIconSrc = "/static/img/job/" + combatant.getLastSnapshot().Job.toLowerCase() + ".png";
+                jobIconSrc = "/static/img/job/" + combatant.getLastSnapshot().Job.toLowerCase() + ".png";
             }
             this.drawImage(
                 jobIconSrc,

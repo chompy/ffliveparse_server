@@ -15,12 +15,17 @@ You should have received a copy of the GNU General Public License
 along with FFLiveParse.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-var GAIN_EFFECT_REGEX = /1A\:([a-zA-Z0-9` ']*) gains the effect of ([a-zA-Z0-9` ']*) from ([a-zA-Z0-9` ']*) for ([0-9]*)\.00 Seconds\./;
-var LOSE_EFFECT_REGEX = /1E\:([a-zA-Z0-9` ']*) loses the effect of ([a-zA-Z0-9` ']*) from ([a-zA-Z0-9` ']*)\./;
+var GAIN_EFFECT_REGEX = "1A\:([A-F0-9]*)\:([a-zA-Z0-9` ']*) gains the effect of ([a-zA-Z0-9` ']*) from ([a-zA-Z0-9` ']*) for ([0-9]*)\.00 Seconds\.";
+var LOSE_EFFECT_REGEX = "1E\:([A-F0-9]*)\:([a-zA-Z0-9` ']*) loses the effect of ([a-zA-Z0-9` ']*) from ([a-zA-Z0-9` ']*)\.";
 var ACTION_TYPE_NORMAL = "normal";
 var ACTION_TYPE_GAIN_STATUS_EFFECT = "gain-effect";
 var ACTION_TYPE_LOSE_STATUS_EFFECT = "lose-effect";
 var ACTION_TYPE_DEATH = "death";
+var PET_NAMES = [
+    "Eos", "Selene", "Seraph", "Garuda-Egi", "Titan-Egi", "Ifrit-Egi",
+    "Emerald Carbuncle", "Topaz Carbuncle", "Ruby Carbuncle", "Demi-Bahamut",
+    "Demi-Phoenix", "Rook Autoturret", "Bishop Autoturret", "Automaton Queen"
+];
 
 /**
  * Collects all actions.
@@ -34,6 +39,8 @@ class ActionCollector
     {
         this.reset();
         this.combatantCollector = combatantCollector;
+        this.gainEffectRegex = new XRegExp(GAIN_EFFECT_REGEX);
+        this.loseEffectRegex = new XRegExp(LOSE_EFFECT_REGEX);
     }
 
     reset()
@@ -90,39 +97,41 @@ class ActionCollector
             }
             case MESSAGE_TYPE_GAIN_EFFECT:
             {
-                var regexParse = GAIN_EFFECT_REGEX.exec(action.data.raw);
+                var regexParse = this.gainEffectRegex.exec(action.data.raw);
                 if (!regexParse) {
                     break;
                 }
                 action.type = ACTION_TYPE_GAIN_STATUS_EFFECT;
-                var target = regexParse[1];
-                var effect = regexParse[2];
-                var source = regexParse[3];
+                var targetId = regexParse[1];
+                var target = regexParse[2];
+                var effect = regexParse[3];
+                var source = regexParse[4];
                 //var time = parseInt(regexParse[4]);
                 action.data.actionId = -2;
                 action.data.actionName = effect;
                 action.data.sourceId = null;
                 action.data.sourceName = source;
-                action.data.targetId = null;
+                action.data.targetId = targetId;
                 action.data.targetName = target;
                 action.data.flags = [LOG_LINE_FLAG_GAIN_EFFECT];
                 break;
             }
             case MESSAGE_TYPE_LOSE_EFFECT:
             {
-                var regexParse = LOSE_EFFECT_REGEX.exec(action.data.raw);
+                var regexParse = this.loseEffectRegex.exec(action.data.raw);
                 if (!regexParse) {
                     break;
                 }
                 action.type = ACTION_TYPE_LOSE_STATUS_EFFECT;
-                var target = regexParse[1];
-                var effect = regexParse[2];
-                var source = regexParse[3];
+                var targetId = regexParse[1];
+                var target = regexParse[2];
+                var effect = regexParse[3];
+                var source = regexParse[4];
                 action.data.actionId = -3;
                 action.data.actionName = effect;
                 action.data.sourceId = null;
                 action.data.sourceName = source;
-                action.data.targetId = null;
+                action.data.targetId = targetId;
                 action.data.targetName = target;
                 action.data.flags = [LOG_LINE_FLAG_LOSE_EFFECT];
                 break;
@@ -226,6 +235,40 @@ class Action
         // rather or not this action should be rendered in views that would
         // display it in some way (timeline, etc)
         this.displayAction = true;
+    }
+
+    /**
+     * Check if action source is pet...use name from
+     * list of known pet names to determine...not my
+     * favorite approach but it's not really easy to determine.
+     * @return {boolean}
+     */
+    sourceIsPet()
+    {
+        if (this.sourceIsPlayer() || !this.data || !this.data.sourceName) {
+            return false;
+        }
+        return PET_NAMES.indexOf(this.data.sourceName) != -1;
+    }
+
+    /**
+     * Check if action source is player.
+     * @return {boolean}
+     */
+    sourceIsPlayer()
+    {
+        return Boolean(this.sourceCombatant);
+    }
+
+
+    /**
+     * Check if action source is enemy. Use process of elimination
+     * not player or pet.
+     * @return {boolean}
+     */
+    sourceisEnemy()
+    {
+        return !this.sourceIsPlayer() && !this.sourceIsPet();
     }
 
 }

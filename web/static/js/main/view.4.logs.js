@@ -39,6 +39,7 @@ class ViewLogs extends ViewBase
         setTimeout(function() {
             t.onResize();
         }, 100);
+        this.tick();
     }
 
     buildBaseElements()
@@ -60,13 +61,15 @@ class ViewLogs extends ViewBase
     {
         clearTimeout(this.tickTimeout);
         var t = this;
-        var actions = this.actionCollector.findByOffset(
-            this.offset,
-            -1
-        );
-        this.offset += actions.length;
-        for (var i in actions) {
-            this.addLogLineElement(actions[i]);
+        if (this.encounter) {
+            var actions = this.actionCollector.findByOffset(
+                this.offset,
+                -1
+            );
+            this.offset += actions.length;
+            for (var i in actions) {
+                this.addLogLineElement(actions[i]);
+            }
         }
         this.tickTimeout = setTimeout(
             function() {
@@ -90,6 +93,9 @@ class ViewLogs extends ViewBase
         combatantElement.classList.add("action-combatant");
         // get job icon
         var jobIconSrc = "/static/img/enemy.png";
+        if (action && action.sourceIsPet()) {
+            jobIconSrc = "/static/img/job/pet.png";
+        }
         if (combatant && combatant.getLastSnapshot().Job != "enemy") {
             jobIconSrc = "/static/img/job/" + combatant.getLastSnapshot().Job.toLowerCase() + ".png";
         }
@@ -205,7 +211,6 @@ class ViewLogs extends ViewBase
     {
         this.encounter = encounter;
         this.reset();
-        this.tick();
     }
 
     onResize()

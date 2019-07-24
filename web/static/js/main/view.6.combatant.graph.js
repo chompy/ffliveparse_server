@@ -77,6 +77,7 @@ class ViewCombatantGraph extends ViewGridBase
     {
         this.needRedraw = true;
         this.maxStatValue = this._getMaxValue(this.valueType);
+        this.max = this.encounter.getLength();
         this.combatants = this.combatantCollector.getSortedCombatants("role");
     }
 
@@ -84,12 +85,21 @@ class ViewCombatantGraph extends ViewGridBase
     {
         this.reset();
         this.encounter = encounter;
+        this.max = this.encounter.getLength();
         this.needRedraw = true;
     }
     
     onLogLine(logLine)
     {
         this.needRedraw = true;
+    }
+
+    tick()
+    {
+        super.tick();
+        if (this.encounter) {
+            this.max = this.encounter.getLength();
+        }
     }
 
     redraw()
@@ -180,9 +190,6 @@ class ViewCombatantGraph extends ViewGridBase
             var combatant = this.combatants[i]
             // draw role icon
             var jobIconSrc = "/static/img/job/" + combatant.getLastSnapshot().Job.toLowerCase() + ".png";
-            if (combatant.getLastSnapshot().Job == "enemy") {
-                continue;
-            }
             var vPos = 32 + this._ES("key_height") + (this._ES("job_icon_height") * i);
             this.drawImage(
                 jobIconSrc,
@@ -215,7 +222,6 @@ class ViewCombatantGraph extends ViewGridBase
         var plotBtm = this.getViewHeight() - 16;
         var plotSize = plotBtm - plotTop;
         var pointSize = this._ES("plot_point_size");
-        var seconds = Math.ceil(this.max / 1000);
 
         // get current seek
         var currentSeek = this.max;
