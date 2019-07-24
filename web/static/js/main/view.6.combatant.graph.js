@@ -62,6 +62,24 @@ class ViewCombatantGraph extends ViewGridBase
         setTimeout(function() {
             t.onResize();
         }, 100);
+
+        var mouseOverAction = function(e) {
+            t.currentMouseOver = null;
+            var mousePos = t._getCursorPosition(e);
+            for (var i = t.mouseOverPositions.length - 1; i >= 0; i--) {
+                var mouseOverPosition = t.mouseOverPositions[i];
+                if (
+                    mousePos[0] > mouseOverPosition[1] && mousePos[1] > mouseOverPosition[2] &&
+                    mousePos[0] < mouseOverPosition[1] + mouseOverPosition[3] &&
+                    mousePos[1] < mouseOverPosition[2] + mouseOverPosition[4]
+                ) {
+                    t.currentMouseOver = [mouseOverPosition[0], mousePos[0], mousePos[1]];
+                    t.needRedraw = true;
+                }
+            }
+            return null;
+        }
+        this.canvasElement.addEventListener("mousemove", mouseOverAction);
     }
 
     reset()
@@ -70,6 +88,8 @@ class ViewCombatantGraph extends ViewGridBase
         this.encounter = null;
         this.maxStatValue = 0;
         this.combatants = [];
+        this.mouseOverPositions = [];
+        this.currentMouseOver = null;
         this.addElementSizes(GRAPH_ELEMENT_SIZES);
     }
 
@@ -108,6 +128,13 @@ class ViewCombatantGraph extends ViewGridBase
         this.drawPlotPoints();
         this.drawStatValueKeys();
         this.drawTimeKeys(this.encounter);
+        if (this.currentMouseOver) {
+            this.drawMouseOverText(
+                this.currentMouseOver[0],
+                this.currentMouseOver[1],
+                this.currentMouseOver[2]
+            );
+        }
     }
 
     /**
@@ -218,6 +245,7 @@ class ViewCombatantGraph extends ViewGridBase
             return;
         }
         // init values
+        this.mouseOverPositions = [];
         var plotTop = this._ES("key_height") + 16
         var plotBtm = this.getViewHeight() - 16;
         var plotSize = plotBtm - plotTop;
@@ -267,6 +295,9 @@ class ViewCombatantGraph extends ViewGridBase
                 this.canvasContext.fillRect(
                     hPos, vPos, pointSize, pointSize
                 );
+                this.mouseOverPositions.push([
+                    combatant.getDisplayName() + " (" + value.toFixed(2) + ")", hPos, vPos, pointSize, pointSize
+                ]);
 
                 // draw line to last point
                 if (i > 1) {

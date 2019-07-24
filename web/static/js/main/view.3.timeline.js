@@ -585,7 +585,6 @@ class ViewTimeline extends ViewGridBase
             case ACTION_TYPE_GAIN_STATUS_EFFECT:
             case ACTION_TYPE_LOSE_STATUS_EFFECT:
             {
-                console.log(action);
                 combatant = action.targetCombatant;
                 break;
             }
@@ -630,7 +629,7 @@ class ViewTimeline extends ViewGridBase
             actionImageSrc = "/static/img/attack.png";
         } else if (!actionData && typeof(action.data.actionName) != "undefined" && ["attack", "shot"].indexOf(action.data.actionName.toLowerCase()) != -1) {
             actionImageSrc = "/static/img/attack.png";
-        } else if (actionData && actionData.icon && combatant && combatant.data.Job != "enemy") {
+        } else if (actionData && actionData.icon && (combatant || action.type != ACTION_TYPE_NORMAL)) {
             actionImageSrc = ACTION_DATA_BASE_URL + actionData.icon;
             if ([ACTION_TYPE_GAIN_STATUS_EFFECT, ACTION_TYPE_LOSE_STATUS_EFFECT].indexOf(action.type) != -1) {
                 actionImageSrc = STATUS_DATA_BASE_URL + actionData.icon;

@@ -158,7 +158,7 @@ class CombatantCollector
                 case "role":
                 {
                     var jobCats = [
-                        ["WAR", "DRK", "PLD", "GLA", "MRD"],  // tanks
+                        ["WAR", "DRK", "PLD", "GLA", "MRD", "GNB"],  // tanks
                         ["SCH", "WHM", "AST", "CNJ"]   // healers
                     ];
                     for (var i in jobCats) {

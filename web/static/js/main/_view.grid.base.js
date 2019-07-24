@@ -361,5 +361,22 @@ class ViewGridBase extends ViewBase
         );
     }
 
+    /**
+     * Draw text to display for mouse over.
+     * @param {*} text 
+     * @param {*} x 
+     * @param {*} y 
+     */
+    drawMouseOverText(text, x, y)
+    {
+        this.canvasContext.font = "14px sans-serif";
+        this.canvasContext.textAlign = "left";
+        this.canvasContext.textBaseline = "top";
+        var textMeasure = this.canvasContext.measureText(text);
+        this.canvasContext.fillStyle = "#000000";
+        this.canvasContext.fillRect(x, y, textMeasure.width + 16, 26);
+        this.canvasContext.fillStyle = "#ffffff";
+        this.canvasContext.fillText(text, x + 8, y + 8);
+    }
 
 }
