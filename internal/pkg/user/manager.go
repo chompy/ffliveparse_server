@@ -29,11 +29,25 @@ import (
 
 // Manager - manages users data
 type Manager struct {
-	database *sql.DB
+}
+
+// getDatabase - get user database
+func getDatabase() (*sql.DB, error) {
+	// open database connection
+	database, err := sql.Open("sqlite3", app.DatabasePath)
+	if err != nil {
+		return nil, err
+	}
+	return database, nil
 }
 
 // createUserTables - create tables in user database
-func createUserTables(database *sql.DB) error {
+func createUserTables() error {
+	database, err := getDatabase()
+	if err != nil {
+		return err
+	}
+	defer database.Close()
 	stmt, err := database.Prepare(`
 		CREATE TABLE IF NOT EXISTS user
 		(
@@ -53,30 +67,27 @@ func createUserTables(database *sql.DB) error {
 
 // NewManager - get new user manager
 func NewManager() (Manager, error) {
-	// open database connection
-	database, err := sql.Open("sqlite3", app.DatabasePath)
-	if err != nil {
-		return Manager{}, err
-	}
 	// create tables if they do not exist
-	err = createUserTables(database)
+	err := createUserTables()
 	if err != nil {
 		return Manager{}, err
 	}
-	return Manager{
-		database: database,
-	}, nil
+	return Manager{}, nil
 }
 
 // Close - clean up method, close database connection
 func (m *Manager) Close() {
-	m.database.Close()
 }
 
 // New - create a new user
 func (m *Manager) New() (Data, error) {
+	database, err := getDatabase()
+	if err != nil {
+		return Data{}, err
+	}
+	defer database.Close()
 	ud := NewData()
-	stmt, err := m.database.Prepare(
+	stmt, err := database.Prepare(
 		`INSERT INTO user (upload_key,web_key) VALUES (?,?)`,
 	)
 	if err != nil {
@@ -107,7 +118,12 @@ func (m *Manager) usersFromRows(rows *sql.Rows) ([]Data, error) {
 
 // LoadFromID - load user from id
 func (m *Manager) LoadFromID(ID int64) (Data, error) {
-	rows, err := m.database.Query(
+	database, err := getDatabase()
+	if err != nil {
+		return Data{}, err
+	}
+	defer database.Close()
+	rows, err := database.Query(
 		`SELECT * FROM user WHERE id = ? LIMIT 1`,
 		ID,
 	)
@@ -127,7 +143,12 @@ func (m *Manager) LoadFromID(ID int64) (Data, error) {
 
 // LoadFromUploadKey - load user from upload key
 func (m *Manager) LoadFromUploadKey(uploadKey string) (Data, error) {
-	rows, err := m.database.Query(
+	database, err := getDatabase()
+	if err != nil {
+		return Data{}, err
+	}
+	defer database.Close()
+	rows, err := database.Query(
 		`SELECT * FROM user WHERE upload_key = ? LIMIT 1`,
 		uploadKey,
 	)
@@ -147,7 +168,12 @@ func (m *Manager) LoadFromUploadKey(uploadKey string) (Data, error) {
 
 // LoadFromWebKey - load user from web key
 func (m *Manager) LoadFromWebKey(webKey string) (Data, error) {
-	rows, err := m.database.Query(
+	database, err := getDatabase()
+	if err != nil {
+		return Data{}, err
+	}
+	defer database.Close()
+	rows, err := database.Query(
 		`SELECT * FROM user WHERE web_key = ? LIMIT 1`,
 		webKey,
 	)
@@ -176,7 +202,12 @@ func (m *Manager) LoadFromWebIDString(webIDString string) (Data, error) {
 
 // Save - save user data, current just updates 'accessed' time
 func (m *Manager) Save(user Data) error {
-	stmt, err := m.database.Prepare(
+	database, err := getDatabase()
+	if err != nil {
+		return err
+	}
+	defer database.Close()
+	stmt, err := database.Prepare(
 		`UPDATE user SET accessed = ? WHERE id = ?`,
 	)
 	if err != nil {
@@ -188,15 +219,3 @@ func (m *Manager) Save(user Data) error {
 	)
 	return err
 }
-
-// Delete - delete user data from database
-/*func (m *Manager) Delete(user Data) error {
-	stmt, err := m.database.Prepare(
-		`DELETE FROM user WHERE id = ?`,
-	)
-	if err != nil {
-		return err
-	}
-	_, err = stmt.Exec(user.ID)
-	return err
-}*/

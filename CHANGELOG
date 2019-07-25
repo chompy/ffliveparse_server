@@ -1,3 +1,6 @@
+1.29
+- Fixed issue with user manager writing to database.
+
 1.28
 - Web app now attempts to reconnect after connection lost.
 - Split player data in to seperate database table.
