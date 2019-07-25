@@ -201,6 +201,7 @@ func initDatabase(database *sql.DB) error {
 			zone VARCHAR(256),
 			damage INTEGER,
 			success_level INTEGER,
+			has_logs BOOL,
 			CONSTRAINT encounter_uid_unique UNIQUE (uid)
 		)
 	`)
@@ -699,13 +700,14 @@ func CleanUpEncounters() (int, error) {
 	cleanUpDate := time.Now().Add(time.Duration(-app.EncounterCleanUpDays*24) * time.Hour)
 	// fetch encounters
 	rows, err := database.Query(
-		"SELECT uid FROM encounter WHERE DATETIME(start_time) < ?",
+		"SELECT uid FROM encounter WHERE DATETIME(start_time) < ? AND has_logs",
 		cleanUpDate,
 	)
 	if err != nil {
 		return 0, err
 	}
-	cleanUpCount := 0
+	// get list of uids
+	uidList := make([]string, 0)
 	for rows.Next() {
 		var uid sql.NullString
 		err = rows.Scan(
@@ -714,18 +716,46 @@ func CleanUpEncounters() (int, error) {
 		if err != nil || !uid.Valid {
 			continue
 		}
-		logPath := getPermanentLogPath(uid.String)
-		if _, err := os.Stat(logPath); os.IsNotExist(err) {
-			continue
-		}
-		err = os.Remove(logPath)
-		if err != nil {
-			log.Println("[CLEAN] Error", uid.String, err.Error())
-		}
-		log.Println("[CLEAN]", uid.String)
-		cleanUpCount++
+		uidList = append(uidList, uid.String)
 	}
 	rows.Close()
+	// itterate uids and clean up log entries
+	cleanUpCount := 0
+	for _, uid := range uidList {
+		// database statement to flag removal of log
+		stmt, err := database.Prepare(`UPDATE encounter SET has_logs = false WHERE uid = ?`)
+		// check if log exists
+		logPath := getPermanentLogPath(uid)
+		if _, err := os.Stat(logPath); os.IsNotExist(err) {
+			// update database if log file is missing
+			_, err = stmt.Exec(
+				uid,
+			)
+			if err != nil {
+				log.Println("[CLEAN] Error", uid, err.Error())
+			}
+			stmt.Close()
+			continue
+		}
+		// delete log file
+		err = os.Remove(logPath)
+		if err != nil {
+			stmt.Close()
+			log.Println("[CLEAN] Error", uid, err.Error())
+			continue
+		}
+		log.Println("[CLEAN]", uid)
+		cleanUpCount++
+		// update database
+		_, err = stmt.Exec(
+			uid,
+		)
+		stmt.Close()
+		if err != nil {
+			log.Println("[CLEAN] Error", uid, err.Error())
+			continue
+		}
+	}
 	log.Println("[CLEAN] Completed. Removed", cleanUpCount, "log(s).")
 	return cleanUpCount, nil
 }
