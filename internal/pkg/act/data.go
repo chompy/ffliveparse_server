@@ -179,7 +179,7 @@ func (d *Data) DumpLogLineBuffer() error {
 // getDatabase - get encounter database
 func getDatabase() (*sql.DB, error) {
 	// open database connection
-	database, err := sql.Open("sqlite3", app.DatabasePath)
+	database, err := sql.Open("sqlite3", app.DatabasePath+"?_journal=WAL")
 	if err != nil {
 		return nil, err
 	}
@@ -295,8 +295,8 @@ func (d *Data) SaveEncounter() error {
 	// insert in to encounter table
 	stmt, err := database.Prepare(`
 		REPLACE INTO encounter
-		(uid, act_id, compare_hash, user_id, start_time, end_time, zone, damage, success_level) VALUES
-		(?, ?, ?, ?, ?, ?, ?, ?, ?)
+		(uid, act_id, compare_hash, user_id, start_time, end_time, zone, damage, success_level, has_logs) VALUES
+		(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`)
 	if err != nil {
 		return err
@@ -311,6 +311,7 @@ func (d *Data) SaveEncounter() error {
 		d.EncounterCollector.Encounter.Zone,
 		d.EncounterCollector.Encounter.Damage,
 		d.EncounterCollector.Encounter.SuccessLevel,
+		true,
 	)
 	if err != nil {
 		return err
@@ -556,7 +557,7 @@ func GetPreviousEncounters(user user.Data, offset int, query string, start *time
 	// build query
 	params := make([]interface{}, 1)
 	params[0] = user.ID
-	dbQueryStr := "SELECT DISTINCT(uid), act_id, start_time, end_time, zone, encounter.damage, success_level"
+	dbQueryStr := "SELECT DISTINCT(uid), act_id, start_time, end_time, zone, encounter.damage, success_level, has_logs"
 	dbQueryStr += " FROM encounter INNER JOIN combatant ON combatant.encounter_uid = encounter.uid"
 	dbQueryStr += " INNER JOIN player ON player.id = combatant.player_id"
 	dbQueryStr += " WHERE DATETIME(end_time) > DATETIME(start_time)"
@@ -593,6 +594,7 @@ func GetPreviousEncounters(user user.Data, offset int, query string, start *time
 	encounters := make([]Data, 0)
 	for rows.Next() {
 		// build encounter
+		hasLogs := true
 		encounter := Encounter{}
 		err := rows.Scan(
 			&encounter.UID,
@@ -602,15 +604,10 @@ func GetPreviousEncounters(user user.Data, offset int, query string, start *time
 			&encounter.Zone,
 			&encounter.Damage,
 			&encounter.SuccessLevel,
+			&hasLogs,
 		)
 		if err != nil {
 			return nil, err
-		}
-		// determine if log file exists
-		hasLogs := true
-		logPath := getPermanentLogPath(encounter.UID)
-		if _, err := os.Stat(logPath); os.IsNotExist(err) {
-			hasLogs = false
 		}
 		// build collectors
 		encounterCollector := NewEncounterCollector(&user)
@@ -728,6 +725,7 @@ func CleanUpEncounters() (int, error) {
 		logPath := getPermanentLogPath(uid)
 		if _, err := os.Stat(logPath); os.IsNotExist(err) {
 			// update database if log file is missing
+			log.Println("[CLEAN]", uid, "(log flag missing from database)")
 			_, err = stmt.Exec(
 				uid,
 			)

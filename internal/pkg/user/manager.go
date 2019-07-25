@@ -34,7 +34,7 @@ type Manager struct {
 // getDatabase - get user database
 func getDatabase() (*sql.DB, error) {
 	// open database connection
-	database, err := sql.Open("sqlite3", app.DatabasePath)
+	database, err := sql.Open("sqlite3", app.DatabasePath+"?_journal=WAL")
 	if err != nil {
 		return nil, err
 	}

@@ -52,7 +52,7 @@ func main() {
 	defer actManager.ClearAllData()
 
 	// clean up old encounters
-	//go act.CleanUpEncounters()
+	go act.CleanUpEncounters()
 
 	// start http server
 	go web.HTTPStartServer(uint16(*httpPort), &userManager, &actManager, &events, &statCollector, *devModePtr)
