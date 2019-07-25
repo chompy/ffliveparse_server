@@ -55,6 +55,8 @@ let kFlagInstantDeath = '33';
 // miss, damage, block, parry, instant death
 let kAttackFlags = ['01', '03', '05', '06', kFlagInstantDeath];
 
+var MESSAGE_TYPE_GAME_LOG = 0;
+var MESSAGE_TYPE_START_CASTING = 20
 var MESSAGE_TYPE_SINGLE_TARGET = 21;
 var MESSAGE_TYPE_AOE = 22;
 var MESSAGE_TYPE_DEATH = 25;
@@ -85,6 +87,17 @@ function parseLogLine(message)
     };
     switch (messageType)
     {
+        case MESSAGE_TYPE_GAME_LOG:
+        {
+            var color = parseInt(fields[1], 16);
+            var colorR = (color & 0xF800) >> 8;
+            var colorG = (color & 0x07E0) >> 3;
+            var colorB = (color & 0x1F) << 3;
+            data["color"] = [colorR, colorG, colorB];
+            data["message"] = fields.slice(2).join(":");
+            break;
+        }
+
         case MESSAGE_TYPE_SINGLE_TARGET:
         case MESSAGE_TYPE_AOE:
         {

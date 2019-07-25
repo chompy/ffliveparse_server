@@ -447,13 +447,14 @@ func getEncounterCombatants(database *sql.DB, user user.Data, encounterUID strin
 	combatantCollector := NewCombatantCollector(&user)
 	var worldName sql.NullString
 	var actName sql.NullString
+	var combatantTime NullTime
 	for rows.Next() {
 		player := Player{}
 		combatant := Combatant{}
 		combatant.EncounterUID = encounterUID
 		err := rows.Scan(
 			&player.ID,
-			&combatant.Time,
+			&combatantTime,
 			&combatant.Job,
 			&combatant.Damage,
 			&combatant.DamageTaken,
@@ -466,6 +467,9 @@ func getEncounterCombatants(database *sql.DB, user user.Data, encounterUID strin
 			&actName,
 			&worldName,
 		)
+		if combatantTime.Valid {
+			combatant.Time = combatantTime.Time
+		}
 		if worldName.Valid {
 			player.World = worldName.String
 		}
@@ -553,11 +557,12 @@ func GetPreviousEncounters(user user.Data, offset int, query string, start *time
 	params[0] = user.ID
 	dbQueryStr := "SELECT DISTINCT(uid), act_id, start_time, end_time, zone, encounter.damage, success_level"
 	dbQueryStr += " FROM encounter INNER JOIN combatant ON combatant.encounter_uid = encounter.uid"
+	dbQueryStr += " INNER JOIN player ON player.id = combatant.player_id"
 	dbQueryStr += " WHERE DATETIME(end_time) > DATETIME(start_time)"
 	dbQueryStr += " AND encounter.user_id = ?"
 	// search string
 	if query != "" {
-		dbQueryStr += " AND (zone LIKE ? OR combatant.name LIKE ?)"
+		dbQueryStr += " AND (zone LIKE ? OR player.name LIKE ?)"
 		params = append(params, "%"+query+"%", "%"+query+"%")
 	}
 	// start date
@@ -634,11 +639,12 @@ func GetPreviousEncounterCount(user user.Data, query string, start *time.Time, e
 	params := make([]interface{}, 1)
 	params[0] = user.ID
 	dbQueryStr := "SELECT COUNT(DISTINCT(uid)) FROM encounter INNER JOIN combatant ON combatant.encounter_uid = encounter.uid"
+	dbQueryStr += " INNER JOIN player ON player.id = combatant.player_id"
 	dbQueryStr += " WHERE DATETIME(end_time) > DATETIME(start_time)"
 	dbQueryStr += " AND encounter.user_id = ?"
 	// search string
 	if query != "" {
-		dbQueryStr += " AND (zone LIKE ? OR combatant.name LIKE ?)"
+		dbQueryStr += " AND (zone LIKE ? OR player.name LIKE ?)"
 		params = append(params, "%"+query+"%", "%"+query+"%")
 	}
 	// start date

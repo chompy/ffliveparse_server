@@ -33,13 +33,6 @@ class ViewLogs extends ViewBase
         super.init();
         this.buildBaseElements();
         this.reset();
-        this.encounter = null;
-        var t = this;
-        this.tickTimeout = null;
-        setTimeout(function() {
-            t.onResize();
-        }, 100);
-        this.tick();
     }
 
     buildBaseElements()
@@ -52,31 +45,9 @@ class ViewLogs extends ViewBase
 
     reset()
     {
-        this.offset = 0;
-        this.lastAddedAction = null;
+        this.encounter = null;
+        this.logQueue = [];
         this.logContainerElement.innerHTML = "";
-    }
-
-    tick()
-    {
-        clearTimeout(this.tickTimeout);
-        var t = this;
-        if (this.encounter) {
-            var actions = this.actionCollector.findByOffset(
-                this.offset,
-                -1
-            );
-            this.offset += actions.length;
-            for (var i in actions) {
-                this.addLogLineElement(actions[i]);
-            }
-        }
-        this.tickTimeout = setTimeout(
-            function() {
-                t.tick();
-            },
-            1000
-        );
     }
 
     /**
@@ -88,6 +59,7 @@ class ViewLogs extends ViewBase
      */
     createCombatantElement(combatant, altName, action)
     {
+
         // create main element
         var combatantElement = document.createElement("div");
         combatantElement.classList.add("action-combatant");
@@ -207,10 +179,90 @@ class ViewLogs extends ViewBase
         this.lastAddedAction = action;
     }
 
+    processLogQueue()
+    {
+        if (!this.actionData || !this.statusData || !this.encounter) {
+            return;
+        }
+        var logLine = null;
+        while (logLine = this.logQueue.shift()) {
+
+            // parse log line
+            var logData = parseLogLine(logLine.LogLine);
+            // ensure we want to display log for this line
+            if ([MESSAGE_TYPE_GAME_LOG].indexOf(logData.type) == -1) {
+                continue;
+            }
+
+            // create log element
+            var logElement = document.createElement("div");
+            logElement.classList.add("log-line", "log-line-" + logData.type);
+
+            // create time element
+            var timeElement = document.createElement("div");
+            timeElement.innerText = "";
+            timeElement.classList.add("log-line-time")
+            var timeElasped = new Date(logLine.Time - this.encounter.data.StartTime);
+            if (logLine.Time < this.encounter.data.StartTime) {
+                timeElasped = new Date(this.encounter.data.StartTime - logLine.Time);
+                timeElement.innerText = "-";
+            }
+
+            timeElement.innerText += (timeElasped.getMinutes() < 0 ? "0" : "") + 
+            timeElasped.getMinutes() + ":" + 
+                (timeElasped.getSeconds() < 10 ? "0" : "") + 
+                timeElasped.getSeconds() + "." +
+                (timeElasped.getMilliseconds() < 10 ? "0" : "") +
+                (timeElasped.getMilliseconds() < 100 ? "0" : "") +
+                timeElasped.getMilliseconds()
+            ;
+            logElement.appendChild(timeElement);
+            // handle specific log line
+            switch (logData.type) {
+                case MESSAGE_TYPE_GAME_LOG:
+                {
+                    var logMessageElement = document.createElement("div");
+                    logMessageElement.classList.add("log-line-data");
+
+                    for (var i in this.combatantCollector.combatants) {
+                        var combatant = this.combatantCollector.combatants[i];
+                        /*var combatantName = combatant.getDisplayName();
+                        var jobIconSrc = "/static/img/job/" + combatant.getLastSnapshot().Job.toLowerCase() + ".png";
+                        logData.message = logData.message.replace(
+                            combatantName,
+                            '<img src="' + jobIconSrc + '" alt="' + combatantName + '" title=" '+ combatantName + '"> ' + combatantName
+                        );*/
+                        if (combatant.data.World) {
+                            logData.message = logData.message.replace(
+                                combatant.data.World,
+                                ""
+                            );
+                        }
+                    }
+
+                    logMessageElement.innerHTML = logData.message;
+                    logMessageElement.style.color = "rgb(" + logData.color.join(",") + ")";
+                    logElement.appendChild(logMessageElement);
+                    break;
+                }
+            }
+            this.logContainerElement.insertBefore(
+                logElement,
+                this.logContainerElement.firstChild
+            );            
+        }
+    }
+
     onEncounter(encounter)
     {
-        this.encounter = encounter;
         this.reset();
+        this.encounter = encounter;
+    }
+
+    onLogLine(logLineData)
+    {
+        this.logQueue.push(logLineData);
+        this.processLogQueue();
     }
 
     onResize()

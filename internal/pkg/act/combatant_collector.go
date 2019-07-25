@@ -173,6 +173,9 @@ func (c *CombatantCollector) GetCombatants() [][]Combatant {
 				lastSnapshotTime = snapshot.Time
 			}
 		}
+		if len(snapshots) == 0 && len(ct.Snapshots) > 0 {
+			snapshots = append(snapshots, ct.Snapshots[0])
+		}
 		combatants = append(
 			combatants,
 			snapshots,

@@ -78,13 +78,28 @@ class Application
             new ViewLogs(this.combatantCollector, this.actionCollector),
             new ViewTriggers(this.combatantCollector, this.actionCollector),
         ];
+        // create mutation observer
+        var t = this;
+        var observer = new MutationObserver(function(mutations) {
+            fflpFixFooter();
+            for (var i in t.views) {
+                t.views[i].onResize();
+            }
+        });
         // init all views
         for (var i in this.views) {
             this.views[i].init();
             sideMenuAddView(this.views[i]);
+            observer.observe(
+                this.views[i].getElement(),
+                {
+                    attributes: true
+                }
+            );
         }
+
+
         // set view on hash change
-        var t = this;
         this.setView(window.location.hash);
         window.addEventListener("hashchange", function(e) {
             t.setView(window.location.hash);

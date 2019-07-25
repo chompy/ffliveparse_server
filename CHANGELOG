@@ -1,7 +1,10 @@
-vDEV
+1.28
 - Web app now attempts to reconnect after connection lost.
 - Split player data in to seperate database table.
 - All recieved combatant data is stored and timestamped for the ability to review stats at any point of the encounter.
+- Added graph view. (TODO add more options then just DPS).
+- Fixes to timeline and log view, fixed icons, fixed buffs/debuffs, etc.
+- Changed log viewer to display log message found in game.
 
 1.27
 - Tweaked user data active check, believe it was incorrect and causing encounters to end mid fight.

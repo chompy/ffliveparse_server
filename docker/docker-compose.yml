@@ -7,7 +7,7 @@ services:
         env_file:
             - "docker.env"
         volumes:
-            - "ffliveparse-data:/app/data/database"
+            - "/mnt/ffliveparse_data:/app/data/database"
             - "/mnt/ffliveparse_logs:/app/data/logs"
 
     ffliveparse-nginx:
@@ -23,6 +23,3 @@ services:
         volumes:
             - "/etc/letsencrypt:/etc/letsencrypt"
             - "/var/www/letsencrypt:/var/www/letsencrypt"
-
-volumes:
-    "ffliveparse-data": 

@@ -227,17 +227,11 @@ class ViewCombatantTable extends ViewBase
         if (!combatant.getLastSnapshot().Job) {
             return;
         }
-        var isNew = false;
         if (typeof(this.combatantElements[combatant.getLastSnapshot().Name]) == "undefined") {
             this.combatantElements[combatant.getLastSnapshot().Name] = this.buildCombatantElement();
-            isNew = true;
         }
         this.updateCombatantElement(combatant, this.combatantElements[combatant.getLastSnapshot().Name]);
         this.displayCombatants();
-        if (isNew) {
-            // TODO find a way to make this automatic?
-            setTimeout(function(){ fflpFixFooter(); }, 500);
-        }
     }
 
     onActive()
