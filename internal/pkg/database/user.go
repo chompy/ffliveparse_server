@@ -48,25 +48,41 @@ func CreateUserTable(db *sql.DB) error {
 
 // SaveUser - save user to database
 func SaveUser(user *user.Data, db *sql.DB) error {
+	// insert
+	if user.ID == 0 {
+		stmt, err := db.Prepare(`
+			INSERT INTO user
+			(created, accessed, upload_key, web_key) VALUES
+			(?, ?, ?, ?)
+		`)
+		if err != nil {
+			return err
+		}
+		defer stmt.Close()
+		res, err := stmt.Exec(
+			user.Created,
+			time.Now(),
+			user.UploadKey,
+			user.WebKey,
+		)
+		if err != nil {
+			return err
+		}
+		user.ID, err = res.LastInsertId()
+		return err
+	}
+	// update
 	stmt, err := db.Prepare(`
-		REPLACE INTO user
-		(created, accessed, upload_key, web_key) VALUES
-		(?, ?, ?, ?)
+		UPDATE user SET accessed = ? WHERE id = ?
 	`)
 	if err != nil {
 		return err
 	}
 	defer stmt.Close()
-	res, err := stmt.Exec(
-		user.Created,
-		time.Now(),
-		user.UploadKey,
-		user.WebKey,
+	_, err = stmt.Exec(
+		user.Accessed,
+		user.ID,
 	)
-	if err != nil {
-		return err
-	}
-	user.ID, err = res.LastInsertId()
 	return err
 }
 
