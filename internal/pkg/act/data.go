@@ -21,7 +21,6 @@ import (
 	"bufio"
 	"compress/gzip"
 	"crypto/md5"
-	"database/sql"
 	"fmt"
 	"io"
 	"log"
@@ -31,6 +30,8 @@ import (
 	"sort"
 	"strconv"
 	"time"
+
+	"github.com/olebedev/emitter"
 
 	"../app"
 	"../user"
@@ -53,19 +54,11 @@ type Data struct {
 	HasValidSession    bool
 	HasLogs            bool
 	LogLineCounter     int
+	events             *emitter.Emitter
 }
 
 // NewData - create new ACT session data
-func NewData(session Session, user user.Data) (Data, error) {
-	database, err := getDatabase()
-	if err != nil {
-		return Data{}, err
-	}
-	err = initDatabase(database)
-	if err != nil {
-		return Data{}, err
-	}
-	database.Close()
+func NewData(session Session, user user.Data, events *emitter.Emitter) (Data, error) {
 	return Data{
 		Session:            session,
 		User:               user,
@@ -74,6 +67,7 @@ func NewData(session Session, user user.Data) (Data, error) {
 		LastUpdate:         time.Now(),
 		HasValidSession:    false,
 		LogLineCounter:     0,
+		events:             events,
 	}, nil
 }
 
@@ -176,91 +170,6 @@ func (d *Data) DumpLogLineBuffer() error {
 	return nil
 }
 
-// getDatabase - get encounter database
-func getDatabase() (*sql.DB, error) {
-	// open database connection
-	database, err := sql.Open("sqlite3", app.DatabasePath+"?_journal=WAL")
-	if err != nil {
-		return nil, err
-	}
-	return database, nil
-}
-
-// initDatabase - perform first time init of database
-func initDatabase(database *sql.DB) error {
-	// create encounter table if not exist
-	stmt, err := database.Prepare(`
-		CREATE TABLE IF NOT EXISTS encounter
-		(
-			uid VARCHAR(32),
-			act_id INTEGER,
-			compare_hash VARCHAR(32),
-			user_id INTEGER,
-			start_time DATETIME,
-			end_time DATETIME,
-			zone VARCHAR(256),
-			damage INTEGER,
-			success_level INTEGER,
-			has_logs BOOL,
-			CONSTRAINT encounter_uid_unique UNIQUE (uid)
-		)
-	`)
-	if err != nil {
-		return err
-	}
-	_, err = stmt.Exec()
-	if err != nil {
-		return err
-	}
-	// create player table if not exist
-	stmt, err = database.Prepare(`
-		CREATE TABLE IF NOT EXISTS player
-		(
-			id INTEGER,
-			name VARCHAR(256),
-			act_name VARCHAR(256),
-			world_name VARCHAR(256),
-			CONSTRAINT player_id UNIQUE (id),
-			CONSTRAINT player_unique UNIQUE (id, name)
-		)
-	`)
-	if err != nil {
-		return err
-	}
-	_, err = stmt.Exec()
-	if err != nil {
-		return err
-	}
-
-	// create combatant table if not exist
-	stmt, err = database.Prepare(`
-		CREATE TABLE IF NOT EXISTS combatant
-		(
-			user_id INTEGER,
-			encounter_uid VARCHAR(32),
-			player_id INTEGER,
-			time DATETIME,
-			job VARCHAR(3),
-			damage INTEGER,
-			damage_taken INTEGER,
-			damage_healed INTEGER,
-			deaths INTEGER,
-			hits INTEGER,
-			heals INTEGER,
-			kills INTEGER,
-			CONSTRAINT combatant_unique UNIQUE (user_id, encounter_uid, player_id, time)
-		)
-	`)
-	if err != nil {
-		return err
-	}
-	_, err = stmt.Exec()
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
 // SaveEncounter - save all data related to current encounter
 func (d *Data) SaveEncounter() error {
 	// no encounter
@@ -272,12 +181,6 @@ func (d *Data) SaveEncounter() error {
 	if duration < app.MinEncounterSaveLength*time.Millisecond || duration > app.MaxEncounterSaveLength*time.Millisecond {
 		return nil
 	}
-	// get database
-	database, err := getDatabase()
-	if err != nil {
-		return err
-	}
-	defer database.Close()
 	// get sorted combatants
 	combatants := d.CombatantCollector.GetCombatants()
 	sort.Slice(combatants, func(i, j int) bool {
@@ -291,100 +194,41 @@ func (d *Data) SaveEncounter() error {
 	for _, combatant := range combatants {
 		io.WriteString(h, strconv.Itoa(int(combatant[0].Player.ID)))
 	}
-	compareHash := fmt.Sprintf("%x", h.Sum(nil))
+	d.EncounterCollector.Encounter.CompareHash = fmt.Sprintf("%x", h.Sum(nil))
 	// insert in to encounter table
-	stmt, err := database.Prepare(`
-		REPLACE INTO encounter
-		(uid, act_id, compare_hash, user_id, start_time, end_time, zone, damage, success_level, has_logs) VALUES
-		(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-	`)
-	if err != nil {
-		return err
-	}
-	_, err = stmt.Exec(
-		d.EncounterCollector.Encounter.UID,
-		d.EncounterCollector.Encounter.ActID,
-		compareHash,
-		d.User.ID,
-		d.EncounterCollector.Encounter.StartTime,
-		d.EncounterCollector.Encounter.EndTime,
-		d.EncounterCollector.Encounter.Zone,
-		d.EncounterCollector.Encounter.Damage,
-		d.EncounterCollector.Encounter.SuccessLevel,
-		true,
+	finE := make(chan bool)
+	d.events.Emit(
+		"database:save",
+		finE,
+		&d.EncounterCollector.Encounter,
+		int(d.User.ID),
 	)
-	if err != nil {
-		return err
-	}
-	stmt.Close()
+	<-finE
 	// insert in to combatant+player tables
 	for _, combatantSnapshots := range combatants {
 		// insert combatant
 		for _, combatant := range combatantSnapshots {
-			stmt, err := database.Prepare(`
-				REPLACE INTO combatant
-				(user_id, encounter_uid, player_id, time, job, damage, damage_taken, damage_healed, deaths, hits, heals, kills) VALUES
-				(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-			`)
-			if err != nil {
-				return err
-			}
-			_, err = stmt.Exec(
-				d.User.ID,
-				d.EncounterCollector.Encounter.UID,
-				combatant.Player.ID,
-				combatant.Time,
-				combatant.Job,
-				combatant.Damage,
-				combatant.DamageTaken,
-				combatant.DamageHealed,
-				combatant.Deaths,
-				combatant.Hits,
-				combatant.Heals,
-				combatant.Kills,
+			combatant.EncounterUID = d.EncounterCollector.Encounter.UID
+			finC := make(chan bool)
+			d.events.Emit(
+				"database:save",
+				finC,
+				&combatant,
+				int(d.User.ID),
 			)
-			if err != nil {
-				return err
-			}
-			stmt.Close()
+			<-finC
 		}
 		// insert player
-		stmt, err = database.Prepare(`
-			INSERT OR IGNORE INTO player
-			(id, name, act_name) VALUES
-			(?, ?, ?)
-		`)
-		if err != nil {
-			return err
-		}
-		_, err = stmt.Exec(
-			combatantSnapshots[0].Player.ID,
-			combatantSnapshots[0].Player.Name,
-			combatantSnapshots[0].Player.ActName,
+		finP := make(chan bool)
+		d.events.Emit(
+			"database:save",
+			finP,
+			combatantSnapshots[0].Player,
 		)
-		if err != nil {
-			return err
-		}
-		stmt.Close()
-		if combatantSnapshots[0].Player.World != "" {
-			stmt, err := database.Prepare(`
-				UPDATE player SET world_name = ? WHERE id = ?
-			`)
-			if err != nil {
-				return err
-			}
-			_, err = stmt.Exec(
-				combatantSnapshots[0].Player.World,
-				combatantSnapshots[0].Player.ID,
-			)
-			if err != nil {
-				return err
-			}
-			stmt.Close()
-		}
+		<-finP
 	}
 	// dump log lines
-	err = d.DumpLogLineBuffer()
+	err := d.DumpLogLineBuffer()
 	if err != nil {
 		return err
 	}
@@ -433,101 +277,43 @@ func (d *Data) ClearEncounter() {
 }
 
 // getEncounterCombatants - fetch all combatants in an encounter
-func getEncounterCombatants(database *sql.DB, user user.Data, encounterUID string) (CombatantCollector, error) {
-	dbQueryStr := "SELECT player_id, time, job, damage, damage_taken, damage_healed, deaths, hits, heals, kills,"
-	dbQueryStr += " player.name, player.act_name, player.world_name FROM combatant"
-	dbQueryStr += " INNER JOIN player ON player.id = combatant.player_id WHERE user_id = ? AND encounter_uid = ?"
-	dbQueryStr += " ORDER BY DATETIME(time) ASC"
-	rows, err := database.Query(
-		dbQueryStr,
-		user.ID,
+func getEncounterCombatants(events *emitter.Emitter, user user.Data, encounterUID string) (CombatantCollector, error) {
+	combatants := make([]Combatant, 0)
+	fin := make(chan bool)
+	events.Emit(
+		"database:find",
+		fin,
+		&combatants,
+		int(user.ID),
 		encounterUID,
 	)
-	if err != nil {
-		return CombatantCollector{}, err
-	}
+	<-fin
 	combatantCollector := NewCombatantCollector(&user)
-	var worldName sql.NullString
-	var actName sql.NullString
-	var combatantTime NullTime
-	for rows.Next() {
-		player := Player{}
-		combatant := Combatant{}
-		combatant.EncounterUID = encounterUID
-		err := rows.Scan(
-			&player.ID,
-			&combatantTime,
-			&combatant.Job,
-			&combatant.Damage,
-			&combatant.DamageTaken,
-			&combatant.DamageHealed,
-			&combatant.Deaths,
-			&combatant.Hits,
-			&combatant.Heals,
-			&combatant.Kills,
-			&player.Name,
-			&actName,
-			&worldName,
-		)
-		if combatantTime.Valid {
-			combatant.Time = combatantTime.Time
-		}
-		if worldName.Valid {
-			player.World = worldName.String
-		}
-		if actName.Valid {
-			player.ActName = actName.String
-		}
-		if err != nil {
-			return CombatantCollector{}, err
-		}
-		combatant.Player = player
+	for _, combatant := range combatants {
 		combatantCollector.UpdateCombatantTracker(combatant)
-		for index := range combatantCollector.CombatantTrackers {
-			combatantCollector.CombatantTrackers[index].Offset = Combatant{}
-		}
 	}
-	rows.Close()
+	for index := range combatantCollector.CombatantTrackers {
+		combatantCollector.CombatantTrackers[index].Offset = Combatant{}
+	}
 	return combatantCollector, nil
 }
 
 // GetPreviousEncounter - retrieve previous encounter data from database
-func GetPreviousEncounter(user user.Data, encounterUID string) (Data, error) {
-	// get database
-	database, err := getDatabase()
-	if err != nil {
-		return Data{}, err
-	}
-	defer database.Close()
+func GetPreviousEncounter(events *emitter.Emitter, user user.Data, encounterUID string) (Data, error) {
 	// fetch encounter
-	rows, err := database.Query(
-		"SELECT uid, act_id, start_time, end_time, zone, damage, success_level FROM encounter WHERE user_id = ? AND uid = ? LIMIT 1",
-		user.ID,
+	encounter := Encounter{}
+	fin := make(chan bool)
+	events.Emit(
+		"database:fetch",
+		fin,
+		&encounter,
+		int(user.ID),
 		encounterUID,
 	)
-	if err != nil {
-		return Data{}, err
-	}
-	encounter := Encounter{}
-	for rows.Next() {
-		err = rows.Scan(
-			&encounter.UID,
-			&encounter.ActID,
-			&encounter.StartTime,
-			&encounter.EndTime,
-			&encounter.Zone,
-			&encounter.Damage,
-			&encounter.SuccessLevel,
-		)
-		if err != nil {
-			return Data{}, err
-		}
-		break
-	}
-	rows.Close()
+	<-fin
 	// fetch combatants
 	combatantCollector, err := getEncounterCombatants(
-		database,
+		events,
 		user,
 		encounterUID,
 	)
@@ -547,68 +333,22 @@ func GetPreviousEncounter(user user.Data, encounterUID string) (Data, error) {
 }
 
 // GetPreviousEncounters - retrieve list of previous encounters
-func GetPreviousEncounters(user user.Data, offset int, query string, start *time.Time, end *time.Time) ([]Data, error) {
-	// get database
-	database, err := getDatabase()
-	if err != nil {
-		return nil, err
-	}
-	defer database.Close()
-	// build query
-	params := make([]interface{}, 1)
-	params[0] = user.ID
-	dbQueryStr := "SELECT DISTINCT(uid), act_id, start_time, end_time, zone, encounter.damage, success_level, has_logs"
-	dbQueryStr += " FROM encounter INNER JOIN combatant ON combatant.encounter_uid = encounter.uid"
-	dbQueryStr += " INNER JOIN player ON player.id = combatant.player_id"
-	dbQueryStr += " WHERE DATETIME(end_time) > DATETIME(start_time)"
-	dbQueryStr += " AND encounter.user_id = ?"
-	// search string
-	if query != "" {
-		dbQueryStr += " AND (zone LIKE ? OR player.name LIKE ?)"
-		params = append(params, "%"+query+"%", "%"+query+"%")
-	}
-	// start date
-	if start != nil {
-		dbQueryStr += " AND DATETIME(start_time) >= ?"
-		params = append(params, start.UTC())
-	} else {
-		dbQueryStr += " AND DATETIME(start_time) > '01-01-2019 00:00:00'"
-	}
-	// end date
-	if end != nil {
-		dbQueryStr += " AND DATETIME(end_time) <= ?"
-		params = append(params, end.UTC())
-	}
-	// limit, offset
-	dbQueryStr += " ORDER BY DATETIME(start_time) DESC LIMIT ? OFFSET ?"
-	params = append(params, app.PastEncounterFetchLimit, offset)
-	// fetch encounters
-	rows, err := database.Query(
-		dbQueryStr,
-		params...,
+func GetPreviousEncounters(events *emitter.Emitter, user user.Data, offset int, query string, start *time.Time, end *time.Time) ([]Data, error) {
+	encounters := make([]Encounter, 0)
+	fin := make(chan bool)
+	events.Emit(
+		"database:find",
+		fin,
+		&encounters,
+		int(user.ID),
+		offset,
+		query,
+		start,
+		end,
 	)
-	if err != nil {
-		return nil, err
-	}
-	// build encounter datas
-	encounters := make([]Data, 0)
-	for rows.Next() {
-		// build encounter
-		hasLogs := true
-		encounter := Encounter{}
-		err := rows.Scan(
-			&encounter.UID,
-			&encounter.ActID,
-			&encounter.StartTime,
-			&encounter.EndTime,
-			&encounter.Zone,
-			&encounter.Damage,
-			&encounter.SuccessLevel,
-			&hasLogs,
-		)
-		if err != nil {
-			return nil, err
-		}
+	<-fin
+	dataRes := make([]Data, 0)
+	for _, encounter := range encounters {
 		// build collectors
 		encounterCollector := NewEncounterCollector(&user)
 		encounterCollector.Encounter = encounter
@@ -617,66 +357,28 @@ func GetPreviousEncounters(user user.Data, offset int, query string, start *time
 			User:               user,
 			EncounterCollector: encounterCollector,
 			CombatantCollector: CombatantCollector{},
-			HasLogs:            hasLogs,
+			HasLogs:            encounter.HasLogs,
 		}
-		encounters = append(encounters, data)
+		dataRes = append(dataRes, data)
 	}
-	rows.Close()
-	return encounters, nil
+	return dataRes, nil
 }
 
 // GetPreviousEncounterCount - get total number of previous encounters
-func GetPreviousEncounterCount(user user.Data, query string, start *time.Time, end *time.Time) (int, error) {
-	// get database
-	database, err := getDatabase()
-	if err != nil {
-		return 0, err
-	}
-	defer database.Close()
-	// build query
-	params := make([]interface{}, 1)
-	params[0] = user.ID
-	dbQueryStr := "SELECT COUNT(DISTINCT(uid)) FROM encounter INNER JOIN combatant ON combatant.encounter_uid = encounter.uid"
-	dbQueryStr += " INNER JOIN player ON player.id = combatant.player_id"
-	dbQueryStr += " WHERE DATETIME(end_time) > DATETIME(start_time)"
-	dbQueryStr += " AND encounter.user_id = ?"
-	// search string
-	if query != "" {
-		dbQueryStr += " AND (zone LIKE ? OR player.name LIKE ?)"
-		params = append(params, "%"+query+"%", "%"+query+"%")
-	}
-	// start date
-	if start != nil {
-		dbQueryStr += " AND DATETIME(start_time) >= ?"
-		params = append(params, start.UTC())
-	} else {
-		dbQueryStr += " AND DATETIME(start_time) > '01-01-2019 00:00:00'"
-	}
-	// end date
-	if end != nil {
-		dbQueryStr += " AND DATETIME(end_time) <= ?"
-		params = append(params, end.UTC())
-	}
-	// fetch encounter counter
-	rows, err := database.Query(
-		dbQueryStr,
-		params...,
+func GetPreviousEncounterCount(events *emitter.Emitter, user user.Data, query string, start *time.Time, end *time.Time) (int, error) {
+	res := int(0)
+	fin := make(chan bool)
+	events.Emit(
+		"database:find_encounter_count",
+		fin,
+		&res,
+		int(user.ID),
+		query,
+		start,
+		end,
 	)
-	if err != nil {
-		return 0, err
-	}
-	// retrieve count
-	var count int
-	for rows.Next() {
-		err = rows.Scan(
-			&count,
-		)
-		if err != nil {
-			return 0, err
-		}
-	}
-	rows.Close()
-	return count, nil
+	<-fin
+	return res, nil
 }
 
 // IsActive - Check if data is actively being updated (i.e. active ACT connection)
@@ -686,161 +388,101 @@ func (d *Data) IsActive() bool {
 }
 
 // CleanUpEncounters - delete log files for old encounters
-func CleanUpEncounters() (int, error) {
-	log.Println("[CLEAN] Begin log clean up.")
-	// get database
-	database, err := getDatabase()
-	if err != nil {
-		return 0, err
-	}
-	defer database.Close()
-	cleanUpDate := time.Now().Add(time.Duration(-app.EncounterCleanUpDays*24) * time.Hour)
-	// fetch encounters
-	rows, err := database.Query(
-		"SELECT uid FROM encounter WHERE DATETIME(start_time) < ? AND has_logs",
-		cleanUpDate,
-	)
-	if err != nil {
-		return 0, err
-	}
-	// get list of uids
-	uidList := make([]string, 0)
-	for rows.Next() {
-		var uid sql.NullString
-		err = rows.Scan(
-			&uid,
+func CleanUpEncounters(events *emitter.Emitter) {
+	for range time.Tick(app.EncounterCleanUpRate * time.Millisecond) {
+		log.Println("[CLEAN] Begin log clean up.")
+		// fetch encounters
+		encounterUIDs := make([]string, 0)
+		fin := make(chan bool)
+		events.Emit(
+			"database:find_encounter_clean_up",
+			fin,
+			&encounterUIDs,
 		)
-		if err != nil || !uid.Valid {
-			continue
-		}
-		uidList = append(uidList, uid.String)
-	}
-	rows.Close()
-	// itterate uids and clean up log entries
-	cleanUpCount := 0
-	for _, uid := range uidList {
-		// database statement to flag removal of log
-		stmt, err := database.Prepare(`UPDATE encounter SET has_logs = false WHERE uid = ?`)
-		// check if log exists
-		logPath := getPermanentLogPath(uid)
-		if _, err := os.Stat(logPath); os.IsNotExist(err) {
-			// update database if log file is missing
-			log.Println("[CLEAN]", uid, "(log flag missing from database)")
-			_, err = stmt.Exec(
+		<-fin
+		// itterate uids and clean up log entries
+		cleanUpCount := 0
+		for _, uid := range encounterUIDs {
+			// flag removal of log
+			finC := make(chan bool)
+			events.Emit(
+				"database:flag_encounter_clean",
+				finC,
 				uid,
 			)
+			<-finC
+			// check if log exists
+			logPath := getPermanentLogPath(uid)
+			if _, err := os.Stat(logPath); os.IsNotExist(err) {
+				// update database if log file is missing
+				log.Println("[CLEAN]", uid, "(log flag missing from database)")
+				continue
+			}
+			// delete log file
+			err := os.Remove(logPath)
 			if err != nil {
 				log.Println("[CLEAN] Error", uid, err.Error())
+				continue
 			}
-			stmt.Close()
-			continue
+			log.Println("[CLEAN]", uid)
+			cleanUpCount++
 		}
-		// delete log file
-		err = os.Remove(logPath)
-		if err != nil {
-			stmt.Close()
-			log.Println("[CLEAN] Error", uid, err.Error())
-			continue
-		}
-		log.Println("[CLEAN]", uid)
-		cleanUpCount++
-		// update database
-		_, err = stmt.Exec(
-			uid,
-		)
-		stmt.Close()
-		if err != nil {
-			log.Println("[CLEAN] Error", uid, err.Error())
-			continue
-		}
+		log.Println("[CLEAN] Completed. Removed", cleanUpCount, "log(s).")
 	}
-	log.Println("[CLEAN] Completed. Removed", cleanUpCount, "log(s).")
-	return cleanUpCount, nil
 }
 
 // GetTotalEncounterCount - get total number of encounters
-func GetTotalEncounterCount() (int, error) {
-	// get database
-	database, err := getDatabase()
-	if err != nil {
-		return 0, err
-	}
-	defer database.Close()
-	// fetch encounters
-	rows, err := database.Query(
-		"SELECT COUNT(DISTINCT(uid)) FROM encounter WHERE DATETIME(start_time) > '01-01-2019 00:00:00'",
+func GetTotalEncounterCount(events *emitter.Emitter) int {
+	res := int(0)
+	fin := make(chan bool)
+	events.Emit(
+		"database:total_count",
+		fin,
+		&res,
+		"encounter",
 	)
-	if err != nil {
-		return 0, err
-	}
-	// retrieve count
-	var count int
-	for rows.Next() {
-		err = rows.Scan(
-			&count,
-		)
-		if err != nil {
-			return 0, err
-		}
-	}
-	rows.Close()
-	return count, nil
+	<-fin
+	return res
 }
 
 // GetTotalCombatantCount - get total number of combatants
-func GetTotalCombatantCount() (int, error) {
-	// get database
-	database, err := getDatabase()
-	if err != nil {
-		return 0, err
-	}
-	defer database.Close()
-	// fetch combatants
-	rows, err := database.Query(
-		"SELECT COUNT(*) FROM combatant",
+func GetTotalCombatantCount(events *emitter.Emitter) int {
+	res := int(0)
+	fin := make(chan bool)
+	events.Emit(
+		"database:total_count",
+		fin,
+		&res,
+		"combatant",
 	)
-	if err != nil {
-		return 0, err
-	}
-	// retrieve count
-	var count int
-	for rows.Next() {
-		err = rows.Scan(
-			&count,
-		)
-		if err != nil {
-			return 0, err
-		}
-	}
-	rows.Close()
-	return count, nil
+	<-fin
+	return res
+}
+
+// GetTotalPlayerCount - get total number of players
+func GetTotalPlayerCount(events *emitter.Emitter) int {
+	res := int(0)
+	fin := make(chan bool)
+	events.Emit(
+		"database:total_count",
+		fin,
+		&res,
+		"player",
+	)
+	<-fin
+	return res
 }
 
 // GetTotalUserCount - get total number of users
-func GetTotalUserCount() (int, error) {
-	// get database
-	database, err := getDatabase()
-	if err != nil {
-		return 0, err
-	}
-	defer database.Close()
-	// fetch users
-	rows, err := database.Query(
-		"SELECT COUNT(*) FROM user",
+func GetTotalUserCount(events *emitter.Emitter) int {
+	res := int(0)
+	fin := make(chan bool)
+	events.Emit(
+		"database:total_count",
+		fin,
+		&res,
+		"user",
 	)
-	if err != nil {
-		return 0, err
-	}
-	// retrieve count
-	var count int
-	for rows.Next() {
-		err = rows.Scan(
-			&count,
-		)
-		if err != nil {
-			return 0, err
-		}
-	}
-	rows.Close()
-	return count, nil
+	<-fin
+	return res
 }

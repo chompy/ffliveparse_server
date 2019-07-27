@@ -1,3 +1,6 @@
+DEV
+- All database transactions now happen through new handler.
+
 1.29
 - Fixed issue with user manager writing to database.
 

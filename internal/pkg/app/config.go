@@ -58,6 +58,9 @@ const PastEncounterFetchLimit = 20
 // EncounterCleanUpDays - Number of days that should pass before deleting encounter logs
 const EncounterCleanUpDays = 90
 
+// EncounterCleanUpRate - Rate at which encounter clean up should be ran
+const EncounterCleanUpRate = 1800000 // 30 minutes
+
 // GetVersionString - get version as string in format X.XX
 func GetVersionString() string {
 	return fmt.Sprintf("%.2f", float32(VersionNumber)/100.0)

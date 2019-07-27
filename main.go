@@ -8,6 +8,7 @@ import (
 
 	"./internal/pkg/act"
 	"./internal/pkg/app"
+	"./internal/pkg/database"
 	"./internal/pkg/user"
 	"./internal/pkg/web"
 )
@@ -39,11 +40,16 @@ func main() {
 	statCollector.TakeSnapshot()
 	go statCollector.Start()
 
-	// create user manager
-	userManager, err := user.NewManager()
-	defer userManager.Close()
+	// create database handler
+	dbHandler, err := database.NewHandler(&events)
 	if err != nil {
-		log.Panicln("Error occured while initalizing the user manager,", err)
+		panic(err)
+	}
+	go dbHandler.Handle()
+
+	// create user manager
+	userManager := user.Manager{
+		Events: &events,
 	}
 
 	// create act manager
@@ -52,7 +58,7 @@ func main() {
 	defer actManager.ClearAllData()
 
 	// clean up old encounters
-	go act.CleanUpEncounters()
+	go act.CleanUpEncounters(&events)
 
 	// start http server
 	go web.HTTPStartServer(uint16(*httpPort), &userManager, &actManager, &events, &statCollector, *devModePtr)

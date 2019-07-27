@@ -74,7 +74,7 @@ func (m *Manager) ParseDataString(dataStr []byte, addr *net.UDPAddr) (*Data, err
 					}
 				}
 				// create new data
-				actData, err := NewData(session, user)
+				actData, err := NewData(session, user, m.events)
 				if err != nil {
 					return nil, err
 				}
@@ -86,7 +86,7 @@ func (m *Manager) ParseDataString(dataStr []byte, addr *net.UDPAddr) (*Data, err
 				go m.doTick(actData.User.ID)
 				go m.doLogTick(actData.User.ID)
 				// save user data, update accessed time
-				m.userManager.Save(user)
+				m.userManager.Save(&user)
 				log.Println("[ USER", actData.User.ID, "] Loaded ACT session for use ", user.ID, "from", addr, "(LoadedDataCount:", len(m.data), ")")
 				// emit act active event
 				activeFlag := Flag{Name: "active", Value: true}
@@ -102,7 +102,7 @@ func (m *Manager) ParseDataString(dataStr []byte, addr *net.UDPAddr) (*Data, err
 				break
 			}
 			// save user data, update accessed time
-			m.userManager.Save(dataObj.User)
+			m.userManager.Save(&dataObj.User)
 			// update existing data
 			dataObj.Session = session
 			log.Println("[ USER", dataObj.User.ID, "] Updated ACT session for user", dataObj.User.ID, "from", addr, "(LoadedDataCount:", len(m.data), ")")
@@ -322,9 +322,9 @@ func (m *Manager) SnapshotListener() {
 			if timeDiff > 0 {
 				statSnapshot.LogLinesPerMinute = logLineCount / timeDiff
 			}
-			encounterCount, _ := GetTotalEncounterCount()
-			combatantCount, _ := GetTotalCombatantCount()
-			userCount, _ := GetTotalUserCount()
+			encounterCount := GetTotalEncounterCount(m.events)
+			combatantCount := GetTotalCombatantCount(m.events)
+			userCount := GetTotalUserCount(m.events)
 			statSnapshot.TotalEncounters = encounterCount
 			statSnapshot.TotalCombatants = combatantCount
 			statSnapshot.TotalUsers = userCount

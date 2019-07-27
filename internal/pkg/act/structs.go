@@ -73,6 +73,7 @@ type Encounter struct {
 	Damage       int32
 	Active       bool
 	SuccessLevel uint8
+	HasLogs      bool
 }
 
 // LogLine - Log line from Act

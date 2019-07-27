@@ -57,7 +57,6 @@ type EncounterCollector struct {
 	CurrentZone      string
 	LastReportTime   time.Time
 	CompletionFlag   bool
-	NextSubArea      string
 }
 
 // NewEncounterCollector - Create new encounter collector
@@ -100,10 +99,6 @@ func (ec *EncounterCollector) UpdateEncounter(encounter Encounter) {
 		}
 		ec.Encounter.ActID = encounter.ActID
 		ec.Encounter.Zone = encounter.Zone
-		if ec.NextSubArea != "" {
-			ec.Encounter.Zone += " - " + ec.NextSubArea
-			ec.NextSubArea = ""
-		}
 		ec.CurrentZone = ec.Encounter.Zone
 	}
 }
@@ -349,6 +344,18 @@ func (ec *EncounterCollector) ReadLogLine(l *LogLineData) {
 					}
 					break
 				}
+			case LogColorCastLot:
+				{
+					re, err := regexp.Compile("00:0839:Cast your lot")
+					if err != nil {
+						break
+					}
+					// end encounter if match
+					if re.MatchString(l.Raw) {
+						ec.CompletionFlag = true
+					}
+					break
+				}
 			}
 		}
 	}
@@ -377,7 +384,7 @@ func (ec *EncounterCollector) CheckInactive() {
 	if !ec.Encounter.Active {
 		return
 	}
-	// recieved tomestones
+	// flagged as cleared
 	if ec.CompletionFlag {
 		ec.Encounter.SuccessLevel = 1
 		ec.endEncounter()

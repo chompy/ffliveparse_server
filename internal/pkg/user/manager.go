@@ -18,177 +18,76 @@ along with FFLiveParse.  If not, see <https://www.gnu.org/licenses/>.
 package user
 
 import (
-	"database/sql"
 	"fmt"
-	"time"
 
-	"../app"
+	"github.com/olebedev/emitter"
 
 	_ "github.com/mattn/go-sqlite3" // sqlite driver
 )
 
 // Manager - manages users data
 type Manager struct {
-}
-
-// getDatabase - get user database
-func getDatabase() (*sql.DB, error) {
-	// open database connection
-	database, err := sql.Open("sqlite3", app.DatabasePath+"?_journal=WAL")
-	if err != nil {
-		return nil, err
-	}
-	return database, nil
-}
-
-// createUserTables - create tables in user database
-func createUserTables() error {
-	database, err := getDatabase()
-	if err != nil {
-		return err
-	}
-	defer database.Close()
-	stmt, err := database.Prepare(`
-		CREATE TABLE IF NOT EXISTS user
-		(
-			id INTEGER PRIMARY KEY AUTOINCREMENT,
-			created DATETIME DEFAULT CURRENT_TIMESTAMP,
-			accessed DATETIME DEFAULT CURRENT_TIMESTAMP,
-			upload_key VARCHAR(32),
-			web_key VARCHAR(32)
-		)
-	`)
-	if err != nil {
-		return err
-	}
-	_, err = stmt.Exec()
-	return err
-}
-
-// NewManager - get new user manager
-func NewManager() (Manager, error) {
-	// create tables if they do not exist
-	err := createUserTables()
-	if err != nil {
-		return Manager{}, err
-	}
-	return Manager{}, nil
-}
-
-// Close - clean up method, close database connection
-func (m *Manager) Close() {
+	Events *emitter.Emitter
 }
 
 // New - create a new user
-func (m *Manager) New() (Data, error) {
-	database, err := getDatabase()
-	if err != nil {
-		return Data{}, err
-	}
-	defer database.Close()
+func (m *Manager) New() Data {
 	ud := NewData()
-	stmt, err := database.Prepare(
-		`INSERT INTO user (upload_key,web_key) VALUES (?,?)`,
-	)
-	if err != nil {
-		return Data{}, err
-	}
-	res, err := stmt.Exec(ud.UploadKey, ud.WebKey)
-	if err != nil {
-		return Data{}, err
-	}
-	id, err := res.LastInsertId()
-	ud.ID = id
-	return ud, nil
-}
-
-func (m *Manager) usersFromRows(rows *sql.Rows) ([]Data, error) {
-	users := make([]Data, 0)
-	for rows.Next() {
-		ud := Data{}
-		err := rows.Scan(&ud.ID, &ud.Created, &ud.Accessed, &ud.UploadKey, &ud.WebKey)
-		if err != nil {
-			return users, err
-		}
-		ud.Accessed = time.Now()
-		users = append(users, ud)
-	}
-	return users, nil
+	m.Save(&ud)
+	return ud
 }
 
 // LoadFromID - load user from id
 func (m *Manager) LoadFromID(ID int64) (Data, error) {
-	database, err := getDatabase()
-	if err != nil {
-		return Data{}, err
-	}
-	defer database.Close()
-	rows, err := database.Query(
-		`SELECT * FROM user WHERE id = ? LIMIT 1`,
-		ID,
+	fin := make(chan bool)
+	ud := Data{}
+	m.Events.Emit(
+		"database:fetch",
+		fin,
+		&ud,
+		int(ID),
 	)
-	if err != nil {
-		return Data{}, err
-	}
-	users, err := m.usersFromRows(rows)
-	rows.Close()
-	if err != nil {
-		return Data{}, err
-	}
-	if len(users) == 0 {
+	<-fin
+	if ud.ID == 0 {
 		return Data{}, fmt.Errorf("could not find user data with ID %d", ID)
 	}
-	return users[0], nil
+	return ud, nil
 }
 
 // LoadFromUploadKey - load user from upload key
 func (m *Manager) LoadFromUploadKey(uploadKey string) (Data, error) {
-	database, err := getDatabase()
-	if err != nil {
-		return Data{}, err
-	}
-	defer database.Close()
-	rows, err := database.Query(
-		`SELECT * FROM user WHERE upload_key = ? LIMIT 1`,
-		uploadKey,
+	fin := make(chan bool)
+	ud := make([]Data, 0)
+	m.Events.Emit(
+		"database:find",
+		fin,
+		&ud,
+		"",        // event arg 1 == web key
+		uploadKey, // event arg 2 == upload key
 	)
-	if err != nil {
-		return Data{}, err
-	}
-	users, err := m.usersFromRows(rows)
-	rows.Close()
-	if err != nil {
-		return Data{}, err
-	}
-	if len(users) == 0 {
+	<-fin
+	if len(ud) == 0 {
 		return Data{}, fmt.Errorf("could not find user data with upload key %s", uploadKey)
 	}
-	return users[0], nil
+	return ud[0], nil
 }
 
 // LoadFromWebKey - load user from web key
 func (m *Manager) LoadFromWebKey(webKey string) (Data, error) {
-	database, err := getDatabase()
-	if err != nil {
-		return Data{}, err
-	}
-	defer database.Close()
-	rows, err := database.Query(
-		`SELECT * FROM user WHERE web_key = ? LIMIT 1`,
-		webKey,
+	fin := make(chan bool)
+	ud := make([]Data, 0)
+	m.Events.Emit(
+		"database:find",
+		fin,
+		&ud,
+		webKey, // event arg 1 == web key
+		"",     // event arg 2 == upload key
 	)
-	if err != nil {
-		return Data{}, err
-	}
-	users, err := m.usersFromRows(rows)
-	rows.Close()
-	if err != nil {
-		return Data{}, err
-	}
-	if len(users) == 0 {
+	<-fin
+	if len(ud) == 0 {
 		return Data{}, fmt.Errorf("could not find user data with web key %s", webKey)
 	}
-	return users[0], nil
+	return ud[0], nil
 }
 
 // LoadFromWebIDString - load user from web ID string
@@ -200,22 +99,13 @@ func (m *Manager) LoadFromWebIDString(webIDString string) (Data, error) {
 	return m.LoadFromID(userID)
 }
 
-// Save - save user data, current just updates 'accessed' time
-func (m *Manager) Save(user Data) error {
-	database, err := getDatabase()
-	if err != nil {
-		return err
-	}
-	defer database.Close()
-	stmt, err := database.Prepare(
-		`UPDATE user SET accessed = ? WHERE id = ?`,
+// Save - save user data
+func (m *Manager) Save(ud *Data) {
+	fin := make(chan bool)
+	m.Events.Emit(
+		"database:save",
+		fin,
+		ud,
 	)
-	if err != nil {
-		return err
-	}
-	_, err = stmt.Exec(
-		time.Now(),
-		user.ID,
-	)
-	return err
+	<-fin
 }
