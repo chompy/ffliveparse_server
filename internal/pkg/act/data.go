@@ -223,7 +223,7 @@ func (d *Data) SaveEncounter() error {
 		d.events.Emit(
 			"database:save",
 			finP,
-			combatantSnapshots[0].Player,
+			&combatantSnapshots[0].Player,
 		)
 		<-finP
 	}

@@ -45,7 +45,7 @@ func CreatePlayerTable(db *sql.DB) error {
 
 // SavePlayer - save player to database
 func SavePlayer(player *act.Player, db *sql.DB) error {
-	stmt, err := db.Prepare(`
+	insStmt, err := db.Prepare(`
 		INSERT OR IGNORE INTO player
 		(id, name, act_name) VALUES
 		(?, ?, ?)
@@ -53,8 +53,8 @@ func SavePlayer(player *act.Player, db *sql.DB) error {
 	if err != nil {
 		return err
 	}
-	defer stmt.Close()
-	_, err = stmt.Exec(
+	defer insStmt.Close()
+	_, err = insStmt.Exec(
 		player.ID,
 		player.Name,
 		player.ActName,
@@ -62,23 +62,21 @@ func SavePlayer(player *act.Player, db *sql.DB) error {
 	if err != nil {
 		return err
 	}
-	stmt.Close()
 	if player.World != "" {
-		stmt, err := db.Prepare(`
+		updateStmt, err := db.Prepare(`
 			UPDATE player SET world_name = ? WHERE id = ?
 		`)
 		if err != nil {
 			return err
 		}
-		defer stmt.Close()
-		_, err = stmt.Exec(
+		defer updateStmt.Close()
+		_, err = updateStmt.Exec(
 			player.World,
 			player.ID,
 		)
 		if err != nil {
 			return err
 		}
-		stmt.Close()
 	}
 	return nil
 }

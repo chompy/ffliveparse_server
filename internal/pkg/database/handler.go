@@ -135,12 +135,6 @@ func (h *Handler) Handle() error {
 							err = FetchEncounter(userID, encounterUID, h.database, fetchObj.(*act.Encounter))
 							break
 						}
-					case *act.Player:
-						{
-							//playerID := event.Int(2)
-							//err = FetchPlayer(playerID, h.database, fetchObj.(*act.Player))
-							break
-						}
 					}
 					break
 				}

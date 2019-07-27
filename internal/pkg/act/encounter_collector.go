@@ -346,7 +346,7 @@ func (ec *EncounterCollector) ReadLogLine(l *LogLineData) {
 				}
 			case LogColorCastLot:
 				{
-					re, err := regexp.Compile("00:0839:Cast your lot")
+					re, err := regexp.Compile("00:0839:Cast your lot|00:0839:One or more party members have yet to complete this duty|00:0839:You received a player commendation")
 					if err != nil {
 						break
 					}
