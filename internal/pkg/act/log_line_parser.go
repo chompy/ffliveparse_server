@@ -131,6 +131,9 @@ const LogColorCompletionTime = 0x0840
 // LogColorCastLot - Log message color for message about casting lot on loot
 const LogColorCastLot = 0x0839
 
+// LogColorEcho - Log message color for echo messages
+const LogColorEcho = 0x0038
+
 // logShiftValues
 var logShiftValues = [...]int{0x3E, 0x113, 0x213, 0x313}
 

@@ -156,7 +156,17 @@ func (h *Handler) Handle() error {
 							query := event.String(4)
 							start := event.Args[5].(*time.Time)
 							end := event.Args[6].(*time.Time)
-							err = FindEncounters(userID, offset, query, start, end, h.database, findObjs.(*[]act.Encounter))
+							totalResults := event.Args[7].(*int)
+							err = FindEncounters(
+								userID,
+								offset,
+								query,
+								start,
+								end,
+								h.database,
+								findObjs.(*[]act.Encounter),
+								totalResults,
+							)
 							break
 						}
 					case *[]act.Combatant:
@@ -165,6 +175,11 @@ func (h *Handler) Handle() error {
 							encounterUID := event.String(3)
 							err = FindEncounterCombatants(userID, encounterUID, h.database, findObjs.(*[]act.Combatant))
 							break
+						}
+					case *[]act.PlayerStat:
+						{
+							zone := event.String(2)
+							err = FindPlayerStats(zone, h.database, findObjs.(*[]act.PlayerStat))
 						}
 					}
 					break
@@ -195,23 +210,6 @@ func (h *Handler) Handle() error {
 							break
 						}
 					}
-					break
-				}
-			case "database:find_encounter_count":
-				{
-					res := event.Args[1].(*int)
-					userID := event.Int(2)
-					query := event.String(3)
-					start := event.Args[4].(*time.Time)
-					end := event.Args[5].(*time.Time)
-					err = FindEncounterCount(
-						userID,
-						query,
-						start,
-						end,
-						h.database,
-						res,
-					)
 					break
 				}
 			case "database:find_encounter_clean_up":

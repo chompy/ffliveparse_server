@@ -57,6 +57,7 @@ type EncounterCollector struct {
 	CurrentZone      string
 	LastReportTime   time.Time
 	CompletionFlag   bool
+	EndFlag          bool
 }
 
 // NewEncounterCollector - Create new encounter collector
@@ -86,6 +87,7 @@ func (ec *EncounterCollector) Reset() {
 	ec.PlayerTeam = 0
 	ec.LastReportTime = time.Now()
 	ec.CompletionFlag = false
+	ec.EndFlag = false
 }
 
 // UpdateEncounter - Sync encounter data from ACT
@@ -356,6 +358,19 @@ func (ec *EncounterCollector) ReadLogLine(l *LogLineData) {
 					}
 					break
 				}
+			case LogColorEcho:
+				{
+					re, err := regexp.Compile("00:0038:end")
+					if err != nil {
+						break
+					}
+					// end encounter if match
+					if re.MatchString(l.Raw) {
+						ec.EndFlag = true
+						log.Println("[", ec.userIDHash, "][ Encounter", ec.Encounter.UID, "] Echo 'end' command detected")
+					}
+					break
+				}
 			}
 		}
 	}
@@ -387,6 +402,12 @@ func (ec *EncounterCollector) CheckInactive() {
 	// flagged as cleared
 	if ec.CompletionFlag {
 		ec.Encounter.SuccessLevel = 1
+		ec.endEncounter()
+		return
+	}
+	// end flag
+	if ec.EndFlag {
+		ec.Encounter.SuccessLevel = 0
 		ec.endEncounter()
 		return
 	}

@@ -116,15 +116,27 @@ func FetchEncounter(userID int, encounterUID string, db *sql.DB, encounter *act.
 }
 
 // FindEncounters - find encounters with given parameters
-func FindEncounters(userID int, offset int, query string, start *time.Time, end *time.Time, db *sql.DB, encounters *[]act.Encounter) error {
+func FindEncounters(
+	userID int,
+	offset int,
+	query string,
+	start *time.Time,
+	end *time.Time,
+	db *sql.DB,
+	encounters *[]act.Encounter,
+	totalResults *int,
+) error {
 	// build query
 	params := make([]interface{}, 1)
 	params[0] = userID
-	dbQueryStr := "SELECT DISTINCT(uid), act_id, compare_hash, start_time, end_time, zone, encounter.damage, success_level, has_logs"
-	dbQueryStr += " FROM encounter INNER JOIN combatant ON combatant.encounter_uid = encounter.uid"
-	dbQueryStr += " INNER JOIN player ON player.id = combatant.player_id"
-	dbQueryStr += " WHERE DATETIME(end_time) > DATETIME(start_time)"
-	dbQueryStr += " AND encounter.user_id = ?"
+	dbQueryStr := `
+		SELECT DISTINCT(uid), act_id, compare_hash, start_time, end_time, zone, encounter.damage, success_level, has_logs,
+		COUNT(*) OVER () as total_results
+		FROM encounter INNER JOIN combatant ON combatant.encounter_uid = encounter.uid
+		INNER JOIN player ON player.id = combatant.player_id
+		WHERE DATETIME(end_time) > DATETIME(start_time)
+		AND encounter.user_id = ?
+	`
 	// search string
 	if query != "" {
 		dbQueryStr += " AND (zone LIKE ? OR player.name LIKE ?)"
@@ -159,6 +171,7 @@ func FindEncounters(userID int, offset int, query string, start *time.Time, end 
 		// build encounter
 		encounter := act.Encounter{}
 		var compareHash sql.NullString
+		fetchTotalResults := 0
 		err := rows.Scan(
 			&encounter.UID,
 			&encounter.ActID,
@@ -169,61 +182,18 @@ func FindEncounters(userID int, offset int, query string, start *time.Time, end 
 			&encounter.Damage,
 			&encounter.SuccessLevel,
 			&encounter.HasLogs,
+			&fetchTotalResults,
 		)
 		if err != nil {
 			return err
+		}
+		if totalResults != nil {
+			*totalResults = fetchTotalResults
 		}
 		if compareHash.Valid {
 			encounter.CompareHash = compareHash.String
 		}
 		*encounters = append(*encounters, encounter)
-	}
-	return nil
-}
-
-// FindEncounterCount - get total number of results from encounter query
-func FindEncounterCount(userID int, query string, start *time.Time, end *time.Time, db *sql.DB, res *int) error {
-	// build query
-	params := make([]interface{}, 1)
-	params[0] = userID
-	dbQueryStr := "SELECT COUNT(DISTINCT(uid)) FROM encounter INNER JOIN combatant ON combatant.encounter_uid = encounter.uid"
-	dbQueryStr += " INNER JOIN player ON player.id = combatant.player_id"
-	dbQueryStr += " WHERE DATETIME(end_time) > DATETIME(start_time)"
-	dbQueryStr += " AND encounter.user_id = ?"
-	// search string
-	if query != "" {
-		dbQueryStr += " AND (zone LIKE ? OR player.name LIKE ?)"
-		params = append(params, "%"+query+"%", "%"+query+"%")
-	}
-	// start date
-	if start != nil {
-		dbQueryStr += " AND DATETIME(start_time) >= ?"
-		params = append(params, start.UTC())
-	} else {
-		dbQueryStr += " AND DATETIME(start_time) > '01-01-2019 00:00:00'"
-	}
-	// end date
-	if end != nil {
-		dbQueryStr += " AND DATETIME(end_time) <= ?"
-		params = append(params, end.UTC())
-	}
-	// fetch encounter counter
-	rows, err := db.Query(
-		dbQueryStr,
-		params...,
-	)
-	if err != nil {
-		return err
-	}
-	defer rows.Close()
-	// retrieve count
-	for rows.Next() {
-		err = rows.Scan(
-			res,
-		)
-		if err != nil {
-			return err
-		}
 	}
 	return nil
 }

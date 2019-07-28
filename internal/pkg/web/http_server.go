@@ -375,6 +375,7 @@ func HTTPStartServer(port uint16, userManager *user.Manager, actManager *act.Man
 				return
 			}
 		}
+		totalEncounterCount := 0
 		td.Encounters, err = act.GetPreviousEncounters(
 			events,
 			userData,
@@ -382,24 +383,16 @@ func HTTPStartServer(port uint16, userManager *user.Manager, actManager *act.Man
 			td.HistorySearchQuery,
 			startTime,
 			endTime,
+			&totalEncounterCount,
 		)
 		if err == nil {
-			totalEncounterCount, err := act.GetPreviousEncounterCount(
-				events,
-				userData,
-				td.HistorySearchQuery,
-				startTime,
-				endTime,
-			)
-			if err == nil {
-				td.EncounterTotalPage = int(math.Floor(float64(totalEncounterCount)/float64(app.PastEncounterFetchLimit))) + 1
-				if offset > totalEncounterCount-app.PastEncounterFetchLimit {
-					offset = (td.EncounterTotalPage - 1) * app.PastEncounterFetchLimit
-				}
-				td.EncounterCurrentPage = 1 + int(math.Floor(float64(offset)/float64(app.PastEncounterFetchLimit)))
-				td.EncounterNextPageOffset = int(offset) + app.PastEncounterFetchLimit
-				td.EncounterPrevPageOffset = int(offset) - app.PastEncounterFetchLimit
+			td.EncounterTotalPage = int(math.Floor(float64(totalEncounterCount)/float64(app.PastEncounterFetchLimit))) + 1
+			if offset > totalEncounterCount-app.PastEncounterFetchLimit {
+				offset = (td.EncounterTotalPage - 1) * app.PastEncounterFetchLimit
 			}
+			td.EncounterCurrentPage = 1 + int(math.Floor(float64(offset)/float64(app.PastEncounterFetchLimit)))
+			td.EncounterNextPageOffset = int(offset) + app.PastEncounterFetchLimit
+			td.EncounterPrevPageOffset = int(offset) - app.PastEncounterFetchLimit
 		}
 		if err != nil {
 			displayError(

@@ -57,6 +57,10 @@ func main() {
 	go actManager.SnapshotListener()
 	defer actManager.ClearAllData()
 
+	// stat tracker
+	statTracker := act.NewStatsTracker(&events)
+	go statTracker.Start()
+
 	// clean up old encounters
 	go act.CleanUpEncounters(&events)
 

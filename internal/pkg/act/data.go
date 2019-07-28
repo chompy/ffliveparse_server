@@ -333,7 +333,16 @@ func GetPreviousEncounter(events *emitter.Emitter, user user.Data, encounterUID 
 }
 
 // GetPreviousEncounters - retrieve list of previous encounters
-func GetPreviousEncounters(events *emitter.Emitter, user user.Data, offset int, query string, start *time.Time, end *time.Time) ([]Data, error) {
+func GetPreviousEncounters(
+	events *emitter.Emitter,
+	user user.Data,
+	offset int,
+	query string,
+	start *time.Time,
+	end *time.Time,
+	totalCount *int,
+) ([]Data, error) {
+
 	encounters := make([]Encounter, 0)
 	fin := make(chan bool)
 	events.Emit(
@@ -345,6 +354,7 @@ func GetPreviousEncounters(events *emitter.Emitter, user user.Data, offset int, 
 		query,
 		start,
 		end,
+		totalCount,
 	)
 	<-fin
 	dataRes := make([]Data, 0)
@@ -362,23 +372,6 @@ func GetPreviousEncounters(events *emitter.Emitter, user user.Data, offset int, 
 		dataRes = append(dataRes, data)
 	}
 	return dataRes, nil
-}
-
-// GetPreviousEncounterCount - get total number of previous encounters
-func GetPreviousEncounterCount(events *emitter.Emitter, user user.Data, query string, start *time.Time, end *time.Time) (int, error) {
-	res := int(0)
-	fin := make(chan bool)
-	events.Emit(
-		"database:find_encounter_count",
-		fin,
-		&res,
-		int(user.ID),
-		query,
-		start,
-		end,
-	)
-	<-fin
-	return res, nil
 }
 
 // IsActive - Check if data is actively being updated (i.e. active ACT connection)
