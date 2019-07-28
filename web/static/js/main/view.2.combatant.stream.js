@@ -67,6 +67,16 @@ class ViewCombatantStream extends ViewCombatantTable
         return;
     }
 
+    processCooldownQueue()
+    {
+        return;
+    }
+
+    updateCooldowns()
+    {
+        return;
+    }
+
     onResize()
     {
         var colElements = this.getElement().getElementsByClassName("combatant-col");
