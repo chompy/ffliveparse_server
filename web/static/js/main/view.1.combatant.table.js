@@ -80,12 +80,6 @@ class ViewCombatantTable extends ViewBase
     init()
     {
         super.init();
-        this.buildBaseElements();
-        this.encounter = null;
-        this.combatantElements = {};
-        this.cooldownQueue = [];
-        this.cooldownTracker = {};
-        this.tickTimeout = null;
         if (!("sortBy" in this.userConfig)) {
             this.userConfig["sortBy"] = "damage";
             this.saveUserConfig();
@@ -94,6 +88,12 @@ class ViewCombatantTable extends ViewBase
             this.userConfig["columns"] = ["job", "name", "damage", "healing"];
             this.saveUserConfig();
         }
+        this.buildBaseElements();
+        this.encounter = null;
+        this.combatantElements = {};
+        this.cooldownQueue = [];
+        this.cooldownTracker = {};
+        this.tickTimeout = null;
         this.tick();
     }
 
