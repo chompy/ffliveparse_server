@@ -25,7 +25,7 @@ class ViewLogs extends ViewBase
 
     getTitle()
     {
-        return "Log Viewer";
+        return "Logs";
     }
 
     init()
@@ -96,92 +96,9 @@ class ViewLogs extends ViewBase
         return combatantElement;
     }
 
-    /**
-     * Create log element for given log line.
-     * @param {Action} action
-     */
-    addLogLineElement(action)
-    {      
-        if (!action.displayAction || !action.type || !this.actionData) {
-            return;
-        }
-        if (
-            this.lastAddedAction && 
-            action.type == this.lastAddedAction.type &&
-            action.data.actionName == this.lastAddedAction.data.actionName &&
-            action.time.getTime() == this.lastAddedAction.time.getTime()
-        ) {
-            return;
-        }
-
-        var logElement = document.createElement("div");
-        logElement.classList.add("action", "action-" + action.type)
-        
-        // create time element
-        var timeElement = document.createElement("div");
-        timeElement.classList.add("action-time")
-        var timeElasped = new Date(action.time - this.encounter.data.StartTime);
-        timeElement.innerText = (timeElasped.getMinutes() < 0 ? "0" : "") + 
-        timeElasped.getMinutes() + ":" + 
-            (timeElasped.getSeconds() < 10 ? "0" : "") + 
-            timeElasped.getSeconds() + "." +
-            (timeElasped.getMilliseconds() < 10 ? "0" : "") +
-            (timeElasped.getMilliseconds() < 100 ? "0" : "") +
-            timeElasped.getMilliseconds()
-        ;
-        logElement.appendChild(timeElement);
-
-        // create source element
-        var sourceCombatantElement = this.createCombatantElement(
-            action.sourceCombatant,
-            action.data.sourceName
-        );
-        sourceCombatantElement.classList.add("action-source");
-        logElement.appendChild(sourceCombatantElement);
-
-        // create action element
-        var actionIcon = this.getActionIcon(action);
-        var actionIconElement = document.createElement("div");
-        actionIconElement.classList.add("action-icon");
-        var actionIconInnerElement = document.createElement("div");
-        actionIconInnerElement.classList.add("action-icon-inner");
-        actionIconElement.appendChild(actionIconInnerElement);
-        var actionIconImgElement = document.createElement("img");
-        actionIconImgElement.src = actionIcon;
-        actionIconImgElement.alt = action.data.actionName;
-        actionIconImgElement.title = actionIconImgElement.alt;
-        actionIconInnerElement.appendChild(actionIconImgElement);
-
-        logElement.appendChild(actionIconElement);
-
-        // create target elements
-        var targetCombatantContainerElement = document.createElement("div");
-        targetCombatantContainerElement.classList.add("action-targets");
-        targetCombatantContainerElement.appendChild(
-            this.createCombatantElement(
-                action.targetCombatant,
-                action.data.targetName,
-                action
-            )
-        );
-        for (var i in action.relatedActions) {
-            targetCombatantContainerElement.appendChild(
-                this.createCombatantElement(
-                    action.relatedActions[i].targetCombatant,
-                    action.relatedActions[i].data.targetName,
-                    action.relatedActions[i]
-                )
-            );
-        }
-        logElement.appendChild(targetCombatantContainerElement);
-
-        this.logContainerElement.appendChild(logElement);
-        this.lastAddedAction = action;
-    }
-
     processLogQueue()
     {
-        if (!this.actionData || !this.statusData || !this.encounter) {
+        if (!this.encounter) {
             return;
         }
         var logLine = null;
@@ -257,6 +174,7 @@ class ViewLogs extends ViewBase
     {
         this.reset();
         this.encounter = encounter;
+        this.processLogQueue();
     }
 
     onLogLine(logLineData)

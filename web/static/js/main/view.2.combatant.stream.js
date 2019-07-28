@@ -32,6 +32,7 @@ class ViewCombatantStream extends ViewCombatantTable
     {
         super.init();
         this.userConfig["sortBy"] = "damage";
+        this.userConfig["columns"] = ["job", "name", "damage"];
         var t = this;
         setTimeout(function() {
             t.onResize();
@@ -59,6 +60,11 @@ class ViewCombatantStream extends ViewCombatantTable
     {
         super.displayCombatants()
         this.onResize();
+    }
+
+    updateColumnVisibility()
+    {
+        return;
     }
 
     onResize()

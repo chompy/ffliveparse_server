@@ -1,6 +1,8 @@
 #view-stream
   #loading-message
     display: none !important
+  .table-options
+    display: none
   .combatant-head
     display: none
   .combatant-row

@@ -61,10 +61,11 @@ func SaveEncounter(userID int, encounter *act.Encounter, db *sql.DB) error {
 		return err
 	}
 	defer stmt.Close()
+	var compareHash sql.NullString
 	_, err = stmt.Exec(
 		encounter.UID,
 		encounter.ActID,
-		encounter.CompareHash,
+		&compareHash,
 		userID,
 		encounter.StartTime,
 		encounter.EndTime,
@@ -73,6 +74,9 @@ func SaveEncounter(userID int, encounter *act.Encounter, db *sql.DB) error {
 		encounter.SuccessLevel,
 		true,
 	)
+	if compareHash.Valid {
+		encounter.CompareHash = compareHash.String
+	}
 	return err
 }
 
@@ -89,10 +93,11 @@ func FetchEncounter(userID int, encounterUID string, db *sql.DB, encounter *act.
 	}
 	defer rows.Close()
 	for rows.Next() {
+		var compareHash sql.NullString
 		err = rows.Scan(
 			&encounter.UID,
 			&encounter.ActID,
-			&encounter.CompareHash,
+			&compareHash,
 			&encounter.StartTime,
 			&encounter.EndTime,
 			&encounter.Zone,
@@ -101,6 +106,9 @@ func FetchEncounter(userID int, encounterUID string, db *sql.DB, encounter *act.
 		)
 		if err != nil {
 			return err
+		}
+		if compareHash.Valid {
+			encounter.CompareHash = compareHash.String
 		}
 		break
 	}
@@ -150,10 +158,11 @@ func FindEncounters(userID int, offset int, query string, start *time.Time, end 
 	for rows.Next() {
 		// build encounter
 		encounter := act.Encounter{}
+		var compareHash sql.NullString
 		err := rows.Scan(
 			&encounter.UID,
 			&encounter.ActID,
-			&encounter.CompareHash,
+			&compareHash,
 			&encounter.StartTime,
 			&encounter.EndTime,
 			&encounter.Zone,
@@ -163,6 +172,9 @@ func FindEncounters(userID int, offset int, query string, start *time.Time, end 
 		)
 		if err != nil {
 			return err
+		}
+		if compareHash.Valid {
+			encounter.CompareHash = compareHash.String
 		}
 		*encounters = append(*encounters, encounter)
 	}

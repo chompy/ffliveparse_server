@@ -1,5 +1,7 @@
-DEV
-- All database transactions now happen through new handler.
+1.30
+- All database transactions now happen through new handler to eliminate (hopefully) issues with database write locks.
+- Added ability to toggle table columns.
+- Added Hits, Heals, Kills, and Cooldowns columns to table view.
 
 1.29
 - Fixed issue with user manager writing to database.

@@ -10,7 +10,7 @@ This is the main server component, it listens for log data from the ACT plugin a
 When you generate a key for yourself you are given a personal parse page. This page takes data from your ACT and displays the parses and action timelines with it. You are free to share this page with others.
 
 
-## Stream Mode
+## Stream View
 
 You can access a more streaming friendly layout of the parses by appending #stream to the end of your parse URL.
 
@@ -25,17 +25,7 @@ https://www.ffliveparse.com/abc123#stream
 
 ## Viewing Past Encounters
 
-Past encounter data is stored and can be replayed. You can access past encounters via the "History" resource found in the side menu of your main parse page. Search and filtering options for past encounter data is planned.
-
-
-## Custom Plugins
-
-Eventually you'll be able to add custom third party plugins that can extends FFLiveParse's functionality and provide additional data and triggers.
-
-Some custom plugin ideas...
-
-- UWU Jail Plugin that works for PS4 users
-- Text-to-speech triggers to help line up raid buffs
+Past encounter data is stored and can be replayed. You can access past encounters via the "History" resource found in the side menu of your main parse page. You can filter encounters by player names, zone names, and dates.
 
 
 ## Triggers
@@ -106,6 +96,8 @@ You can run the server on your own machine if you prefer.
 
 ## Todos
 
+- Stats, view detailed information about your best runs and parses
+- Log view, display detailed log of fight with nice visual styling...(partially implemented?)
 - Ability to have user provided custom widgets/plugins.
 - Restore functionality from v0.XX
     - Cactbot triggers
@@ -114,6 +106,4 @@ You can run the server on your own machine if you prefer.
     - Timeline scrollbar
 - Timeline improvements
     - Filter actions
-- Log view, display detailed log of fight with nice visual styling
-- Search and filter past encounters
-- Stats, view detailed information about your best runs and parses
+

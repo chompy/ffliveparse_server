@@ -152,9 +152,6 @@ class CombatantCollector
                     return a.data.Name.localeCompare(b.data.Name);
                 }
                 case "job":
-                {
-                    return a.data.Job.localeCompare(b.data.Job);
-                }
                 case "role":
                 {
                     var jobCats = [
@@ -170,7 +167,7 @@ class CombatantCollector
                             return 1;
                         }
                     }
-                    return a.getDisplayName().localeCompare(b.getDisplayName());
+                    return a.data.Job.localeCompare(b.data.Job);
                 }
                 default:
                 case "damage":
@@ -355,6 +352,18 @@ class Combatant
             case "deaths":
             {
                 return data.Deaths;
+            }
+            case "hits":
+            {
+                return data.Hits;   
+            }
+            case "heals":
+            {
+                return data.Heals;
+            }
+            case "kills":
+            {
+                return data.Kills;   
             }
         }
         return "";
