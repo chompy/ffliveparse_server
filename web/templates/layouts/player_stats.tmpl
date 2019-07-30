@@ -117,7 +117,7 @@
                 var jobFilterElement = document.createElement("a");
                 jobFilterElement.href = "?sort={{ .PlayerStatSort }}&job=" + jobs[i];
                 var jobIcon = document.createElement("img");
-                jobIcon.src = "/static/img/job/" + jobs[i] + ".png";
+                jobIcon.src = "/static/img/job/" + jobs[i].toLowerCase() + ".png";
                 jobIcon.alt = jobs[i].toUpperCase();
                 jobFilterElement.title = jobIcon.alt;
                 jobFilterElement.appendChild(jobIcon);
