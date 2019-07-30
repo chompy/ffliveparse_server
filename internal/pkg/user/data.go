@@ -54,6 +54,16 @@ func (d *Data) GetWebIDString() (string, error) {
 	if d.webIDHash != "" {
 		return d.webIDHash, nil
 	}
+	var err error
+	d.webIDHash, err = GetWebIDStringFromID(d.ID)
+	if err != nil {
+		return "", err
+	}
+	return d.webIDHash, nil
+}
+
+// GetWebIDStringFromID - convert user id to web id string
+func GetWebIDStringFromID(userID int64) (string, error) {
 	hd := hashids.NewData()
 	hd.Salt = webIDSalt
 	hd.MinLength = 5
@@ -61,11 +71,10 @@ func (d *Data) GetWebIDString() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	idStr, err := h.EncodeInt64([]int64{d.ID})
+	idStr, err := h.EncodeInt64([]int64{userID})
 	if err != nil {
 		return "", err
 	}
-	d.webIDHash = idStr
 	return idStr, nil
 }
 

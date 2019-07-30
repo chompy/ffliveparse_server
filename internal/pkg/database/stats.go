@@ -19,98 +19,79 @@ package database
 
 import (
 	"database/sql"
-	"time"
 
 	"../act"
+	"../user"
 )
 
 // FindPlayerStats - player stats for given zone
-func FindPlayerStats(zone string, db *sql.DB, playerStats *[]act.PlayerStat) error {
+func FindPlayerStats(db *sql.DB, playerStats *[]act.PlayerStat) error {
 	// build query
 	dbQueryStr := `
-	SELECT DISTINCT encounter.compare_hash, player_id FROM combatant
+	SELECT encounter_uid, encounter.compare_hash, encounter.zone, encounter.start_time, encounter.end_time,
+	encounter.user_id, player_id, player.name, player.world_name,
+	job, c.damage, c.damage_taken, c.damage_healed, c.deaths, c.hits, c.heals, c.kills
+	FROM (
+		SELECT encounter_uid, player_id, job, damage, damage_taken, damage_healed, deaths,
+		hits, heals, kills,	time,
+		RANK() OVER(PARTITION BY encounter_uid ORDER BY DATETIME(time) DESC) rnk
+		FROM combatant
+	) as c
 	INNER JOIN encounter ON encounter.uid = encounter_uid
-	WHERE hits >= 0 AND encounter.compare_hash != "" AND encounter.success_level = 1 AND zone = ?
-	ORDER by DATETIME(combatant.time) DESC
+	INNER JOIN player ON player.id = player_id
+	WHERE rnk = 1 AND c.hits > 0 AND c.time > 0 AND encounter.compare_hash != "" AND encounter.success_level = 1
 	`
 	// execute query
 	rows, err := db.Query(
 		dbQueryStr,
-		zone,
 	)
 	if err != nil {
 		return err
 	}
 	defer rows.Close()
 	for rows.Next() {
-		compareHash := ""
-		playerID := 0
+		combatant := act.Combatant{
+			Player: act.Player{},
+		}
+		encounter := act.Encounter{}
+		var worldName sql.NullString
+		userID := int64(0)
 		err := rows.Scan(
-			&compareHash,
-			&playerID,
+			&encounter.UID,
+			&encounter.CompareHash,
+			&encounter.Zone,
+			&encounter.StartTime,
+			&encounter.EndTime,
+			&userID,
+			&combatant.Player.ID,
+			&combatant.Player.Name,
+			&worldName,
+			&combatant.Job,
+			&combatant.Damage,
+			&combatant.DamageTaken,
+			&combatant.DamageHealed,
+			&combatant.Deaths,
+			&combatant.Hits,
+			&combatant.Heals,
+			&combatant.Kills,
 		)
 		if err != nil {
 			return err
 		}
-		subDbQueryStr := `
-			SELECT job, combatant.damage, damage_taken, damage_healed, deaths, hits, heals, kills, encounter_uid,
-			encounter.start_time, encounter.end_time, player.name, player.world_name FROM combatant
-			INNER JOIN encounter ON encounter.uid = encounter_uid
-			INNER JOIN player ON player.id = player_id
-			WHERE encounter.compare_hash = ? AND player_id = ? LIMIT 1
-		`
-		subRows, err := db.Query(
-			subDbQueryStr,
-			compareHash,
-			playerID,
-		)
-		if err != nil {
-			return err
+		if worldName.Valid {
+			combatant.Player.World = worldName.String
 		}
-		defer subRows.Close()
-		for subRows.Next() {
-			combatant := act.Combatant{
-				Player: act.Player{
-					ID: int32(playerID),
-				},
-			}
-			encounter := act.Encounter{
-				CompareHash: compareHash,
-				Zone:        zone,
-			}
-			var worldName sql.NullString
-			err := subRows.Scan(
-				&combatant.Job,
-				&combatant.Damage,
-				&combatant.DamageTaken,
-				&combatant.DamageHealed,
-				&combatant.Deaths,
-				&combatant.Hits,
-				&combatant.Heals,
-				&combatant.Kills,
-				&encounter.UID,
-				&encounter.StartTime,
-				&encounter.EndTime,
-				&combatant.Player.Name,
-				&worldName,
-			)
-			if err != nil {
-				return err
-			}
-			if worldName.Valid {
-				combatant.Player.World = worldName.String
-			}
-			combatant.EncounterUID = encounter.UID
-			encounterTime := encounter.EndTime.Sub(encounter.StartTime)
-			playerStat := act.PlayerStat{
-				Combatant: combatant,
-				Encounter: encounter,
-				DPS:       float64(combatant.Damage) / float64(encounterTime/time.Second),
-				HPS:       float64(combatant.DamageHealed) / float64(encounterTime/time.Second),
-			}
-			*playerStats = append(*playerStats, playerStat)
+		combatant.EncounterUID = encounter.UID
+		encounterTime := encounter.EndTime.Sub(encounter.StartTime)
+		webIDStr, _ := user.GetWebIDStringFromID(userID)
+		playerStat := act.PlayerStat{
+			Combatant: combatant,
+			Encounter: encounter,
+			DPS:       float64(combatant.Damage) / float64(encounterTime.Seconds()),
+			HPS:       float64(combatant.DamageHealed) / float64(encounterTime.Seconds()),
+			URL:       "/" + webIDStr + "/" + encounter.UID,
 		}
-		subRows.Close()
+		*playerStats = append(*playerStats, playerStat)
 	}
 	return nil
 }

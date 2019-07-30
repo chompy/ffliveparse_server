@@ -1,3 +1,7 @@
+1.31
+- Global stats page.
+- Manually end encounter in game with '/e end.'
+
 1.30
 - All database transactions now happen through new handler to eliminate (hopefully) issues with database write locks.
 - Added ability to toggle table columns.

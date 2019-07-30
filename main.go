@@ -35,10 +35,10 @@ func main() {
 	// create event emitter
 	events := emitter.Emitter{}
 
-	// create stat collector
-	statCollector := app.NewStatCollector(&events)
-	statCollector.TakeSnapshot()
-	go statCollector.Start()
+	// create usage stat collector
+	usageStatCollector := app.NewStatCollector(&events)
+	usageStatCollector.TakeSnapshot()
+	go usageStatCollector.Start()
 
 	// create database handler
 	dbHandler, err := database.NewHandler(&events)
@@ -57,15 +57,21 @@ func main() {
 	go actManager.SnapshotListener()
 	defer actManager.ClearAllData()
 
-	// stat tracker
-	statTracker := act.NewStatsTracker(&events)
-	go statTracker.Start()
+	// player stat tracker on seperate threads
+	psEvents := emitter.Emitter{}
+	psDbHandler, err := database.NewHandler(&psEvents)
+	go psDbHandler.Handle()
+	if err != nil {
+		panic(err)
+	}
+	playerStatTracker := act.NewStatsTracker(&psEvents)
+	go playerStatTracker.Start()
 
 	// clean up old encounters
 	go act.CleanUpEncounters(&events)
 
 	// start http server
-	go web.HTTPStartServer(uint16(*httpPort), &userManager, &actManager, &events, &statCollector, *devModePtr)
+	go web.HTTPStartServer(uint16(*httpPort), &userManager, &actManager, &events, &usageStatCollector, &playerStatTracker, *devModePtr)
 
 	// start act listen server
 	act.Listen(uint16(*actPort), &actManager)

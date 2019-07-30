@@ -39,41 +39,40 @@ const DataTypeFlag byte = 99
 
 // Player - Data about a player
 type Player struct {
-	ID      int32
-	UID     string
-	Name    string
-	ActName string
-	World   string
+	ID      int32  `json:"id"`
+	Name    string `json:"name"`
+	ActName string `json:"act_name"`
+	World   string `json:"world"`
 }
 
 // Combatant - Data about a combatant
 type Combatant struct {
-	Player         Player
-	EncounterUID   string
-	ActEncounterID uint32
-	Time           time.Time
-	Job            string
-	Damage         int32
-	DamageTaken    int32
-	DamageHealed   int32
-	Deaths         int32
-	Hits           int32
-	Heals          int32
-	Kills          int32
+	Player         Player    `json:"player"`
+	EncounterUID   string    `json:"encounter_uid"`
+	ActEncounterID uint32    `json:"act_encounter_id"`
+	Time           time.Time `json:"time"`
+	Job            string    `json:"job"`
+	Damage         int32     `json:"damage"`
+	DamageTaken    int32     `json:"damage_taken"`
+	DamageHealed   int32     `json:"damage_healed"`
+	Deaths         int32     `json:"deaths"`
+	Hits           int32     `json:"hits"`
+	Heals          int32     `json:"heals"`
+	Kills          int32     `json:"kills"`
 }
 
 // Encounter - Data about an encounter
 type Encounter struct {
-	UID          string
-	ActID        uint32
-	CompareHash  string
-	StartTime    time.Time
-	EndTime      time.Time
-	Zone         string
-	Damage       int32
-	Active       bool
-	SuccessLevel uint8
-	HasLogs      bool
+	UID          string    `json:"uid"`
+	ActID        uint32    `json:"act_id"`
+	CompareHash  string    `json:"compare_hash"`
+	StartTime    time.Time `json:"start_time"`
+	EndTime      time.Time `json:"end_time"`
+	Zone         string    `json:"zone"`
+	Damage       int32     `json:"damage"`
+	Active       bool      `json:"active"`
+	SuccessLevel uint8     `json:"success_level"`
+	HasLogs      bool      `json:"has_logs"`
 }
 
 // LogLine - Log line from Act

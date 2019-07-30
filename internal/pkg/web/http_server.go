@@ -75,6 +75,9 @@ type templateData struct {
 	HistorySearchQuery      string
 	HistoryStartDate        string
 	HistoryEndDate          string
+	PlayerStatSortOptions   []string
+	PlayerStatSort          string
+	PlayerStatJob           string
 }
 
 // websocketConnection - Websocket connection data associated with user data
@@ -84,7 +87,15 @@ type websocketConnection struct {
 }
 
 // HTTPStartServer - Start HTTP server
-func HTTPStartServer(port uint16, userManager *user.Manager, actManager *act.Manager, events *emitter.Emitter, statCollector *app.StatCollector, devMode bool) {
+func HTTPStartServer(
+	port uint16,
+	userManager *user.Manager,
+	actManager *act.Manager,
+	events *emitter.Emitter,
+	usageStatCollector *app.StatCollector,
+	playerStatTracker *act.StatsTracker,
+	devMode bool,
+) {
 	// load html templates
 	var err error
 	htmlTemplates, err = getTemplates()
@@ -232,7 +243,7 @@ func HTTPStartServer(port uint16, userManager *user.Manager, actManager *act.Man
 		http.Redirect(w, r, "/", http.StatusFound)
 	})
 	// display stats
-	http.HandleFunc("/stats", func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc("/usage", func(w http.ResponseWriter, r *http.Request) {
 		// set resposne headers
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		// build template data
@@ -242,13 +253,13 @@ func HTTPStartServer(port uint16, userManager *user.Manager, actManager *act.Man
 		td.StatActiveWebUsers = len(websocketConnections)
 		td.StatPageLoads = pageLoads
 		// render stats template
-		htmlTemplates["stats.tmpl"].ExecuteTemplate(w, "base.tmpl", td)
+		htmlTemplates["usage_stats.tmpl"].ExecuteTemplate(w, "base.tmpl", td)
 	})
 	// display json stats
-	http.HandleFunc("/_stats_json", func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc("/_usage_json", func(w http.ResponseWriter, r *http.Request) {
 		// set resposne headers
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
-		jsonBytes, err := json.Marshal(statCollector)
+		jsonBytes, err := json.Marshal(usageStatCollector)
 		if err != nil {
 			log.Println("[WEB] Error occured while displaying stats,", err)
 			displayError(
@@ -406,6 +417,54 @@ func HTTPStartServer(port uint16, userManager *user.Manager, actManager *act.Man
 		// render encounters template
 		htmlTemplates["history.tmpl"].ExecuteTemplate(w, "base.tmpl", td)
 	})
+
+	// display player stats
+	http.HandleFunc("/stats", func(w http.ResponseWriter, r *http.Request) {
+		// set resposne headers
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		// filter options
+		td := getBaseTemplateData()
+		td.PlayerStatSortOptions = []string{"dps", "hps", "speed", "time", "damage", "healing"}
+		td.PlayerStatSort = r.URL.Query().Get("sort")
+		if td.PlayerStatSort == "" {
+			td.PlayerStatSort = "dps"
+		}
+		td.PlayerStatJob = r.URL.Query().Get("job")
+		// render stats template
+		htmlTemplates["player_stats.tmpl"].ExecuteTemplate(w, "base.tmpl", td)
+	})
+
+	// display player stats JSON
+	http.HandleFunc("/stats_json", func(w http.ResponseWriter, r *http.Request) {
+		// set resposne headers
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+		// sort
+		statSort := r.URL.Query().Get("sort")
+		if statSort == "" {
+			statSort = ""
+		}
+		job := r.URL.Query().Get("job")
+		// fetch zones
+		zones := make([][]*act.PlayerStat, 0)
+		for _, zoneName := range act.StatTrackerZones {
+			zones = append(
+				zones,
+				playerStatTracker.GetZoneStats(zoneName, job, statSort),
+			)
+		}
+		jsonBytes, err := json.Marshal(zones)
+		if err != nil {
+			log.Println("[WEB] Error occured while displaying player stats,", err)
+			displayError(
+				w,
+				"An error occured while displaying player stats",
+				http.StatusInternalServerError,
+			)
+			return
+		}
+		w.Write(jsonBytes)
+	})
+
 	// ping
 	http.HandleFunc("/ping", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")

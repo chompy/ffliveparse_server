@@ -1,0 +1,91 @@
+#player-stat-content
+  margin: 15px
+  .player-stat-zone
+    h3
+      display: inline-block
+      margin-right: 10px
+    .player-stat-col
+      display: inline-block
+      width: 25%
+      text-align: left
+      vertical-align: middle
+      white-space: nowrap
+      overflow: hidden
+      text-overflow: ellipsis
+      &.rank
+        width: 10%
+      &.job
+        width: 10%
+        img
+          max-width: 28px
+      .player-stat-value-percent
+        font-size: 14px
+        margin-left: 10px
+        vertical-align: 1px
+        color: #666
+        background: #000
+        padding: 3px
+        &.artifact
+          color: rgb(229,204,128) 
+        &.legendary
+          color: rgb(255,128,0)
+        &.epic
+          color: rgb(163,53,238)
+        &.rare
+          color: rgb(0,112,255)
+        &.uncommon
+          color: rgb(30,255,0)
+
+    .player-stat-head
+      background: #2d2d2d
+      padding: 5px 10px
+      .player-stat-col
+        background: #2d2d2d
+        color: #fff
+        text-transform: uppercase
+
+    .player-stat-data
+      background: #e7e7e7
+      color: #000
+      padding: 5px 10px
+      a
+        color: #000
+      &:nth-child(even)
+        background: #747682
+        color: #fff
+        a
+          color: #fff
+      &.show-more
+        display: none
+        background: #2d2d2d
+        color: #fff
+        cursor: pointer
+        text-decoration: underline
+        font-size: 14px
+        vertical-align: middle
+        padding: 10px
+        text-align: center
+        text-transform: lowercase
+        
+    &.hide-more
+      .player-stat-data.hide-more
+        display: none
+      .show-more
+        display: block
+  #player-stat-filters
+    .current
+      font-weight: bold
+    & > div
+      margin-bottom: 10px
+      span
+        display: block
+        margin-bottom: 5px
+        font-size: 16px
+        font-weight: bold
+      a
+        display: inline-block
+        margin-right: 10px
+      img
+        max-width: 38px
+      br
+        margin-bottom: 6px

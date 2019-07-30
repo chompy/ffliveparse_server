@@ -178,8 +178,7 @@ func (h *Handler) Handle() error {
 						}
 					case *[]act.PlayerStat:
 						{
-							zone := event.String(2)
-							err = FindPlayerStats(zone, h.database, findObjs.(*[]act.PlayerStat))
+							err = FindPlayerStats(h.database, findObjs.(*[]act.PlayerStat))
 						}
 					}
 					break

@@ -20,6 +20,7 @@ package act
 import (
 	"log"
 	"sort"
+	"strings"
 	"time"
 
 	"../app"
@@ -43,54 +44,41 @@ var StatTrackerZones = []string{
 
 // PlayerStat - stat data for single player in single encounter
 type PlayerStat struct {
-	Encounter Encounter
-	Combatant Combatant
-	DPS       float64
-	HPS       float64
-}
-
-// ZoneStats - global stats for specific zone
-type ZoneStats struct {
-	Zone    string
-	Players []PlayerStat
+	Encounter Encounter `json:"encounter"`
+	Combatant Combatant `json:"combatant"`
+	DPS       float64   `json:"dps"`
+	HPS       float64   `json:"hps"`
+	URL       string    `json:"url"`
 }
 
 // StatsTracker - track global stats
 type StatsTracker struct {
-	ZoneStats []ZoneStats
-	events    *emitter.Emitter
+	PlayerStats []PlayerStat `json:"players"`
+	events      *emitter.Emitter
 }
 
 // NewStatsTracker - create new stats tracker
 func NewStatsTracker(events *emitter.Emitter) StatsTracker {
 	return StatsTracker{
-		ZoneStats: make([]ZoneStats, 0),
-		events:    events,
+		PlayerStats: make([]PlayerStat, 0),
+		events:      events,
 	}
 }
 
 func (st *StatsTracker) collect() {
+	startTime := time.Now()
 	log.Println("[PLAYER-STATS] Collect global player stats...")
-	// reset zone stats
-	st.ZoneStats = make([]ZoneStats, 0)
-	// itterate raid zones
-	for _, zone := range StatTrackerZones {
-		playerStats := make([]PlayerStat, 0)
-		fin := make(chan bool)
-		st.events.Emit(
-			"database:find",
-			fin,
-			&playerStats,
-			zone,
-		)
-		<-fin
-		zoneStats := ZoneStats{
-			Players: playerStats,
-			Zone:    zone,
-		}
-		st.ZoneStats = append(st.ZoneStats, zoneStats)
-	}
-	log.Println("[PLAYER-STATS] Done.")
+	// collect all player stats
+	playerStats := make([]PlayerStat, 0)
+	fin := make(chan bool)
+	st.events.Emit(
+		"database:find",
+		fin,
+		&playerStats,
+	)
+	<-fin
+	st.PlayerStats = playerStats
+	log.Println("[PLAYER-STATS] Done (", time.Now().Sub(startTime), ")")
 }
 
 // Start - start the stats tracker
@@ -104,43 +92,48 @@ func (st *StatsTracker) Start() error {
 }
 
 // GetZoneStats - get global player stats for specific zone
-func (st *StatsTracker) GetZoneStats(zone string, job string, sortStat string) []*PlayerStat {
+func (st *StatsTracker) GetZoneStats(zone string, jobs string, sortStat string) []*PlayerStat {
+	// itterate player stats and filter
 	playerStats := make([]*PlayerStat, 0)
-	for index := range st.ZoneStats {
-		if st.ZoneStats[index].Zone == zone {
-			// collect player stats
-			for playerIndex := range st.ZoneStats[index].Players {
-				if job == "" || st.ZoneStats[index].Players[playerIndex].Combatant.Job == job {
-					playerStats = append(playerStats, &st.ZoneStats[index].Players[playerIndex])
-				}
-			}
-			// sort stats
-			sort.Slice(
-				playerStats,
-				func(i, j int) bool {
-					switch sortStat {
-					case "dps":
-						{
-							return playerStats[i].DPS < playerStats[j].DPS
-						}
-					case "hps":
-						{
-							return playerStats[i].HPS < playerStats[j].HPS
-						}
-					case "damage":
-						{
-							return playerStats[i].Combatant.Damage < playerStats[j].Combatant.Damage
-						}
-					case "healing":
-						{
-							return playerStats[i].Combatant.DamageHealed < playerStats[j].Combatant.DamageHealed
-						}
-					}
-					return true
-				},
-			)
-			break
+	for index := range st.PlayerStats {
+		if st.PlayerStats[index].Encounter.Zone == zone && (jobs == "" || strings.Contains(jobs, st.PlayerStats[index].Combatant.Job)) {
+			playerStats = append(playerStats, &st.PlayerStats[index])
 		}
 	}
+	// sort stats
+	sort.Slice(
+		playerStats,
+		func(i, j int) bool {
+			switch sortStat {
+			case "dps":
+				{
+					return playerStats[i].DPS > playerStats[j].DPS
+				}
+			case "hps":
+				{
+					return playerStats[i].HPS > playerStats[j].HPS
+				}
+			case "speed":
+				{
+					return playerStats[i].Encounter.EndTime.Sub(playerStats[i].Encounter.StartTime) <
+						playerStats[j].Encounter.EndTime.Sub(playerStats[j].Encounter.StartTime)
+				}
+			case "time":
+				{
+					return playerStats[i].Encounter.EndTime.Before(playerStats[j].Encounter.EndTime)
+				}
+			case "damage":
+				{
+					return playerStats[i].Combatant.Damage > playerStats[j].Combatant.Damage
+				}
+			case "healing":
+				{
+					return playerStats[i].Combatant.DamageHealed > playerStats[j].Combatant.DamageHealed
+				}
+			}
+			return true
+		},
+	)
+
 	return playerStats
 }
