@@ -28,18 +28,15 @@ import (
 func FindPlayerStats(db *sql.DB, playerStats *[]act.PlayerStat) error {
 	// build query
 	dbQueryStr := `
-	SELECT encounter_uid, encounter.compare_hash, encounter.zone, encounter.start_time, encounter.end_time,
-	encounter.user_id, player_id, player.name, player.world_name,
-	job, c.damage, c.damage_taken, c.damage_healed, c.deaths, c.hits, c.heals, c.kills
-	FROM (
-		SELECT encounter_uid, player_id, job, damage, damage_taken, damage_healed, deaths,
-		hits, heals, kills,	time,
-		RANK() OVER(PARTITION BY encounter_uid ORDER BY DATETIME(time) DESC) rnk
-		FROM combatant
-	) as c
-	INNER JOIN encounter ON encounter.uid = encounter_uid
-	INNER JOIN player ON player.id = player_id
-	WHERE rnk = 1 AND c.hits > 0 AND c.time > 0 AND encounter.compare_hash != "" AND encounter.success_level = 1
+	SELECT encounter.uid, encounter.compare_hash, encounter.zone, encounter.start_time, encounter.end_time,
+	encounter.user_id, player.id, player.name, player.world_name,
+	job, combatant.damage, combatant.damage_taken, combatant.damage_healed,
+	combatant.deaths, combatant.hits, combatant.heals, combatant.kills FROM
+	(SELECT encounter_uid, player_id, MAX(ROWID) as rowid FROM combatant GROUP BY player_id, encounter_uid ORDER BY ROWID DESC) as c
+	INNER JOIN combatant ON combatant.rowid = c.ROWID AND combatant.encounter_uid = c.encounter_uid AND combatant.player_id = c.player_id
+	INNER JOIN encounter ON encounter.uid = c.encounter_uid
+	INNER JOIN player ON player.id = c.player_id
+	WHERE combatant.hits > 0 AND combatant.time > 0 AND encounter.compare_hash != "" AND encounter.success_level = 1
 	`
 	// execute query
 	rows, err := db.Query(

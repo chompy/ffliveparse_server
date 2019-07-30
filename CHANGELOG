@@ -1,3 +1,7 @@
+1.32
+- Fixed combatant hash not being set in database.
+- Trying new player stat DB query.
+
 1.31
 - Global stats page.
 - Manually end encounter in game with '/e end.'

@@ -61,11 +61,10 @@ func SaveEncounter(userID int, encounter *act.Encounter, db *sql.DB) error {
 		return err
 	}
 	defer stmt.Close()
-	var compareHash sql.NullString
 	_, err = stmt.Exec(
 		encounter.UID,
 		encounter.ActID,
-		&compareHash,
+		encounter.CompareHash,
 		userID,
 		encounter.StartTime,
 		encounter.EndTime,
@@ -74,9 +73,6 @@ func SaveEncounter(userID int, encounter *act.Encounter, db *sql.DB) error {
 		encounter.SuccessLevel,
 		true,
 	)
-	if compareHash.Valid {
-		encounter.CompareHash = compareHash.String
-	}
 	return err
 }
 
