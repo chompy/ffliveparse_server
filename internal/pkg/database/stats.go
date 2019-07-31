@@ -30,13 +30,12 @@ func FindPlayerStats(db *sql.DB, playerStats *[]act.PlayerStat) error {
 	dbQueryStr := `
 	SELECT encounter.uid, encounter.compare_hash, encounter.zone, encounter.start_time, encounter.end_time,
 	encounter.user_id, player.id, player.name, player.world_name,
-	job, combatant.damage, combatant.damage_taken, combatant.damage_healed,
-	combatant.deaths, combatant.hits, combatant.heals, combatant.kills FROM
-	(SELECT encounter_uid, player_id, MAX(ROWID) as rowid FROM combatant GROUP BY player_id, encounter_uid ORDER BY ROWID DESC) as c
-	INNER JOIN combatant ON combatant.rowid = c.ROWID AND combatant.encounter_uid = c.encounter_uid AND combatant.player_id = c.player_id
-	INNER JOIN encounter ON encounter.uid = c.encounter_uid
-	INNER JOIN player ON player.id = c.player_id
+	job, MAX(combatant.damage), combatant.damage_taken, combatant.damage_healed,
+	combatant.deaths, combatant.hits, combatant.heals, combatant.kills FROM combatant
+	INNER JOIN encounter ON encounter.uid = combatant.encounter_uid
+	INNER JOIN player ON player.id = combatant.player_id
 	WHERE combatant.hits > 0 AND combatant.time > 0 AND encounter.compare_hash != "" AND encounter.success_level = 1
+	GROUP BY encounter.compare_hash, combatant.player_id
 	`
 	// execute query
 	rows, err := db.Query(

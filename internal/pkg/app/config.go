@@ -20,7 +20,7 @@ package app
 import "fmt"
 
 // VersionNumber - version number
-const VersionNumber int32 = 132
+const VersionNumber int32 = 133
 
 // ActPluginMinVersionNumber - act plugin min version
 const ActPluginMinVersionNumber int32 = 5
@@ -33,6 +33,9 @@ const Name string = "FFLiveParse"
 
 // DatabasePath - path to database file
 const DatabasePath = "./data/database/db.sqlite"
+
+// GlobalStatBanPath - path to global stat ban file
+const GlobalStatBanPath = "./data/conf/global_stat_bans.txt"
 
 // LogPath - path where log data is stored
 const LogPath = "./data/logs"

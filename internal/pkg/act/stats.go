@@ -18,7 +18,9 @@ along with FFLiveParse.  If not, see <https://www.gnu.org/licenses/>.
 package act
 
 import (
+	"bufio"
 	"log"
+	"os"
 	"sort"
 	"strings"
 	"time"
@@ -77,7 +79,34 @@ func (st *StatsTracker) collect() {
 		&playerStats,
 	)
 	<-fin
-	st.PlayerStats = playerStats
+	// get ban list
+	banEncounterUids := make([]string, 0)
+	if banFile, err := os.Open(app.GlobalStatBanPath); err == nil {
+		defer banFile.Close()
+		scanner := bufio.NewScanner(banFile)
+		for scanner.Scan() {
+			banLine := strings.TrimSpace(scanner.Text())
+			if banLine == "" || banLine[0] == '#' {
+				continue
+			}
+			banEncounterUids = append(banEncounterUids, banLine)
+		}
+	}
+	// compile player stats with bans enacted
+	st.PlayerStats = make([]PlayerStat, 0)
+	for _, stat := range playerStats {
+		hasBan := false
+		for _, banEncounterUID := range banEncounterUids {
+			if banEncounterUID == stat.Encounter.UID {
+				hasBan = true
+				break
+			}
+		}
+		if !hasBan {
+			st.PlayerStats = append(st.PlayerStats, stat)
+		}
+	}
+
 	log.Println("[PLAYER-STATS] Done (", time.Now().Sub(startTime), ")")
 }
 

@@ -8,6 +8,7 @@ services:
             - "docker.env"
         volumes:
             - "ffliveparse-data:/app/data/database"
+            - "ffliveparse-conf:/app/data/conf"
             - "/mnt/ffliveparse_logs:/app/data/logs"
 
     ffliveparse-nginx:
@@ -26,3 +27,4 @@ services:
 
 volumes:
     "ffliveparse-data": 
+    "ffliveparse-conf":

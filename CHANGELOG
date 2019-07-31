@@ -1,3 +1,7 @@
+1.33
+- Added ability to ban encounter from global stats.
+- Fixed issue where the same encounter as uploaded by two different users both appeared in global stats.
+
 1.32
 - Fixed combatant hash not being set in database.
 - Trying new player stat DB query.
