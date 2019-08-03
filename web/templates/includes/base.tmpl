@@ -55,24 +55,7 @@
         <div id="footer">
             &copy; 2018-2019 Nathan Ogden :: <a href="https://na.finalfantasyxiv.com/lodestone/character/1034047/">Minda Silva (Sargatanas)</a>
         </div>
-        <script type="text/javascript">
-            function fflpFixFooter()
-            {
-                var body = document.body,
-                    html = document.documentElement
-                ;
-                var height = Math.max( body.scrollHeight, body.offsetHeight, 
-                    html.clientHeight, html.scrollHeight, html.offsetHeight )
-                ;
-                var footerElement = document.getElementById("footer");
-                footerElement.style.position = "";
-                if (window.innerHeight < height) {
-                    footerElement.style.position = "relative";
-                }
-            }
-            window.addEventListener("load", fflpFixFooter);
-            window.addEventListener("resize", fflpFixFooter);
-        </script>
+        <script type="text/javascript" src="/static/js/other/footer_fix.js"></script>
         {{ template "scripts" . }}
     </body>
 </html>

@@ -13,6 +13,9 @@
         <div class="stat-item stat-graph">
             <canvas id="graph-connections"></canvas>
         </div>
+        <div class="stat-item stat-graph">
+            <canvas id="graph-log-lines"></canvas>
+        </div>
 
         <div class="stat-item">
             <div class="stat-name">Active ACT Connections</div>
@@ -28,91 +31,6 @@
         </div>
 
     </div>
-    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.8.0/Chart.min.js"></script>
-    <script type="text/javascript">
-        function fetchStats() {
-            fetch('/_usage_json')
-                .then((resp) => resp.json())
-                .then(function(data) {
-
-                    var labels = [];
-                    var actConnections = [];
-                    var webConnections = [];
-                    for (var i in data.snapshots) {
-                        var snapshot = data.snapshots[i];
-                        var time = new Date(snapshot.time);
-                        labels.push(
-                            time.toLocaleDateString() + ' ' + time.toLocaleTimeString()
-                        );
-                        var actConnectionCount = 0;
-                        var webConnectionCount = 0;
-                        for (var k in snapshot.connections.act) {
-                            actConnectionCount += snapshot.connections.act[k];
-                        }
-                        for (var k in snapshot.connections.web) {
-                            webConnectionCount += snapshot.connections.web[k];
-                        }
-                        actConnections.push(actConnectionCount);
-                        webConnections.push(webConnectionCount);
-                    }
-
-                    var graphConnectionsConfig = {
-                        type: 'line',
-                        data: {
-                            labels: labels,
-                            datasets: [{
-                                label: 'ACT Connections',
-                                backgroundColor: '#ff0000',
-                                borderColor: '#ff0000',
-                                data: actConnections,
-                                fill: false,
-                            }, {
-                                label: 'Web Connections',
-                                fill: false,
-                                backgroundColor: '#0000ff',
-                                borderColor: '#0000ff',
-                                data: webConnections,
-                            }]
-                        },
-                        options: {
-                            responsive: true,
-                            title: {
-                                display: true,
-                                text: 'Connections'
-                            },
-                            tooltips: {
-                                mode: 'index',
-                                intersect: false,
-                            },
-                            hover: {
-                                mode: 'nearest',
-                                intersect: true
-                            },
-                            scales: {
-                                xAxes: [{
-                                    display: true,
-                                    scaleLabel: {
-                                        display: true,
-                                        labelString: 'Time'
-                                    }
-                                }],
-                                yAxes: [{
-                                    display: true,
-                                    scaleLabel: {
-                                        display: true,
-                                        labelString: 'Count'
-                                    }
-                                }]
-                            }
-                        }
-                    };
-                    var graphConnectionsCtx = document.getElementById('graph-connections').getContext('2d');
-                    window.graphConnections = new Chart(graphConnectionsCtx, graphConnectionsConfig);
-                })
-            ;
-        }
-        window.onload = function() {
-            fetchStats();
-        }
-    </script>
+    <script type="text/javascript" src="//cdnjs.cloudflare.com/ajax/libs/Chart.js/2.8.0/Chart.min.js"></script>
+    <script type="text/javascript" src="/static/js/other/usage_stats.js"></script>
 {{ end }}
