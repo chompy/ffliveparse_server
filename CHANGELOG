@@ -1,3 +1,8 @@
+DEV
+- Fixed page count in past encounter list.
+- Added scroll bar to timeline and graph.
+- Tweaked/fixed action icons in timeline and cooldowns.
+
 1.33
 - Added ability to ban encounter from global stats.
 - Fixed issue where the same encounter as uploaded by two different users both appeared in global stats.

@@ -266,7 +266,7 @@ class Action
      * not player or pet.
      * @return {boolean}
      */
-    sourceisEnemy()
+    sourceIsEnemy()
     {
         return !this.sourceIsPlayer() && !this.sourceIsPet();
     }

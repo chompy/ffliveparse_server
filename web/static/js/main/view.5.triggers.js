@@ -200,7 +200,6 @@ class ViewTriggers extends ViewBase
     {
         super.init();
         this.zoneName = "";
-        this.buildBaseElements();
         // create triggers in user config if not present
         if (!("triggers" in this.userConfig)) {
             this.userConfig["triggers"] = {};
@@ -216,6 +215,7 @@ class ViewTriggers extends ViewBase
             this.userConfig["enable_tts"] = true;
             this.saveUserConfig();
         }
+        this.buildBaseElements();
         this.triggerTimeouts = [];
         this.reset();
         this.importStatusDiv.textContent = this.triggers.length + " trigger(s) loaded."

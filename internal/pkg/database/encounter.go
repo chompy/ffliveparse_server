@@ -123,11 +123,12 @@ func FindEncounters(
 	totalResults *int,
 ) error {
 	// build query
-	params := make([]interface{}, 1)
+	params := make([]interface{}, 2)
 	params[0] = userID
+	params[1] = userID
 	dbQueryStr := `
 		SELECT DISTINCT(uid), act_id, compare_hash, start_time, end_time, zone, encounter.damage, success_level, has_logs,
-		COUNT(*) OVER () as total_results
+		(SELECT COUNT(*) FROM encounter WHERE user_id = ?)
 		FROM encounter INNER JOIN combatant ON combatant.encounter_uid = encounter.uid
 		INNER JOIN player ON player.id = combatant.player_id
 		WHERE DATETIME(end_time) > DATETIME(start_time)

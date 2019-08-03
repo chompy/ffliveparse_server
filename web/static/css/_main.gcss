@@ -67,3 +67,4 @@ img.loading
   overflow: hidden
   white-space: nowrap
   background: #6aff00
+  z-index: 100

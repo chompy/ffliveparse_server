@@ -54,6 +54,7 @@ class ViewGridBase extends ViewBase
         this.images = {};
         this.needRedraw = true;
         this.tickTimeout = null;
+        this.leftOffset = 0;
         this.addElementSizes(GRID_ELEMENT_SIZES);
     }
 
@@ -85,9 +86,11 @@ class ViewGridBase extends ViewBase
     buildBaseElements()
     {
         var element = this.getElement();
+        this.scrollElement = document.createElement("div");
         this.canvasElement = document.createElement("canvas");
         this.canvasContext = this.canvasElement.getContext("2d");
-        element.appendChild(this.canvasElement);
+        this.scrollElement.appendChild(this.canvasElement)
+        element.appendChild(this.scrollElement);
     }
 
     /** {@inheritdoc} */
@@ -114,6 +117,7 @@ class ViewGridBase extends ViewBase
     redraw()
     {
         this.canvasContext.clearRect(0, 0, this.canvasElement.width, this.canvasElement.height);
+        this.scrollElement.style.width = this.max + "px"
     }
 
     /**
@@ -122,6 +126,7 @@ class ViewGridBase extends ViewBase
     enableScroll()
     {
         var t = this;
+        var ticking = false;
         // horizontal scrolling
         function hScrollTimeline(e) {
             var delta = Math.max(-1, Math.min(1, (e.wheelDelta || -e.detail)));
@@ -159,8 +164,19 @@ class ViewGridBase extends ViewBase
             }
             t._scrollGrid([e.touches[0].clientX - t.lastTouchPos[0], e.touches[0].clientY - t.lastTouchPos[1]]);
             t.lastTouchPos = null;
+        });        
+        this.getElement().addEventListener("scroll", function(e) {
+            if (!ticking) {
+                var element = t.getElement();
+                window.requestAnimationFrame(function() {
+                    t.canvasElement.style.left = element.scrollLeft + "px";
+                    t.seek = t.scrollElement.offsetWidth - element.scrollLeft;
+                    t.redraw();
+                    ticking = false;
+                });
+                ticking = true;
+            }
         });
-
     }
 
     /**
@@ -261,6 +277,9 @@ class ViewGridBase extends ViewBase
             currentSeek = 1;
         }
         this.seek = currentSeek;
+        if (currentSeek) {
+            this.getElement().scrollLeft = this.max - currentSeek;
+        }
         this.redraw();
     }    
 

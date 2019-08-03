@@ -372,7 +372,10 @@ class ViewCombatantTable extends ViewBase
             totalWidth = viewportWidth - offset;
         }
         for (var i = 0; i < element.children.length; i++) {
-            element.children[i].style.width = (totalWidth + offset - (i == 0 ? 30 : 0)) + "px";
+            var newWidth = (totalWidth + offset - (i == 0 ? 30 : 0));
+            if (element.children[i].style.offsetWidth != newWidth) {
+                element.children[i].style.width = newWidth + "px";
+            }
         }
     }
 
@@ -400,7 +403,7 @@ class ViewCombatantTable extends ViewBase
                 cdElement.classList.add("table-cooldown", "table-cooldown-" + cdtKey);
                 cdElement.setAttribute("data-action-id", action.data.actionId);
                 var cdElementIcon = document.createElement("img");
-                cdElementIcon.src = ACTION_DATA_BASE_URL + actionData.icon;
+                cdElementIcon.src = this.getActionIcon(action);
                 cdElementIcon.alt = action.data.actionName;
                 cdElementIcon.title = action.data.actionName;
                 cdElement.appendChild(cdElementIcon);

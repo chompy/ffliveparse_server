@@ -218,17 +218,38 @@ class ViewBase
      */
     getViewHeight()
     {
+        var element = this.getElement();
         return window.innerHeight - 
             (
                 document.getElementById("head").offsetHeight +
                 document.getElementById("footer").offsetHeight +
-                document.getElementById("encounter").offsetHeight
+                document.getElementById("encounter").offsetHeight +
+                (element.offsetHeight - element.clientHeight)
             )
         ;            
     }
 
+    /**
+     * Get icon url for given action.
+     * @param Action action 
+     * @return {string}
+     */
     getActionIcon(action)
     {
+        // enemy icon always the same (as far as I know there are no icons for enemy actions)
+        if (!action || (action.sourceIsEnemy() && [ACTION_TYPE_GAIN_STATUS_EFFECT, ACTION_TYPE_LOSE_STATUS_EFFECT].indexOf(action.type) == -1)) {
+            return "/static/img/enemy.png";
+        // auto attack icons are incorrect, force correct one
+        } else if (["Attack", "Shot"].indexOf(action.data.actionName) != -1) {
+            return "/static/img/attack.png";
+        // sprint icon is incorrect, force correct one
+        } else if ("Sprint" == action.data.actionName) {
+            return "/static/img/sprint.png";
+        // use special icon for deaths
+        } else if (action.type == ACTION_TYPE_DEATH) {
+            return "/static/img/death.png";
+        }
+        // fetch data on action
         var actionData = null;
         switch (action.type) {
             case ACTION_TYPE_NORMAL:
@@ -244,18 +265,9 @@ class ViewBase
             }
         }
         // get icon image
-        var actionImageSrc = "/static/img/enemy.png";
-        if (!actionData && action.type == ACTION_TYPE_DEATH) {
-            actionImageSrc = "/static/img/death.png";
-        } else if (actionData && actionData.name == "Attack") {
-            actionImageSrc = "/static/img/attack.png";
-        } else if (!actionData && ["Attack", "Shot"].indexOf(action.data.actionName) != -1) {
-            actionImageSrc = "/static/img/attack.png";
-        } else if (actionData && actionData.icon) {
-            actionImageSrc = ACTION_DATA_BASE_URL + actionData.icon;
-            if ([ACTION_TYPE_GAIN_STATUS_EFFECT, ACTION_TYPE_LOSE_STATUS_EFFECT].indexOf(action.type) != -1) {
-                actionImageSrc = STATUS_DATA_BASE_URL + actionData.icon;
-            }
+        var actionImageSrc = ACTION_DATA_BASE_URL + actionData.icon;
+        if ([ACTION_TYPE_GAIN_STATUS_EFFECT, ACTION_TYPE_LOSE_STATUS_EFFECT].indexOf(action.type) != -1) {
+            actionImageSrc = STATUS_DATA_BASE_URL + actionData.icon;
         }
         return actionImageSrc;
     }
