@@ -264,6 +264,9 @@ class ViewBase
                 break;
             }
         }
+        if (!actionData) {
+            return "/static/img/enemy.png";
+        }
         // get icon image
         var actionImageSrc = ACTION_DATA_BASE_URL + actionData.icon;
         if ([ACTION_TYPE_GAIN_STATUS_EFFECT, ACTION_TYPE_LOSE_STATUS_EFFECT].indexOf(action.type) != -1) {
