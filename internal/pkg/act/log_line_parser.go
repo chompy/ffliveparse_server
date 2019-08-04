@@ -134,6 +134,9 @@ const LogColorCastLot = 0x0839
 // LogColorEcho - Log message color for echo messages
 const LogColorEcho = 0x0038
 
+// LogColorCountdown - Log message color for countdown messages
+const LogColorCountdown = 0x0039
+
 // logShiftValues
 var logShiftValues = [...]int{0x3E, 0x113, 0x213, 0x313}
 

@@ -323,13 +323,14 @@ func (ec *EncounterCollector) ReadLogLine(l *LogLineData) {
 			case LogColorObtainItem:
 				{
 					// if message about tomestones is recieved then that should mean the encounter is over
-					re, err := regexp.Compile("00:083e:You obtain .* Allagan tomestones of")
+					re, err := regexp.Compile("00:083e:You obtain .* Allagan tomestones of|00:083e:You cannot receive any more Allagan tomestones of .* this week")
 					if err != nil {
 						break
 					}
 					// end encounter if match
 					if re.MatchString(l.Raw) {
 						ec.CompletionFlag = true
+						log.Println("[", ec.userIDHash, "][ Encounter", ec.Encounter.UID, "] Clear flag (tomestones) detected")
 					}
 					break
 				}
@@ -343,6 +344,7 @@ func (ec *EncounterCollector) ReadLogLine(l *LogLineData) {
 					// end encounter if match
 					if re.MatchString(l.Raw) {
 						ec.CompletionFlag = true
+						log.Println("[", ec.userIDHash, "][ Encounter", ec.Encounter.UID, "] Clear flag (completion time) detected")
 					}
 					break
 				}
@@ -355,6 +357,7 @@ func (ec *EncounterCollector) ReadLogLine(l *LogLineData) {
 					// end encounter if match
 					if re.MatchString(l.Raw) {
 						ec.CompletionFlag = true
+						log.Println("[", ec.userIDHash, "][ Encounter", ec.Encounter.UID, "] Clear flag (cast lots) detected")
 					}
 					break
 				}
@@ -367,7 +370,19 @@ func (ec *EncounterCollector) ReadLogLine(l *LogLineData) {
 					// end encounter if match
 					if re.MatchString(l.Raw) {
 						ec.EndFlag = true
-						log.Println("[", ec.userIDHash, "][ Encounter", ec.Encounter.UID, "] Echo 'end' command detected")
+						log.Println("[", ec.userIDHash, "][ Encounter", ec.Encounter.UID, "] End flag (end command) detected")
+					}
+					break
+				}
+			case LogColorCountdown:
+				{
+					re, err := regexp.Compile("00:0039:Engage")
+					if err != nil {
+						break
+					}
+					if re.MatchString(l.Raw) {
+						ec.EndFlag = true
+						log.Println("[", ec.userIDHash, "][ Encounter", ec.Encounter.UID, "] End flag (countdown) detected")
 					}
 					break
 				}

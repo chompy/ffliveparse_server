@@ -73,6 +73,9 @@ func NewData(session Session, user user.Data, events *emitter.Emitter) (Data, er
 
 // UpdateEncounter - Add or update encounter data
 func (d *Data) UpdateEncounter(encounter Encounter) {
+	if time.Now().Sub(encounter.StartTime) > time.Hour {
+		return
+	}
 	d.LastUpdate = time.Now()
 	d.NewTickData = true
 	d.EncounterCollector.UpdateEncounter(encounter)
@@ -111,6 +114,9 @@ func (d *Data) GetLogPath() string {
 
 // UpdateLogLine - Add log line to buffer
 func (d *Data) UpdateLogLine(logLine LogLine) {
+	if time.Now().Sub(logLine.Time) > time.Hour {
+		return
+	}
 	d.LogLineCounter++
 	// update log last update flag
 	d.LastUpdate = time.Now()
