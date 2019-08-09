@@ -1,3 +1,6 @@
+DEV
+- Tweak countdown encounter reset to reset on first message.
+
 1.35
 - Reset encounter on countdown.
 - No longer accept encounter data if older then an hour (prevent loading ACT history from creating garbage data)

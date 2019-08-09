@@ -374,9 +374,9 @@ func (ec *EncounterCollector) ReadLogLine(l *LogLineData) {
 					}
 					break
 				}
-			case LogColorCountdown:
+			case LogColorCountdownStart:
 				{
-					re, err := regexp.Compile("00:0039:Battle commencing in .* seconds")
+					re, err := regexp.Compile("00:00b9:Battle commencing in .* seconds!")
 					if err != nil {
 						break
 					}
