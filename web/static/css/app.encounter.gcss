@@ -7,7 +7,7 @@
   line-height: 21px
   position: relative
   z-index: 3
-  #encounter-time::before, #encounter-status::before
+  #encounter-time::before, #encounter-status::before, #encounter-boss::before
     display: inline-block
     content: "|"
     margin-left: 1px
@@ -41,7 +41,7 @@
   #encounter
     #encounter-name
       max-width: 60%
-    #encounter-status
+    #encounter-status, #encounter-boss
       display: none
 
 @media (max-width: 150px)

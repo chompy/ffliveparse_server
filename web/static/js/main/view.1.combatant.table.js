@@ -240,7 +240,7 @@ class ViewCombatantTable extends ViewBase
                 {
                     var value = this.combatantCollector.getCombatantTotalDamage(combatant);
                     var storedDamage = colElement.getAttribute("data-damage")
-                    if (value == storedDamage) {
+                    if (!this.encounter.data.Active && value == storedDamage) {
                         break;
                     }
                     colElement.setAttribute("data-damage", value);
@@ -255,7 +255,7 @@ class ViewCombatantTable extends ViewBase
                 {
                     var value = this.combatantCollector.getCombatantTotalHealing(combatant);
                     var storedHealing = colElement.getAttribute("data-healing")
-                    if (value == storedHealing) {
+                    if (!this.encounter.data.Active && value == storedHealing) {
                         break;
                     }
                     colElement.setAttribute("data-healing", value);
@@ -308,7 +308,7 @@ class ViewCombatantTable extends ViewBase
         }
         // make combatant list
         var combatants = this.combatantCollector.getSortedCombatants(this.userConfig["sortBy"]);
-        this.tableBody.innerHTML = "";
+        //this.tableBody.innerHTML = "";
         // display elements
         for (var i in combatants) {
             if (typeof(this.combatantElements[combatants[i].getLastSnapshot().Name]) == "undefined") {
@@ -458,8 +458,9 @@ class ViewCombatantTable extends ViewBase
         if (this.tickTimeout) {
             clearTimeout(this.tickTimeout);
         }
-        this.processCooldownQueue();
-        this.updateCooldowns();
+        if (this.encounter && this.encounter.data.Active) {
+            this.redraw();
+        }
         var t = this;
         this.tickTimeout = setTimeout(
             function() { t.tick(); },
@@ -467,6 +468,18 @@ class ViewCombatantTable extends ViewBase
         );
     }
 
+    redraw()
+    {
+        for (var i in this.combatantCollector.combatants) {
+            var combatant = this.combatantCollector.combatants[i];
+            if (combatant.getLastSnapshot().Name in this.combatantElements) {
+                this.updateCombatantElement(combatant, this.combatantElements[combatant.getLastSnapshot().Name]);
+            }
+        }
+        this.displayCombatants();
+        this.processCooldownQueue();
+        this.updateCooldowns();        
+    }
 
     onEncounter(encounter)
     {
@@ -485,8 +498,9 @@ class ViewCombatantTable extends ViewBase
         if (typeof(this.combatantElements[combatant.getLastSnapshot().Name]) == "undefined") {
             this.combatantElements[combatant.getLastSnapshot().Name] = this.buildCombatantElement();
         }
-        this.updateCombatantElement(combatant, this.combatantElements[combatant.getLastSnapshot().Name]);
-        this.displayCombatants();
+        if (!this.encounter.data.Active) {
+            this.redraw();
+        }
     }
 
     onAction(action)
