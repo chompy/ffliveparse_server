@@ -394,7 +394,7 @@ func CleanUpEncounters(events *emitter.Emitter) {
 		encounterUIDs := make([]string, 0)
 		fin := make(chan bool)
 		events.Emit(
-			"database:find_encounter_clean_up",
+			"database:find_encounter_log_clean",
 			fin,
 			&encounterUIDs,
 		)
@@ -405,7 +405,7 @@ func CleanUpEncounters(events *emitter.Emitter) {
 			// flag removal of log
 			finC := make(chan bool)
 			events.Emit(
-				"database:flag_encounter_clean",
+				"database:flag_encounter_log_clean",
 				finC,
 				uid,
 			)
@@ -414,7 +414,7 @@ func CleanUpEncounters(events *emitter.Emitter) {
 			logPath := getPermanentLogPath(uid)
 			if _, err := os.Stat(logPath); os.IsNotExist(err) {
 				// update database if log file is missing
-				log.Println("[CLEAN]", uid, "(log flag missing from database)")
+				log.Println("[CLEAN] Delete log for", uid, "(log flag missing from database)")
 				continue
 			}
 			// delete log file
@@ -423,10 +423,19 @@ func CleanUpEncounters(events *emitter.Emitter) {
 				log.Println("[CLEAN] Error", uid, err.Error())
 				continue
 			}
-			log.Println("[CLEAN]", uid)
+			log.Println("[CLEAN] Delete log for", uid)
 			cleanUpCount++
 		}
-		log.Println("[CLEAN] Completed. Removed", cleanUpCount, "log(s).")
+		// delete encounters
+		encountersDeleted := int64(0)
+		fin2 := make(chan bool)
+		events.Emit(
+			"database:encounter_clean",
+			fin2,
+			&encountersDeleted,
+		)
+		<-fin2
+		log.Println("[CLEAN] Completed. Removed", cleanUpCount, "log(s) and", encountersDeleted, "encounters(s).")
 	}
 }
 

@@ -117,7 +117,8 @@ class ViewGridBase extends ViewBase
     redraw()
     {
         this.canvasContext.clearRect(0, 0, this.canvasElement.width, this.canvasElement.height);
-        this.scrollElement.style.width = this.max + "px"
+        this.scrollElement.style.width = this.max + "px";
+        this.scrollElement.style.height = this.getViewHeight() + "px";
     }
 
     /**
@@ -169,7 +170,6 @@ class ViewGridBase extends ViewBase
             if (!ticking) {
                 var element = t.getElement();
                 window.requestAnimationFrame(function() {
-                    t.canvasElement.style.left = element.scrollLeft + "px";
                     t.seek = t.scrollElement.offsetWidth - element.scrollLeft;
                     t.redraw();
                     ticking = false;

@@ -34,14 +34,14 @@
 
 @media (max-width: 512px)
   #encounter
-    #encounter-time
+    #encounter-time, #encounter-boss
       display: none
 
 @media (max-width: 320px)
   #encounter
     #encounter-name
       max-width: 60%
-    #encounter-status, #encounter-boss
+    #encounter-status
       display: none
 
 @media (max-width: 150px)

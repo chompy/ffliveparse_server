@@ -1,7 +1,7 @@
 #view-timeline, #view-graph
   overflow-x: scroll
   canvas
-    position: relative
+    position: fixed
     cursor: grab
     &.action-over
       cursor: pointer

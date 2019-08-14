@@ -211,16 +211,22 @@ func (h *Handler) Handle() error {
 					}
 					break
 				}
-			case "database:find_encounter_clean_up":
+			case "database:find_encounter_log_clean":
 				{
 					encounterUIDs := event.Args[1].(*[]string)
-					err = FindEncounterNeedClean(h.database, encounterUIDs)
+					err = FindEncounterLogClean(h.database, encounterUIDs)
 					break
 				}
-			case "database:flag_encounter_clean":
+			case "database:flag_encounter_log_clean":
 				{
 					encounterUID := event.String(1)
-					err = FlagEncounterClean(encounterUID, h.database)
+					err = FlagEncounterLogClean(encounterUID, h.database)
+					break
+				}
+			case "database:encounter_clean":
+				{
+					rows := event.Args[1].(*int64)
+					err = EncounterClean(rows, h.database)
 					break
 				}
 			}

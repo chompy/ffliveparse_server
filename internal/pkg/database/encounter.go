@@ -213,9 +213,9 @@ func TotalCountEncounter(db *sql.DB, res *int) error {
 	return err
 }
 
-// FindEncounterNeedClean - find encounters that need clean up
-func FindEncounterNeedClean(db *sql.DB, encounterUIDs *[]string) error {
-	cleanUpDate := time.Now().Add(time.Duration(-app.EncounterCleanUpDays*24) * time.Hour)
+// FindEncounterLogClean - find encounters that need log delete
+func FindEncounterLogClean(db *sql.DB, encounterUIDs *[]string) error {
+	cleanUpDate := time.Now().Add(time.Duration(-app.EncounterLogDeleteDays*24) * time.Hour)
 	rows, err := db.Query(
 		"SELECT uid FROM encounter WHERE DATETIME(start_time) < ? AND has_logs LIMIT 100",
 		cleanUpDate,
@@ -237,8 +237,8 @@ func FindEncounterNeedClean(db *sql.DB, encounterUIDs *[]string) error {
 	return nil
 }
 
-// FlagEncounterClean - flag encounter as cleaned
-func FlagEncounterClean(encounterUID string, db *sql.DB) error {
+// FlagEncounterLogClean - flag encounter as having the log deleted
+func FlagEncounterLogClean(encounterUID string, db *sql.DB) error {
 	stmt, err := db.Prepare(`
 		UPDATE encounter SET has_logs = 0 WHERE uid = ?
 	`)
@@ -248,6 +248,28 @@ func FlagEncounterClean(encounterUID string, db *sql.DB) error {
 	defer stmt.Close()
 	_, err = stmt.Exec(
 		encounterUID,
+	)
+	return err
+}
+
+// EncounterClean - delete old encounters
+func EncounterClean(rows *int64, db *sql.DB) error {
+	// delete encounters older then EncounterDeleteDays days
+	cleanUpDate := time.Now().Add(time.Duration(-app.EncounterDeleteDays*24) * time.Hour)
+	res, err := db.Exec(
+		"DELETE FROM encounter WHERE DATETIME(start_time) < ? AND NOT has_logs",
+		cleanUpDate,
+	)
+	if err != nil {
+		return err
+	}
+	*rows, err = res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	// delete all combatants that don't have an encounter
+	_, err = db.Exec(
+		"DELETE FROM combatant WHERE (SELECT COUNT(*) FROM encounter WHERE uid = combatant.encounter_uid) = 0",
 	)
 	return err
 }
