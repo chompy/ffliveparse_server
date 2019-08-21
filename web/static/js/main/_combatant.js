@@ -20,7 +20,8 @@ var combatantRoleClasses = {
     "tank"    : ["WAR", "DRK", "PLD", "GLA", "MRD", "GNB"],
     "healer"  : ["SCH", "WHM", "AST", "CNJ"],
     "pet"     : ["PET"],
-    "enemy"   : ["ENEMY"]
+    "enemy"   : ["ENEMY"],
+    "special" : ["LB"],
 };
 
 /**
@@ -158,6 +159,9 @@ class CombatantCollector
                         ["WAR", "DRK", "PLD", "GLA", "MRD", "GNB"],  // tanks
                         ["SCH", "WHM", "AST", "CNJ"]   // healers
                     ];
+                    if (b.data.Job.toUpperCase() == "LB") {
+                        return -1;
+                    }
                     for (var i in jobCats) {
                         var indexA = jobCats[i].indexOf(a.data.Job.toUpperCase());
                         var indexB = jobCats[i].indexOf(b.data.Job.toUpperCase());
@@ -168,6 +172,14 @@ class CombatantCollector
                         }
                     }
                     return a.data.Job.localeCompare(b.data.Job);
+                }
+                case "hits":
+                {
+                    return a.data.Hits > b.data.Hits;
+                }
+                case "heals":
+                {
+                    return a.data.Heals > b.data.Heals;
                 }
                 default:
                 case "damage":

@@ -15,7 +15,6 @@ You should have received a copy of the GNU General Public License
 along with FFLiveParse.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-var NON_PLAYER_ID_COMBATANT_RANGE = 1000000000;
 var GAIN_EFFECT_REGEX = /1A\:([a-zA-Z0-9` ']*) gains the effect of ([a-zA-Z0-9` ']*) from ([a-zA-Z0-9` ']*) for ([0-9]*)\.00 Seconds\./;
 var LOSE_EFFECT_REGEX = /1E\:([a-zA-Z0-9` ']*) loses the effect of ([a-zA-Z0-9` ']*) from ([a-zA-Z0-9` ']*)\./;
 // define sizes of different elements at different break points
@@ -67,7 +66,8 @@ var TIMELINE_ROLE_COLORS = {
     "tank"          : ["#4f59c4", "#fff"],
     "dps"           : ["#723c3a", "#fff"],
     "enemy"         : ["#404040", "#fff"],
-    "pet"           : ["#404040", "#fff"]
+    "pet"           : ["#404040", "#fff"],
+    "special"       : ["#2d2d2d", "#fff"]
 };
 var TIMELINE_ACTION_ICON_SIZE_KEYS = {
     [ACTION_TYPE_NORMAL]: ["action_icon_normal_width", "action_icon_normal_height"],
@@ -564,7 +564,7 @@ class ViewTimeline extends ViewGridBase
         // get combatant list
         var fetchedCombatants = this.combatantCollector.getSortedCombatants("role");
         for (var i in fetchedCombatants) {
-            if (fetchedCombatants[i].data.Job) {
+            if (fetchedCombatants[i].data.Job && fetchedCombatants[i].data.Job != "LB") {
                 this.combatants.push(fetchedCombatants[i]);
             }
         }

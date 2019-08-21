@@ -58,6 +58,7 @@ type EncounterCollector struct {
 	LastReportTime   time.Time
 	CompletionFlag   bool
 	EndFlag          bool
+	IsValid          bool
 }
 
 // NewEncounterCollector - Create new encounter collector
@@ -66,6 +67,7 @@ func NewEncounterCollector(user *user.Data) EncounterCollector {
 	ec := EncounterCollector{
 		userIDHash: userIDHash,
 		PlayerTeam: 0,
+		IsValid:    true,
 	}
 	ec.Reset()
 	return ec
@@ -297,6 +299,11 @@ func (ec *EncounterCollector) ReadLogLine(l *LogLineData) {
 			log.Println("[", ec.userIDHash, "] Zone changed to", l.TargetName)
 			if ec.CurrentZone != l.TargetName {
 				ec.CurrentZone = l.TargetName
+				if ec.Encounter.Active {
+					ec.EndFlag = true
+					ec.IsValid = true
+					log.Println("[", ec.userIDHash, "][ Encounter", ec.Encounter.UID, "] Clear flag (change zone) detected")
+				}
 			}
 			break
 		}
@@ -328,7 +335,7 @@ func (ec *EncounterCollector) ReadLogLine(l *LogLineData) {
 						break
 					}
 					// end encounter if match
-					if re.MatchString(l.Raw) {
+					if re.MatchString(l.Raw) && ec.Encounter.Active {
 						ec.CompletionFlag = true
 						log.Println("[", ec.userIDHash, "][ Encounter", ec.Encounter.UID, "] Clear flag (tomestones) detected")
 					}
@@ -342,7 +349,7 @@ func (ec *EncounterCollector) ReadLogLine(l *LogLineData) {
 						break
 					}
 					// end encounter if match
-					if re.MatchString(l.Raw) {
+					if re.MatchString(l.Raw) && ec.Encounter.Active {
 						ec.CompletionFlag = true
 						log.Println("[", ec.userIDHash, "][ Encounter", ec.Encounter.UID, "] Clear flag (completion time) detected")
 					}
@@ -355,7 +362,7 @@ func (ec *EncounterCollector) ReadLogLine(l *LogLineData) {
 						break
 					}
 					// end encounter if match
-					if re.MatchString(l.Raw) {
+					if re.MatchString(l.Raw) && ec.Encounter.Active {
 						ec.CompletionFlag = true
 						log.Println("[", ec.userIDHash, "][ Encounter", ec.Encounter.UID, "] Clear flag (cast lots) detected")
 					}
@@ -368,8 +375,9 @@ func (ec *EncounterCollector) ReadLogLine(l *LogLineData) {
 						break
 					}
 					// end encounter if match
-					if re.MatchString(l.Raw) {
+					if re.MatchString(l.Raw) && ec.Encounter.Active {
 						ec.EndFlag = true
+						ec.IsValid = false
 						log.Println("[", ec.userIDHash, "][ Encounter", ec.Encounter.UID, "] End flag (end command) detected")
 					}
 					break
@@ -380,8 +388,9 @@ func (ec *EncounterCollector) ReadLogLine(l *LogLineData) {
 					if err != nil {
 						break
 					}
-					if re.MatchString(l.Raw) {
+					if re.MatchString(l.Raw) && ec.Encounter.Active {
 						ec.EndFlag = true
+						ec.IsValid = true
 						log.Println("[", ec.userIDHash, "][ Encounter", ec.Encounter.UID, "] End flag (countdown) detected")
 					}
 					break
@@ -414,6 +423,12 @@ func (ec *EncounterCollector) CheckInactive() {
 	if !ec.Encounter.Active {
 		return
 	}
+	// if encounter is considered invalid then remove completion flag
+	if !ec.IsValid && ec.CompletionFlag {
+		ec.CompletionFlag = false
+		ec.EndFlag = true
+		ec.IsValid = true
+	}
 	// flagged as cleared
 	if ec.CompletionFlag {
 		ec.Encounter.SuccessLevel = 1
@@ -422,13 +437,6 @@ func (ec *EncounterCollector) CheckInactive() {
 	}
 	// end flag
 	if ec.EndFlag {
-		ec.Encounter.SuccessLevel = 0
-		ec.endEncounter()
-		return
-	}
-	// check if new zone
-	if ec.CurrentZone != ec.Encounter.Zone && ec.Encounter.Zone != "" {
-		log.Println("[", ec.userIDHash, "][ Encounter", ec.Encounter.UID, "] New zone detected.", ec.CurrentZone, ec.Encounter.Zone)
 		ec.Encounter.SuccessLevel = 0
 		ec.endEncounter()
 		return

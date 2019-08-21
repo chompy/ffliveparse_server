@@ -18,7 +18,6 @@ along with FFLiveParse.  If not, see <https://www.gnu.org/licenses/>.
 var ENCOUNTER_TIME_ID = "encounter-time";
 var ENCOUNTER_LENGTH_ID = "encounter-length";
 var ENCOUNTER_NAME_ID = "encounter-name";
-var ENCOUNTER_BOSS_ID ="encounter-boss";
 var ENCOUNTER_STATUS_ID ="encounter-status";
 
 /**
@@ -38,8 +37,6 @@ class EncounterDisplay
         this.encounterLengthElement = document.getElementById(ENCOUNTER_LENGTH_ID);
         this.encounterNameElement = document.getElementById(ENCOUNTER_NAME_ID);
         this.encounterStatusElement = document.getElementById(ENCOUNTER_STATUS_ID);
-        this.encounterBossElement = document.getElementById(ENCOUNTER_BOSS_ID);
-        this.bossTracker = [];
     }
 
     init()
@@ -49,7 +46,6 @@ class EncounterDisplay
         // hook events
         var t = this;
         window.addEventListener("act:encounter", function(e) { t._updateEncounter(e); });
-        window.addEventListener("act:logLine", function(e) { t._onLogLine(e); });
         this._tick();
     }
 
@@ -59,15 +55,12 @@ class EncounterDisplay
     reset()
     {
         this.combatants = [];
-        this.bossTracker = [];
         this.encounterLengthElement.innerText = "00:00";
         this.encounterNameElement.innerText = "-";
         this.encounterStatusElement.classList.add("hide");
         this.encounterStatusElement.innerText = "";
         this.encounterTimeElement.innerText = "";
         this.encounterTimeElement.classList.add("hide");
-        this.encounterBossElement.innerText = "";
-        this.encounterBossElement.classList.add("hide");
     }
 
     /**
@@ -122,10 +115,6 @@ class EncounterDisplay
             this.encounterLengthElement.classList.remove("hide");
             this.encounterTimeElement.classList.remove("hide");
             this.encounterTimeElement.innerText = event.detail.StartTime.toLocaleString();
-            if (this.encounterBossElement.classList.contains("hide")) {
-                this.encounterBossElement.innerText = "-";
-                this.encounterBossElement.classList.remove("hide");            
-            }
         }
 
         // calculate encounter dps
@@ -173,31 +162,5 @@ class EncounterDisplay
         this.encounterStatusElement.classList.add("hide");
     }
 
-    _onLogLine(e) {
-        var pLogLine = parseLogLine(e.detail.LogLine)
-        if (pLogLine.type != MESSAGE_TYPE_SINGLE_TARGET) {
-            return;
-        }
-        var tMaxHp = parseInt(pLogLine.targetMaxHp);
-        var tCurHp = parseInt(pLogLine.targetCurrentHp - pLogLine.damage);
-        if (tMaxHp <= 0) {
-            return;
-        }
-        if (this.bossTracker.length == 0 || this.bossTracker[1] <= tMaxHp) {
-            this.bossTracker = [
-                pLogLine.targetName,
-                tMaxHp,
-                tCurHp
-            ];
-            var percent = (tCurHp / tMaxHp) * 100;
-            if (percent < 0) {
-                percent = 0;
-            }
-            this.encounterBossElement.innerText = pLogLine.targetName + " " + percent.toFixed(2) + "%";
-            if (percent == 0) {
-                this.bossTracker = [];
-            }
-        }
-    }
 
 }

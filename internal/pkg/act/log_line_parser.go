@@ -56,6 +56,9 @@ const LogTypeLoseEffect = 0x1E
 // LogTypeHPPercent - Log type identifier, HP percent of combatant
 const LogTypeHPPercent = 0x1D
 
+// LogTypeFFLPCombatant - Log type identifier, custom combatant data
+const LogTypeFFLPCombatant = 0x99
+
 // LogFieldType - Log field identifier, message type
 const LogFieldType = 0
 

@@ -1,0 +1,118 @@
+#view-overview
+  .card-container
+    width: 49%
+    height: 70px
+    display: inline-block
+    background: #e7e7e7
+    border: 1px solid #000
+    color: #000
+    text-align: center
+    vertical-align: middle
+    .card-value
+      font-size: 32px
+      font-weight: bold
+      margin-top: 5px
+    .card-desc
+      font-size: 18px
+  .players
+    overflow-x: hidden
+    position: relative
+    .player
+      padding: 10px 20px
+      position: absolute
+      top: 0
+      transition: top 1s
+      width: 100%
+      &.dps
+        background-color: #723c3a
+      &.healer
+        background-color: #2fa35f
+        color: #000
+      &.tank
+        background-color: #4f59c4
+      &.special
+        background-color: #2d2d2d
+      img.job
+        width: 48px
+        vertical-align: -12px
+        display: inline-block
+        margin-right: 15px
+      .dps
+        display: inline-block
+        font-size: 32px
+        font-weight: bold
+        width: 150px
+      .cooldowns
+        display: inline-block
+        .cooldown
+          display: none
+          margin-left: 15px
+          vertical-align: 5px
+          &.blink
+            animation: overviewCooldownBlinker 1s linear infinite
+          .action-icon
+            max-width: 32px
+            display: inline-block
+            vertical-align: -10px
+            margin-right: 5px
+          .time
+            display: inline-block
+            font-size: 18px
+            font-weight: bold
+          &:nth-child(1), &:nth-child(2), &:nth-child(3), &:nth-child(4)
+            display: inline-block
+      .actions
+        position: absolute
+        top: 9px
+        .action
+          position: absolute
+          left: 600px
+          transition: left 20s linear
+
+@keyframes overviewCooldownBlinker
+  50%
+    opacity: 0      
+
+@media(max-width: 640px)
+  #view-overview
+    .players
+      .player
+        img.job
+          max-width: 38px
+          vertical-align: -11px
+          margin-right: 10px
+        .dps
+          font-size: 20px
+          width: 96px
+        .cooldowns
+          .cooldown
+            vertical-align: 3px
+            .action-icon
+              max-width: 24px
+              vertical-align: -7px
+            &:nth-child(3)
+              display: none
+
+@media(max-width: 340px)
+  #view-overview
+    .card-container
+      display: block
+      width: 100% !important
+      height: 54px
+      .card-value
+        font-size: 24px
+      .card-desc
+        font-size: 14px
+
+    .players
+      .player
+        padding: 10px 5px
+        img.job
+          max-width: 28px
+          vertical-align: -7px
+          margin-right: 5px
+        .dps
+          font-size: 19px
+          width: auto
+        .cooldowns
+          display: none

@@ -29,6 +29,8 @@
         color: #000
       &.tank
         background-color: #4f59c4
+      &.special
+        background-color: #2d2d2d
       &.pet
         background-color: #175906
         .damage, .healing
@@ -79,7 +81,7 @@
     opacity: 0
 
 @media(max-width: 640px)
-  .view-table, .view-stream
+  #view-table, #view-stream
     .combatant-head
       .combatant-col
         font-size: 14px !important
@@ -87,7 +89,7 @@
       font-size: 12px
       &.job
         img
-          max-width: 32px      
+          max-width: 32px
       &.name
         font-size: 12px
       &.damage

@@ -78,9 +78,26 @@ func combatantSub(c1 Combatant, c2 Combatant) Combatant {
 
 // UpdateCombatantTracker - Sync ACT combatant data
 func (c *CombatantCollector) UpdateCombatantTracker(combatant Combatant) {
-	// ignore invalid combatants
-	if combatant.Player.ID > 1000000000 || combatant.Job == "" {
+	// ignore non player combatants
+	if combatant.Player.ID > 1000000000 {
 		return
+	}
+	// fix limit break combatant data
+	if combatant.Job == "" {
+		for _, ct := range c.CombatantTrackers {
+			if ct.Player.ID == combatant.Player.ID {
+				combatant.Job = "LB"
+				combatant.Player = Player{
+					ID:      -99,
+					ActName: "Limit Break",
+					Name:    "Limit Break",
+				}
+				break
+			}
+		}
+		if combatant.Job == "" {
+			return
+		}
 	}
 	// update existing
 	for index := range c.CombatantTrackers {

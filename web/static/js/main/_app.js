@@ -71,6 +71,7 @@ class Application
         // load views, statically for now, eventually views should be 
         // loaded dynamically and user should be able to load their own views in
         this.views = [
+            new ViewOverview(this.combatantCollector, this.actionCollector),
             new ViewCombatantTable(this.combatantCollector, this.actionCollector),
             new ViewCombatantGraph(this.combatantCollector, this.actionCollector),
             new ViewCombatantStream(this.combatantCollector, this.actionCollector),

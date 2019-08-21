@@ -1,3 +1,8 @@
+1.37
+- Added 'Overview' view with raid DPS, boss HP, est time to kill, etc.
+- Encounters that are manually restarted mid encounter should no longer count as a clear.
+- Added limit break as a combatant to all relevant views.
+
 1.36
 - Tweak countdown encounter reset to reset on first message.
 - Added boss HP percentage to encounter details bar.
