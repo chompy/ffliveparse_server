@@ -6,6 +6,7 @@ services:
             - "31593:31593/udp"
         env_file:
             - "docker.env"
+        restart: always
         volumes:
             - "ffliveparse-data:/app/data/database"
             - "ffliveparse-conf:/app/data/conf"
