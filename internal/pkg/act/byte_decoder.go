@@ -22,10 +22,7 @@ import (
 	"compress/gzip"
 	"encoding/binary"
 	"errors"
-	"net"
 	"time"
-
-	"../app"
 )
 
 func readUint16(data []byte, pos *int) uint16 {
@@ -73,85 +70,6 @@ func readTime(data []byte, pos *int) time.Time {
 	timeString := readString(data, pos)
 	time, _ := time.Parse(time.RFC3339, timeString)
 	return time
-}
-
-// DecodeSessionBytes - Create Session struct from incomming data packet
-func DecodeSessionBytes(data []byte, addr *net.UDPAddr) (Session, int, error) {
-	if data[0] != DataTypeSession {
-		return Session{}, 0, errors.New("invalid data type for Session")
-	}
-	pos := 1
-	// check version number
-	versionNumber := readInt32(data, &pos)
-	if versionNumber < app.ActPluginMinVersionNumber || versionNumber > app.ActPluginMaxVersionNumber {
-		return Session{}, 0, errors.New("version number mismatch")
-	}
-	return Session{
-		UploadKey: readString(data, &pos),
-		IP:        addr.IP,
-		Port:      addr.Port,
-	}, pos, nil
-}
-
-// DecodeEncounterBytes - Create Encounter struct from incomming data packet
-func DecodeEncounterBytes(data []byte) (Encounter, int, error) {
-	if data[0] != DataTypeEncounter {
-		return Encounter{}, 0, errors.New("invalid data type for Encounter")
-	}
-	pos := 1
-	return Encounter{
-		ActID:        readUint32(data, &pos),
-		StartTime:    readTime(data, &pos),
-		EndTime:      readTime(data, &pos),
-		Zone:         readString(data, &pos),
-		Damage:       readInt32(data, &pos),
-		Active:       readByte(data, &pos) != 0,
-		SuccessLevel: readByte(data, &pos),
-	}, pos, nil
-}
-
-// DecodeCombatantBytes - Create Combatant struct from incomming data packet
-func DecodeCombatantBytes(data []byte) (Combatant, int, error) {
-	if data[0] != DataTypeCombatant {
-		return Combatant{}, 0, errors.New("invalid data type for Combatant")
-	}
-	pos := 1
-	actEncounterID := readUint32(data, &pos)
-	p := Player{
-		ID:   readInt32(data, &pos),
-		Name: readString(data, &pos),
-	}
-	p.ActName = p.Name
-	c := Combatant{
-		Player:         p,
-		ActEncounterID: actEncounterID,
-		Job:            readString(data, &pos),
-		Damage:         readInt32(data, &pos),
-		DamageTaken:    readInt32(data, &pos),
-		DamageHealed:   readInt32(data, &pos),
-		Deaths:         readInt32(data, &pos),
-		Hits:           readInt32(data, &pos),
-		Heals:          readInt32(data, &pos),
-		Kills:          readInt32(data, &pos),
-		Time:           time.Now(),
-	}
-	return c, pos, nil
-}
-
-// DecodeLogLineBytes - Create LogLine struct from incomming data packet
-func DecodeLogLineBytes(data []byte) (LogLine, int, error) {
-	if data[0] != DataTypeLogLine {
-		return LogLine{}, 0, errors.New("invalid data type for LogLine")
-	}
-	pos := 1
-	encounterID := readUint32(data, &pos)
-	time := readTime(data, &pos)
-	logLine := readString(data, &pos)
-	return LogLine{
-		ActEncounterID: encounterID,
-		Time:           time,
-		LogLine:        logLine,
-	}, pos, nil
 }
 
 // DecompressBytes - Decompress byte array for recieving

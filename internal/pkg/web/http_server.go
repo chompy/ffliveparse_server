@@ -66,7 +66,7 @@ type templateData struct {
 	StatActConnections      int
 	StatActiveWebUsers      int
 	StatPageLoads           int
-	Encounters              []act.Data
+	Encounters              []act.GameSession
 	EncounterCurrentPage    int
 	EncounterTotalPage      int
 	EncounterNextPageOffset int
@@ -176,13 +176,13 @@ func HTTPStartServer(
 
 		log.Println("[WEB] New web socket session for ACT user", userData.ID, "from", ws.Request().RemoteAddr)
 		// get act data from web ID
-		actData, err := actManager.GetDataWithWebID(userID)
+		actSession, err := actManager.GetSessionWithWebID(userID)
 		if err != nil {
 			log.Println("[WEB] Error when attempting to retreive user", userID, ",", err)
 			return
 		}
 		// relay previous encounter data if encounter id was provided
-		if encounterUID != "" && (actData == nil || encounterUID != actData.EncounterCollector.Encounter.UID) {
+		if encounterUID != "" && (actSession == nil || encounterUID != actSession.EncounterCollector.Encounter.UID) {
 			log.Println("[WEB] Load previous encounter data (EncounterUID:", encounterUID, ", UserID:", userData.ID, ")")
 			previousEncounter, err := act.GetPreviousEncounter(events, userData, encounterUID)
 			if err != nil {
@@ -192,13 +192,13 @@ func HTTPStartServer(
 			sendInitData(ws, &previousEncounter)
 		} else {
 			// get act data from web ID
-			actData, err := actManager.GetDataWithWebID(userID)
+			actSession, err := actManager.GetSessionWithWebID(userID)
 			if err != nil {
 				log.Println("[WEB] Error when retreiving encounter", encounterUID, "for user", userData.ID, ",", err)
 				return
 			}
 			// send init data
-			sendInitData(ws, actData)
+			sendInitData(ws, actSession)
 		}
 		// add websocket connection to global list
 		websocketConnections = append(
@@ -249,7 +249,7 @@ func HTTPStartServer(
 		// build template data
 		td := getBaseTemplateData()
 		// collect stats
-		td.StatActConnections = actManager.DataCount()
+		td.StatActConnections = actManager.SessionCount()
 		td.StatActiveWebUsers = len(websocketConnections)
 		td.StatPageLoads = pageLoads
 		// render stats template
@@ -721,52 +721,54 @@ func getWebKeyCookie(user user.Data, r *http.Request) http.Cookie {
 }
 
 // sendInitData - Send initial data to web user to sync their session
-func sendInitData(ws *websocket.Conn, data *act.Data) {
+func sendInitData(ws *websocket.Conn, gameSession *act.GameSession) {
 	// prepare data
 	dataBytes := make([]byte, 0)
 	// send encounter
-	if data != nil && data.EncounterCollector.Encounter.UID != "" {
-		encounterUID := data.EncounterCollector.Encounter.UID
-		combatants := data.CombatantCollector.GetCombatants()
+	if gameSession != nil && gameSession.EncounterCollector.Encounter.UID != "" {
+		encounterUID := gameSession.EncounterCollector.Encounter.UID
+		combatants := gameSession.CombatantCollector.GetCombatants()
 		log.Println("[WEB] Send encounter data for", encounterUID, "(TotalCombatants:", len(combatants), ")")
 		// add encounter
-		dataBytes = append(dataBytes, act.EncodeEncounterBytes(&data.EncounterCollector.Encounter)...)
+		dataBytes = append(dataBytes, gameSession.EncounterCollector.Encounter.ToBytes()...)
 		// add combatants
 		for _, combatantSnapshots := range combatants {
 			if len(combatantSnapshots) > 0 {
 				combatantSnapshots[0].EncounterUID = encounterUID
-				dataBytes = append(dataBytes, act.EncodeCombatantBytes(&combatantSnapshots)...)
+				dataBytes = append(dataBytes, act.CombatantsToBytes(&combatantSnapshots)...)
 			}
 		}
 	}
 	// add flag indicating if ACT is active
 	isActiveFlag := act.Flag{
 		Name:  "active",
-		Value: data != nil && data.IsActive(),
+		Value: gameSession != nil && gameSession.IsActive(),
 	}
-	dataBytes = append(dataBytes, act.EncodeFlagBytes(&isActiveFlag)...)
+	dataBytes = append(dataBytes, isActiveFlag.ToBytes()...)
 	// compress
 	compressData, err := act.CompressBytes(dataBytes)
 	if err != nil {
 		log.Println("[WEB] Error when compressing init data,", err)
 		return
 	}
+	log.Println("[WEB] Send", len(compressData), "bytes (encounter/combatants) of data to", ws.RemoteAddr)
 	websocket.Message.Send(ws, compressData)
 	// send logs
-	if data != nil && data.EncounterCollector.Encounter.UID != "" {
-		logPath := data.GetLogPath()
+	if gameSession != nil && gameSession.EncounterCollector.Encounter.UID != "" {
+		logPath := gameSession.GetLogPath()
 		logBytes, err := ioutil.ReadFile(logPath)
 		if err != nil {
 			log.Println("[WEB] Error when opening log line file,", err)
 			return
 		}
 		// compress if from temp path
-		if logPath == data.GetLogTempPath() {
+		if logPath == gameSession.GetLogTempPath() {
 			logBytes, err = act.CompressBytes(logBytes)
 			if err != nil {
 				log.Println("[WEB] Error when compressing log line data,", err)
 			}
 		}
+		log.Println("[WEB] Send", len(logBytes), "bytes (log) of data to", ws.RemoteAddr)
 		websocket.Message.Send(ws, logBytes)
 	}
 

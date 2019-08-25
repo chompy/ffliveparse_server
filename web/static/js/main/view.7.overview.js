@@ -279,7 +279,6 @@ class ViewOverview extends ViewBase
             raidDps += dps;
             if (snapshot.ID in this.playerElements) {
                 var playerElement = this.playerElements[snapshot.ID];
-                console.log(playerElement.offsetHeight);
                 playerElement.style.top = (offsetPos) + "px";
 
                 offsetPos += playerElement.offsetHeight

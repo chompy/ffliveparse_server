@@ -31,7 +31,7 @@ import (
 
 // Manager - manage all act data sessions
 type Manager struct {
-	data        []Data
+	sessions    []GameSession
 	events      *emitter.Emitter
 	userManager *user.Manager
 	devMode     bool
@@ -40,7 +40,7 @@ type Manager struct {
 // NewManager - create new act manager
 func NewManager(events *emitter.Emitter, userManager *user.Manager, devMode bool) Manager {
 	return Manager{
-		data:        make([]Data, 0),
+		sessions:    make([]GameSession, 0),
 		events:      events,
 		userManager: userManager,
 		devMode:     devMode,
@@ -48,49 +48,51 @@ func NewManager(events *emitter.Emitter, userManager *user.Manager, devMode bool
 }
 
 // ParseDataString - parse incoming act, store it in a data object
-func (m *Manager) ParseDataString(dataStr []byte, addr *net.UDPAddr) (*Data, error) {
-	dataObj := m.GetDataWithAddr(addr)
+func (m *Manager) ParseDataString(dataStr []byte, addr *net.UDPAddr) (*GameSession, error) {
+	sessObj := m.GetSessionWithAddr(addr)
 	switch dataStr[0] {
 	case DataTypeSession:
 		{
-			// decode session string
-			session, _, err := DecodeSessionBytes(dataStr, addr)
+			// decode session data string
+			sessionData := Session{}
+			err := sessionData.FromBytes(dataStr)
 			if err != nil {
 				return nil, err
 			}
+			sessionData.SetAddress(addr)
 			// act data not currently loaded for user, load it
-			if dataObj == nil {
+			if sessObj == nil {
 				// ensure upload key is present
-				user, err := m.userManager.LoadFromUploadKey(session.UploadKey)
+				user, err := m.userManager.LoadFromUploadKey(sessionData.UploadKey)
 				if err != nil {
 					return nil, err
 				}
 				// check for existing data
-				for index, existingData := range m.data {
+				for index, existingData := range m.sessions {
 					if existingData.User.ID == user.ID {
-						m.data[index].Session = session
-						log.Println("[ USER", m.data[index].User.ID, "] Updated ACT session for user", existingData.User.ID, "from", addr, "(LoadedDataCount:", len(m.data), ")")
-						return &m.data[index], nil
+						m.sessions[index].Session = sessionData
+						log.Println("[ USER", m.sessions[index].User.ID, "] Updated ACT session for user", existingData.User.ID, "from", addr, "(LoadedDataCount:", m.SessionCount(), ")")
+						return &m.sessions[index], nil
 					}
 				}
 				// create new data
-				actData, err := NewData(session, user, m.events)
+				gameSession, err := NewGameSession(sessionData, user, m.events)
 				if err != nil {
 					return nil, err
 				}
-				m.data = append(
-					m.data,
-					actData,
+				m.sessions = append(
+					m.sessions,
+					gameSession,
 				)
 				// start ticks
-				go m.doTick(actData.User.ID)
-				go m.doLogTick(actData.User.ID)
+				go m.doTick(gameSession.User.ID)
+				go m.doLogTick(gameSession.User.ID)
 				// save user data, update accessed time
 				m.userManager.Save(&user)
-				log.Println("[ USER", actData.User.ID, "] Loaded ACT session for user ", user.ID, "from", addr, "(LoadedDataCount:", len(m.data), ")")
+				log.Println("[ USER", gameSession.User.ID, "] Loaded ACT session for user ", user.ID, "from", addr, "(LoadedDataCount:", m.SessionCount(), ")")
 				// emit act active event
 				activeFlag := Flag{Name: "active", Value: true}
-				activeFlagBytes, err := CompressBytes(EncodeFlagBytes(&activeFlag))
+				activeFlagBytes, err := CompressBytes(activeFlag.ToBytes())
 				if err != nil {
 					return nil, err
 				}
@@ -102,32 +104,33 @@ func (m *Manager) ParseDataString(dataStr []byte, addr *net.UDPAddr) (*Data, err
 				break
 			}
 			// save user data, update accessed time
-			m.userManager.Save(&dataObj.User)
+			m.userManager.Save(&sessObj.User)
 			// update existing data
-			dataObj.Session = session
-			log.Println("[ USER", dataObj.User.ID, "] Updated ACT session for user", dataObj.User.ID, "from", addr, "(LoadedDataCount:", len(m.data), ")")
+			sessObj.Session = sessionData
+			log.Println("[ USER", sessObj.User.ID, "] Updated ACT session for user", sessObj.User.ID, "from", addr, "(LoadedDataCount:", m.SessionCount(), ")")
 			break
 		}
 	case DataTypeEncounter:
 		{
 			// data required
-			if dataObj == nil {
+			if sessObj == nil {
 				return nil, errors.New("recieved Encounter with no matching data object")
 			}
 			// parse encounter data
-			encounter, _, err := DecodeEncounterBytes(dataStr)
+			encounter := Encounter{}
+			err := encounter.FromBytes(dataStr)
 			if err != nil {
 				return nil, err
 			}
 			// update data
-			dataObj.UpdateEncounter(encounter)
+			sessObj.UpdateEncounter(encounter)
 			// log
 			/*dur := encounter.EndTime.Sub(encounter.StartTime)
 			log.Println(
 				"Update encounter",
 				encounter.UID,
 				"for user",
-				dataObj.User.ID,
+				sessObj.User.ID,
 				"(ZoneName:",
 				encounter.Zone,
 				", Damage: ",
@@ -145,16 +148,17 @@ func (m *Manager) ParseDataString(dataStr []byte, addr *net.UDPAddr) (*Data, err
 	case DataTypeCombatant:
 		{
 			// data required
-			if dataObj == nil {
+			if sessObj == nil {
 				return nil, errors.New("recieved Combatant with no matching data object")
 			}
 			// parse combatant data
-			combatant, _, err := DecodeCombatantBytes(dataStr)
+			combatant := Combatant{}
+			err := combatant.FromBytes(dataStr)
 			if err != nil {
 				return nil, err
 			}
 			// update user data
-			dataObj.UpdateCombatant(combatant)
+			sessObj.UpdateCombatant(combatant)
 			// log
 			/*log.Println(
 				"Update combatant",
@@ -162,7 +166,7 @@ func (m *Manager) ParseDataString(dataStr []byte, addr *net.UDPAddr) (*Data, err
 				"for encounter",
 				combatant.UID,
 				"(UserID:",
-				dataObj.User.ID,
+				sessObj.User.ID,
 				", Job:",
 				combatant.Job,
 				", Damage:",
@@ -179,29 +183,30 @@ func (m *Manager) ParseDataString(dataStr []byte, addr *net.UDPAddr) (*Data, err
 	case DataTypeLogLine:
 		{
 			// data required
-			if dataObj == nil {
+			if sessObj == nil {
 				return nil, errors.New("recieved LogLine with no matching data object")
 			}
 			// parse log line data
-			logLine, _, err := DecodeLogLineBytes(dataStr)
+			logLine := LogLine{}
+			err := logLine.FromBytes(dataStr)
 			if err != nil {
 				return nil, err
 			}
 			// add log line
-			dataObj.UpdateLogLine(logLine)
+			sessObj.UpdateLogLine(logLine)
 		}
 	default:
 		{
 			return nil, errors.New("recieved unknown data")
 		}
 	}
-	return dataObj, nil
+	return sessObj, nil
 }
 
 // doTick - ticks every app.TickRate milliseconds
 func (m *Manager) doTick(userID int64) {
 	for range time.Tick(app.TickRate * time.Millisecond) {
-		data := m.GetDataWithUserID(userID)
+		data := m.GetSessionWithUserID(userID)
 		if data == nil {
 			log.Println("[ USER", userID, "] Tick with no session data, killing thread.")
 			return
@@ -210,7 +215,7 @@ func (m *Manager) doTick(userID int64) {
 		if !data.IsActive() {
 			webIDStr, _ := data.User.GetWebIDString()
 			log.Println("[", webIDStr, "] Session inactive.")
-			m.ClearData(data)
+			m.ClearSession(data)
 			return
 		}
 		if data.EncounterCollector.Encounter.UID == "" {
@@ -231,7 +236,7 @@ func (m *Manager) doTick(userID int64) {
 		data.NewTickData = false
 		//log.Println("Tick for user", data.User.ID, "send data for encounter", data.EncounterCollector.Encounter.UID)
 		// gz compress encounter data and emit event
-		compressData, err := CompressBytes(EncodeEncounterBytes(&data.EncounterCollector.Encounter))
+		compressData, err := CompressBytes(data.EncounterCollector.Encounter.ToBytes())
 		if err != nil {
 			log.Println("[ USER", userID, "] Error while compressing encounter data,", err)
 			continue
@@ -247,7 +252,9 @@ func (m *Manager) doTick(userID int64) {
 			combatants := make([]Combatant, 1)
 			combatants[0] = combatantSnapshots[len(combatantSnapshots)-1]
 			combatants[0].EncounterUID = data.EncounterCollector.Encounter.UID
-			sendBytes = append(sendBytes, EncodeCombatantBytes(&combatants)...)
+			for _, combatant := range combatants {
+				sendBytes = append(sendBytes, combatant.ToBytes()...)
+			}
 		}
 		if len(sendBytes) > 0 {
 			compressData, err := CompressBytes(sendBytes)
@@ -267,7 +274,7 @@ func (m *Manager) doTick(userID int64) {
 // doLogTick - ticks every app.LogTickRate milliseconds
 func (m *Manager) doLogTick(userID int64) {
 	for range time.Tick(app.LogTickRate * time.Millisecond) {
-		data := m.GetDataWithUserID(userID)
+		data := m.GetSessionWithUserID(userID)
 		if data == nil {
 			log.Println("[ USER", userID, "] Log tick with no session data, killing thread.")
 			return
@@ -278,7 +285,7 @@ func (m *Manager) doLogTick(userID int64) {
 		// emit log line events
 		sendBytes := make([]byte, 0)
 		for _, logLine := range data.LogLineBuffer {
-			sendBytes = append(sendBytes, EncodeLogLineBytes(&logLine)...)
+			sendBytes = append(sendBytes, logLine.ToBytes()...)
 		}
 		if len(sendBytes) > 0 {
 			// dump log buffer
@@ -312,9 +319,9 @@ func (m *Manager) SnapshotListener() {
 			timeDiff := int(currentTime.Sub(startTime).Minutes())
 			statSnapshot := event.Args[0].(*app.StatSnapshot)
 			logLineCount := 0
-			for _, data := range m.data {
-				logLineCount += data.LogLineCounter
-				userIDString, err := data.User.GetWebIDString()
+			for _, sess := range m.sessions {
+				logLineCount += sess.LogLineCounter
+				userIDString, err := sess.User.GetWebIDString()
 				if err == nil {
 					statSnapshot.Connections.ACT[userIDString]++
 				}
@@ -332,70 +339,70 @@ func (m *Manager) SnapshotListener() {
 	}
 }
 
-// GetDataWithAddr - retrieve data with UDP address
-func (m *Manager) GetDataWithAddr(addr *net.UDPAddr) *Data {
-	for index, data := range m.data {
-		if data.Session.IP.Equal(addr.IP) && data.Session.Port == addr.Port {
-			return &m.data[index]
+// GetSessionWithAddr - retrieve session with UDP address
+func (m *Manager) GetSessionWithAddr(addr *net.UDPAddr) *GameSession {
+	for index, session := range m.sessions {
+		if session.Session.IP.Equal(addr.IP) && session.Session.Port == addr.Port {
+			return &m.sessions[index]
 		}
 	}
 	return nil
 }
 
-// GetLastDataWithIP - retrieve last available data object with given ip address
-func (m *Manager) GetLastDataWithIP(ip string) *Data {
-	var lastData *Data
-	for index, data := range m.data {
-		if data.Session.IP.String() == ip {
-			lastData = &m.data[index]
+// GetLastSessionWithIP - retrieve last available session object with given ip address
+func (m *Manager) GetLastSessionWithIP(ip string) *GameSession {
+	var lastData *GameSession
+	for index, sess := range m.sessions {
+		if sess.Session.IP.String() == ip {
+			lastData = &m.sessions[index]
 		}
 	}
 	return lastData
 }
 
-// GetDataWithUserID - retrieve data object from user ID
-func (m *Manager) GetDataWithUserID(userID int64) *Data {
-	for index, data := range m.data {
-		if data.User.ID == userID {
-			return &m.data[index]
+// GetSessionWithUserID - retrieve data object from user ID
+func (m *Manager) GetSessionWithUserID(userID int64) *GameSession {
+	for index, session := range m.sessions {
+		if session.User.ID == userID {
+			return &m.sessions[index]
 		}
 	}
 	return nil
 }
 
-// GetDataWithWebID - retrieve data with web id string
-func (m *Manager) GetDataWithWebID(webID string) (*Data, error) {
+// GetSessionWithWebID - retrieve data with web id string
+func (m *Manager) GetSessionWithWebID(webID string) (*GameSession, error) {
 	userID, err := user.GetIDFromWebIDString(webID)
 	if err != nil {
 		return nil, err
 	}
-	return m.GetDataWithUserID(userID), nil
+	return m.GetSessionWithUserID(userID), nil
 }
 
-// ClearData - remove data from memory
-func (m *Manager) ClearData(d *Data) {
-	for index, data := range m.data {
-		if data.User.ID == d.User.ID {
-			m.data = append(m.data[:index], m.data[index+1:]...)
-			if d.EncounterCollector.Encounter.Active {
-				d.SaveEncounter()
-				d.ClearEncounter()
+// ClearSession - remove session from memory
+func (m *Manager) ClearSession(s *GameSession) {
+	for index, ittSess := range m.sessions {
+		if ittSess.User.ID == s.User.ID {
+			m.sessions = append(m.sessions[:index], m.sessions[index+1:]...)
+			if s.EncounterCollector.Encounter.Active {
+				s.SaveEncounter()
+				s.ClearEncounter()
 			}
-			webIDStr, _ := d.User.GetWebIDString()
-			log.Println("[", webIDStr, "] Remove ACT session for user (LoadedDataCount:", len(m.data), ")")
+			webIDStr, _ := s.User.GetWebIDString()
+			log.Println("[", webIDStr, "] Remove ACT session for user (LoadedDataCount:", m.SessionCount(), ")")
 			break
 		}
 	}
 }
 
-// ClearAllData - clear all data from memory
-func (m *Manager) ClearAllData() {
-	for len(m.data) > 0 {
-		m.ClearData(&m.data[0])
+// ClearAllSessions - clear all sessions from memory
+func (m *Manager) ClearAllSessions() {
+	for m.SessionCount() > 0 {
+		m.ClearSession(&m.sessions[0])
 	}
 }
 
-// DataCount - get number of data objects
-func (m *Manager) DataCount() int {
-	return len(m.data)
+// SessionCount - get number of session objects
+func (m *Manager) SessionCount() int {
+	return len(m.sessions)
 }

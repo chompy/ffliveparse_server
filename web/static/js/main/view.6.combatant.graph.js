@@ -157,6 +157,9 @@ class ViewCombatantGraph extends ViewGridBase
                     var timeIndex = new Date(startTimestamp + (i * 1000));
                     for (var j in this.combatantCollector.combatants) {
                         var combatant = this.combatantCollector.combatants[j];
+                        if (combatant.data.ID <= 0) {
+                            continue;
+                        }
                         var snapshot = combatant.getSnapshot(timeIndex);
                         if (!snapshot) {
                             continue;

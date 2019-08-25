@@ -55,7 +55,7 @@ func main() {
 	// create act manager
 	actManager := act.NewManager(&events, &userManager, *devModePtr)
 	go actManager.SnapshotListener()
-	defer actManager.ClearAllData()
+	defer actManager.ClearAllSessions()
 
 	// player stat tracker on seperate threads
 	psEvents := emitter.Emitter{}

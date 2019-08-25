@@ -42,8 +42,8 @@ import (
 // logLineRetainCount - Number of log lines to retain in memory before dumping to temp file
 const logLineRetainCount = 1000
 
-// Data - data about an ACT session
-type Data struct {
+// GameSession - data about an ACT session
+type GameSession struct {
 	Session            Session
 	User               user.Data
 	EncounterCollector EncounterCollector
@@ -57,9 +57,9 @@ type Data struct {
 	events             *emitter.Emitter
 }
 
-// NewData - create new ACT session data
-func NewData(session Session, user user.Data, events *emitter.Emitter) (Data, error) {
-	return Data{
+// NewGameSession - create new ACT session data
+func NewGameSession(session Session, user user.Data, events *emitter.Emitter) (GameSession, error) {
+	return GameSession{
 		Session:            session,
 		User:               user,
 		EncounterCollector: NewEncounterCollector(&user),
@@ -72,30 +72,30 @@ func NewData(session Session, user user.Data, events *emitter.Emitter) (Data, er
 }
 
 // UpdateEncounter - Add or update encounter data
-func (d *Data) UpdateEncounter(encounter Encounter) {
+func (s *GameSession) UpdateEncounter(encounter Encounter) {
 	if time.Now().Sub(encounter.StartTime) > time.Hour {
 		return
 	}
-	d.LastUpdate = time.Now()
-	d.NewTickData = true
-	d.EncounterCollector.UpdateEncounter(encounter)
+	s.LastUpdate = time.Now()
+	s.NewTickData = true
+	s.EncounterCollector.UpdateEncounter(encounter)
 }
 
 // UpdateCombatant - Add or update combatant data
-func (d *Data) UpdateCombatant(combatant Combatant) {
+func (s *GameSession) UpdateCombatant(combatant Combatant) {
 	// ensure there is an active encounter
-	if !d.EncounterCollector.Encounter.Active {
+	if !s.EncounterCollector.Encounter.Active {
 		return
 	}
-	d.LastUpdate = time.Now()
-	d.NewTickData = true
+	s.LastUpdate = time.Now()
+	s.NewTickData = true
 	// update combatant collector
-	d.CombatantCollector.UpdateCombatantTracker(combatant)
+	s.CombatantCollector.UpdateCombatantTracker(combatant)
 }
 
 // GetLogTempPath - Get path to temp log lines file
-func (d *Data) GetLogTempPath() string {
-	return path.Join(os.TempDir(), fmt.Sprintf("fflp_LogLine_%s.dat", d.EncounterCollector.Encounter.UID))
+func (s *GameSession) GetLogTempPath() string {
+	return path.Join(os.TempDir(), fmt.Sprintf("fflp_LogLine_%s.dat", s.EncounterCollector.Encounter.UID))
 }
 
 // getPermanentLogPath - Get path to permanent log file from uid
@@ -104,22 +104,22 @@ func getPermanentLogPath(uid string) string {
 }
 
 // GetLogPath - Get path to log lines file
-func (d *Data) GetLogPath() string {
-	tempPath := d.GetLogTempPath()
+func (s *GameSession) GetLogPath() string {
+	tempPath := s.GetLogTempPath()
 	if _, err := os.Stat(tempPath); os.IsNotExist(err) {
-		return getPermanentLogPath(d.EncounterCollector.Encounter.UID)
+		return getPermanentLogPath(s.EncounterCollector.Encounter.UID)
 	}
 	return tempPath
 }
 
 // UpdateLogLine - Add log line to buffer
-func (d *Data) UpdateLogLine(logLine LogLine) {
+func (s *GameSession) UpdateLogLine(logLine LogLine) {
 	if time.Now().Sub(logLine.Time) > time.Hour {
 		return
 	}
-	d.LogLineCounter++
+	s.LogLineCounter++
 	// update log last update flag
-	d.LastUpdate = time.Now()
+	s.LastUpdate = time.Now()
 	// parse out log line details
 	logLineParse, err := ParseLogLine(logLine)
 	if err != nil {
@@ -127,41 +127,41 @@ func (d *Data) UpdateLogLine(logLine LogLine) {
 		return
 	}
 	// reset encounter
-	if d.EncounterCollector.IsNewEncounter(&logLineParse) {
-		d.EncounterCollector.Reset()
-		d.CombatantCollector.Reset()
+	if s.EncounterCollector.IsNewEncounter(&logLineParse) {
+		s.EncounterCollector.Reset()
+		s.CombatantCollector.Reset()
 	}
 	// update encounter collector
-	wasActiveEncounter := d.EncounterCollector.Encounter.Active
-	d.EncounterCollector.ReadLogLine(&logLineParse)
-	d.CombatantCollector.ReadLogLine(&logLineParse)
+	wasActiveEncounter := s.EncounterCollector.Encounter.Active
+	s.EncounterCollector.ReadLogLine(&logLineParse)
+	s.CombatantCollector.ReadLogLine(&logLineParse)
 	// add log line to buffer if active encounter
-	if !d.EncounterCollector.Encounter.Active {
+	if !s.EncounterCollector.Encounter.Active {
 		if wasActiveEncounter {
-			d.NewTickData = true
+			s.NewTickData = true
 		}
 		return
 	}
 	// set encounter UID
-	logLine.EncounterUID = d.EncounterCollector.Encounter.UID
+	logLine.EncounterUID = s.EncounterCollector.Encounter.UID
 	// add to log line list
-	d.LogLineBuffer = append(d.LogLineBuffer, logLine)
+	s.LogLineBuffer = append(s.LogLineBuffer, logLine)
 }
 
 // ClearLogLines - Clear log lines from current session
-func (d *Data) ClearLogLines() {
-	d.LogLineBuffer = make([]LogLine, 0)
-	os.Remove(d.GetLogTempPath())
+func (s *GameSession) ClearLogLines() {
+	s.LogLineBuffer = make([]LogLine, 0)
+	os.Remove(s.GetLogTempPath())
 }
 
 // DumpLogLineBuffer - Dump log line buffer to temp file
-func (d *Data) DumpLogLineBuffer() error {
+func (s *GameSession) DumpLogLineBuffer() error {
 	logBytes := make([]byte, 0)
-	for _, logLine := range d.LogLineBuffer {
-		logBytes = append(logBytes, EncodeLogLineBytes(&logLine)...)
+	for _, logLine := range s.LogLineBuffer {
+		logBytes = append(logBytes, logLine.ToBytes()...)
 	}
 	if len(logBytes) > 0 {
-		f, err := os.OpenFile(d.GetLogTempPath(), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
+		f, err := os.OpenFile(s.GetLogTempPath(), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
 		if err != nil {
 			return err
 		}
@@ -172,23 +172,23 @@ func (d *Data) DumpLogLineBuffer() error {
 		}
 	}
 	// clear buffer
-	d.LogLineBuffer = make([]LogLine, 0)
+	s.LogLineBuffer = make([]LogLine, 0)
 	return nil
 }
 
 // SaveEncounter - save all data related to current encounter
-func (d *Data) SaveEncounter() error {
+func (s *GameSession) SaveEncounter() error {
 	// no encounter
-	if d.EncounterCollector.Encounter.UID == "" {
+	if s.EncounterCollector.Encounter.UID == "" {
 		return nil
 	}
 	// ensure encounter meets min encounter length
-	duration := d.EncounterCollector.Encounter.EndTime.Sub(d.EncounterCollector.Encounter.StartTime)
+	duration := s.EncounterCollector.Encounter.EndTime.Sub(s.EncounterCollector.Encounter.StartTime)
 	if duration < app.MinEncounterSaveLength*time.Millisecond || duration > app.MaxEncounterSaveLength*time.Millisecond {
 		return nil
 	}
 	// get sorted combatants
-	combatants := d.CombatantCollector.GetCombatants()
+	combatants := s.CombatantCollector.GetCombatants()
 	sort.Slice(combatants, func(i, j int) bool {
 		return combatants[i][0].Player.ID < combatants[j][0].Player.ID
 	})
@@ -196,37 +196,37 @@ func (d *Data) SaveEncounter() error {
 	// this is used to determine if two different user's encounters
 	// are actually the same encounter
 	h := md5.New()
-	io.WriteString(h, d.EncounterCollector.Encounter.StartTime.UTC().String())
+	io.WriteString(h, s.EncounterCollector.Encounter.StartTime.UTC().String())
 	for _, combatant := range combatants {
 		io.WriteString(h, strconv.Itoa(int(combatant[0].Player.ID)))
 	}
-	d.EncounterCollector.Encounter.CompareHash = fmt.Sprintf("%x", h.Sum(nil))
+	s.EncounterCollector.Encounter.CompareHash = fmt.Sprintf("%x", h.Sum(nil))
 	// insert in to encounter table
 	finE := make(chan bool)
-	d.events.Emit(
+	s.events.Emit(
 		"database:save",
 		finE,
-		&d.EncounterCollector.Encounter,
-		int(d.User.ID),
+		&s.EncounterCollector.Encounter,
+		int(s.User.ID),
 	)
 	<-finE
 	// insert in to combatant+player tables
 	for _, combatantSnapshots := range combatants {
 		// insert combatant
 		for _, combatant := range combatantSnapshots {
-			combatant.EncounterUID = d.EncounterCollector.Encounter.UID
+			combatant.EncounterUID = s.EncounterCollector.Encounter.UID
 			finC := make(chan bool)
-			d.events.Emit(
+			s.events.Emit(
 				"database:save",
 				finC,
 				&combatant,
-				int(d.User.ID),
+				int(s.User.ID),
 			)
 			<-finC
 		}
 		// insert player
 		finP := make(chan bool)
-		d.events.Emit(
+		s.events.Emit(
 			"database:save",
 			finP,
 			&combatantSnapshots[0].Player,
@@ -234,18 +234,18 @@ func (d *Data) SaveEncounter() error {
 		<-finP
 	}
 	// dump log lines
-	err := d.DumpLogLineBuffer()
+	err := s.DumpLogLineBuffer()
 	if err != nil {
 		return err
 	}
 	// open temp log file
-	tempLogFile, err := os.Open(d.GetLogTempPath())
+	tempLogFile, err := os.Open(s.GetLogTempPath())
 	if err != nil {
 		return err
 	}
 	defer tempLogFile.Close()
 	// open output log file
-	logFilePath := filepath.Join(app.LogPath, d.EncounterCollector.Encounter.UID+"_LogLines.dat")
+	logFilePath := filepath.Join(app.LogPath, s.EncounterCollector.Encounter.UID+"_LogLines.dat")
 	outLogFile, err := os.OpenFile(logFilePath, os.O_WRONLY|os.O_CREATE, 0664)
 	if err != nil {
 		return err
@@ -276,10 +276,10 @@ func (d *Data) SaveEncounter() error {
 }
 
 // ClearEncounter - delete all data for current encounter from memory
-func (d *Data) ClearEncounter() {
-	d.ClearLogLines()
-	d.EncounterCollector.Reset()
-	d.CombatantCollector.Reset()
+func (s *GameSession) ClearEncounter() {
+	s.ClearLogLines()
+	s.EncounterCollector.Reset()
+	s.CombatantCollector.Reset()
 }
 
 // getEncounterCombatants - fetch all combatants in an encounter
@@ -305,7 +305,7 @@ func getEncounterCombatants(events *emitter.Emitter, user user.Data, encounterUI
 }
 
 // GetPreviousEncounter - retrieve previous encounter data from database
-func GetPreviousEncounter(events *emitter.Emitter, user user.Data, encounterUID string) (Data, error) {
+func GetPreviousEncounter(events *emitter.Emitter, user user.Data, encounterUID string) (GameSession, error) {
 	// fetch encounter
 	encounter := Encounter{}
 	fin := make(chan bool)
@@ -324,18 +324,18 @@ func GetPreviousEncounter(events *emitter.Emitter, user user.Data, encounterUID 
 		encounterUID,
 	)
 	if err != nil {
-		return Data{}, err
+		return GameSession{}, err
 	}
 	// build encounter collector
 	encounterCollector := NewEncounterCollector(&user)
 	encounterCollector.Encounter = encounter
 	// return data set
-	d := Data{
+	s := GameSession{
 		User:               user,
 		EncounterCollector: encounterCollector,
 		CombatantCollector: combatantCollector,
 	}
-	return d, nil
+	return s, nil
 }
 
 // GetPreviousEncounters - retrieve list of previous encounters
@@ -347,7 +347,7 @@ func GetPreviousEncounters(
 	start *time.Time,
 	end *time.Time,
 	totalCount *int,
-) ([]Data, error) {
+) ([]GameSession, error) {
 
 	encounters := make([]Encounter, 0)
 	fin := make(chan bool)
@@ -363,26 +363,26 @@ func GetPreviousEncounters(
 		totalCount,
 	)
 	<-fin
-	dataRes := make([]Data, 0)
+	sessionRes := make([]GameSession, 0)
 	for _, encounter := range encounters {
 		// build collectors
 		encounterCollector := NewEncounterCollector(&user)
 		encounterCollector.Encounter = encounter
 		// build data object
-		data := Data{
+		sess := GameSession{
 			User:               user,
 			EncounterCollector: encounterCollector,
 			CombatantCollector: CombatantCollector{},
 			HasLogs:            encounter.HasLogs,
 		}
-		dataRes = append(dataRes, data)
+		sessionRes = append(sessionRes, sess)
 	}
-	return dataRes, nil
+	return sessionRes, nil
 }
 
 // IsActive - Check if data is actively being updated (i.e. active ACT connection)
-func (d *Data) IsActive() bool {
-	dur := time.Now().Sub(d.LastUpdate)
+func (s *GameSession) IsActive() bool {
+	dur := time.Now().Sub(s.LastUpdate)
 	return dur < time.Duration(app.LastUpdateInactiveTime*time.Millisecond)
 }
 
@@ -435,7 +435,7 @@ func CleanUpEncounters(events *emitter.Emitter) {
 			&encountersDeleted,
 		)
 		<-fin2
-		log.Println("[CLEAN] Completed. Removed", cleanUpCount, "log(s) and", encountersDeleted, "encounters(s).")
+		log.Println("[CLEAN] Completes. Removed", cleanUpCount, "log(s) and", encountersDeleted, "encounters(s).")
 	}
 }
 

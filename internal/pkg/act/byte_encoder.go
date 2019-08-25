@@ -60,63 +60,6 @@ func writeTime(data *[]byte, value time.Time) {
 	writeString(data, value.UTC().Format(time.RFC3339Nano))
 }
 
-// EncodeEncounterBytes - Create Encounter byte array
-func EncodeEncounterBytes(value *Encounter) []byte {
-	data := make([]byte, 1)
-	data[0] = DataTypeEncounter
-	writeString(&data, value.UID)
-	writeTime(&data, value.StartTime)
-	writeTime(&data, value.EndTime)
-	writeString(&data, value.Zone)
-	writeInt32(&data, value.Damage)
-	writeBool(&data, value.Active)
-	writeByte(&data, value.SuccessLevel)
-	return data
-}
-
-// EncodeCombatantBytes - Create Combatant[s] byte array
-func EncodeCombatantBytes(value *[]Combatant) []byte {
-	data := make([]byte, 1)
-	data[0] = DataTypeCombatant
-	cb := *value
-	writeString(&data, cb[0].EncounterUID)
-	writeInt32(&data, cb[0].Player.ID)
-	writeString(&data, cb[0].Player.Name)
-	writeString(&data, cb[0].Player.World)
-	writeString(&data, cb[0].Job)
-	writeInt32(&data, int32(len(cb)))
-	for index := range cb {
-		writeInt32(&data, cb[index].Damage)
-		writeInt32(&data, cb[index].DamageTaken)
-		writeInt32(&data, cb[index].DamageHealed)
-		writeInt32(&data, cb[index].Deaths)
-		writeInt32(&data, cb[index].Hits)
-		writeInt32(&data, cb[index].Heals)
-		writeInt32(&data, cb[index].Kills)
-		writeTime(&data, cb[index].Time)
-	}
-	return data
-}
-
-// EncodeLogLineBytes - Create LogLine byte array
-func EncodeLogLineBytes(value *LogLine) []byte {
-	data := make([]byte, 1)
-	data[0] = DataTypeLogLine
-	writeString(&data, value.EncounterUID)
-	writeTime(&data, value.Time)
-	writeString(&data, value.LogLine)
-	return data
-}
-
-// EncodeFlagBytes - Create flag byte array
-func EncodeFlagBytes(value *Flag) []byte {
-	data := make([]byte, 1)
-	data[0] = DataTypeFlag
-	writeString(&data, value.Name)
-	writeBool(&data, value.Value)
-	return data
-}
-
 // CompressBytes - Compress byte array for sending
 func CompressBytes(data []byte) ([]byte, error) {
 	var gzBytes bytes.Buffer
