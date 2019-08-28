@@ -25,6 +25,8 @@ const StoreTypeCombatant = "Combatant"
 
 // BaseHandler - base storage handler
 type BaseHandler interface {
+	Init() error
 	Store(data []interface{}) error
+	FetchBytes(params map[string]interface{}) ([]byte, error)
 	Fetch(params map[string]interface{}) ([]interface{}, error)
 }

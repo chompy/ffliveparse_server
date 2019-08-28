@@ -16,3 +16,11 @@ along with FFLiveParse.  If not, see <https://www.gnu.org/licenses/>.
 */
 
 package storage
+
+import "database/sql"
+
+// SqliteHandler - handles sqlite storage
+type SqliteHandler struct {
+	BaseHandler
+	db *sql.DB
+}

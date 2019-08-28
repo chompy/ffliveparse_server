@@ -18,6 +18,9 @@ along with FFLiveParse.  If not, see <https://www.gnu.org/licenses/>.
 package storage
 
 import (
+	"compress/gzip"
+	"fmt"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 
@@ -40,19 +43,37 @@ func NewFileHandler(path string) (FileHandler, error) {
 	}, nil
 }
 
-// getFileWriter - get file writer object
-func (f *FileHandler) getFileWriter(objType string, encounterUID string) (*os.File, error) {
-	fullPath := filepath.Join(
+// getFilePath - get path to data file
+func (f *FileHandler) getFilePath(objType string, encounterUID string) string {
+	return filepath.Join(
 		f.path,
 		encounterUID+"_"+objType+".dat",
 	)
-	return os.OpenFile(fullPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
+}
+
+// getWriteFile - open file for writing
+func (f *FileHandler) getWriteFile(objType string, encounterUID string) (*os.File, error) {
+	return os.OpenFile(
+		f.getFilePath(objType, encounterUID),
+		os.O_CREATE|os.O_APPEND|os.O_WRONLY,
+		0644,
+	)
+}
+
+// Init - init file handler
+func (f *FileHandler) Init() error {
+	return nil
 }
 
 // Store - store data to file system
 func (f *FileHandler) Store(data []interface{}) error {
-	fileWriters := make(map[string]*os.File)
+	uid := ""
+	dType := ""
+	var dFile *os.File
+	var gzWriter *gzip.Writer
+	// itterate data to store
 	for index := range data {
+		var byteData []byte
 		switch data[index].(type) {
 		case *act.LogLine:
 			{
@@ -61,21 +82,13 @@ func (f *FileHandler) Store(data []interface{}) error {
 				if logLine.EncounterUID == "" {
 					break
 				}
-				// open file if needed
-				if fileWriters[fileTypeLogLine+logLine.EncounterUID] == nil {
-					fileWriter, err := f.getFileWriter(fileTypeLogLine, logLine.EncounterUID)
-					if err != nil {
-						return err
-					}
-					defer fileWriter.Close()
+				// must be of same uid/type as last item
+				if (uid != "" && logLine.EncounterUID != uid) || (dType != "" && dType != fileTypeLogLine) {
+					return fmt.Errorf("cannot store multiple items of different uid or types")
 				}
-				// write
-				_, err := fileWriters[fileTypeLogLine+logLine.EncounterUID].Write(
-					act.EncodeLogLineBytes(logLine),
-				)
-				if err != nil {
-					return err
-				}
+				byteData = logLine.ToBytes()
+				uid = logLine.EncounterUID
+				dType = fileTypeLogLine
 				break
 			}
 		case *act.Combatant:
@@ -85,33 +98,47 @@ func (f *FileHandler) Store(data []interface{}) error {
 				if combatant.EncounterUID == "" {
 					break
 				}
-				// open file if needed
-				if fileWriters[fileTypeCombatant+combatant.EncounterUID] == nil {
-					fileWriter, err := f.getFileWriter(fileTypeCombatant, combatant.EncounterUID)
-					if err != nil {
-						return err
-					}
-					defer fileWriter.Close()
+				// must be of same uid/type as last item
+				if (uid != "" && combatant.EncounterUID != uid) || (dType != "" && dType != fileTypeCombatant) {
+					return fmt.Errorf("cannot store multiple items of different uid or types")
 				}
-				// write
-				combatantData := []act.Combatant{
-					*combatant,
-				}
-				_, err := fileWriters[fileTypeCombatant+combatant.EncounterUID].Write(
-					act.EncodeCombatantBytes(&combatantData),
-				)
+				byteData = combatant.ToBytes()
+				uid = combatant.EncounterUID
+				dType = fileTypeCombatant
+				break
+			}
+		}
+		// data to write
+		if len(byteData) > 0 && uid != "" && dType != "" {
+			if dFile == nil {
+				dFile, err := f.getWriteFile(dType, uid)
 				if err != nil {
 					return err
 				}
-				break
+				gzWriter = gzip.NewWriter(dFile)
+				defer gzWriter.Close()
+				defer dFile.Close()
 			}
+			gzWriter.Write(byteData)
 		}
 	}
 	return nil
 }
 
-// Fetch -
-func (f *FileHandler) Fetch(params map[string]interface{}) ([]interface{}, error) {
+// FetchBytes - retrieve data bytes from file system (gzip compressed)
+func (f *FileHandler) FetchBytes(params map[string]interface{}) ([]byte, error) {
+	dType := ParamsGetType(params)
+	if dType == "" {
+		return nil, nil
+	}
+	uid := ParamGetUID(params)
+	if uid == "" {
+		return nil, nil
+	}
+	return ioutil.ReadFile(f.getFilePath(dType, uid))
+}
 
+// Fetch - retrieve data from file system
+func (f *FileHandler) Fetch(params map[string]interface{}) ([]interface{}, error) {
 	return nil, nil
 }
