@@ -15,10 +15,4 @@ You should have received a copy of the GNU General Public License
 along with FFLiveParse.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-package act
-
-// ByteEncodable - data that can be encoded to and from bytes
-type ByteEncodable interface {
-	ToBytes() []byte
-	FromBytes(data []byte) error
-}
+package storage

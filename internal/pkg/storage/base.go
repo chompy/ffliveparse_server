@@ -15,10 +15,16 @@ You should have received a copy of the GNU General Public License
 along with FFLiveParse.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-package act
+package storage
 
-// ByteEncodable - data that can be encoded to and from bytes
-type ByteEncodable interface {
-	ToBytes() []byte
-	FromBytes(data []byte) error
+// StoreTypeLogLine - denotes log line storage type
+const StoreTypeLogLine = "LogLine"
+
+// StoreTypeCombatant - denotes combatant storage type
+const StoreTypeCombatant = "Combatant"
+
+// BaseHandler - base storage handler
+type BaseHandler interface {
+	Store(data []interface{}) error
+	Fetch(params map[string]interface{}) ([]interface{}, error)
 }

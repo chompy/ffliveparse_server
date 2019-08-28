@@ -15,10 +15,25 @@ You should have received a copy of the GNU General Public License
 along with FFLiveParse.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-package act
+package storage
 
-// ByteEncodable - data that can be encoded to and from bytes
-type ByteEncodable interface {
-	ToBytes() []byte
-	FromBytes(data []byte) error
+import (
+	"database/sql"
+)
+
+// Handler - handle storage transactions
+type Handler struct {
+	database *sql.DB
+}
+
+// NewHandler - create new storage handler
+func NewHandler() (Handler, error) {
+	handler := Handler{}
+	err := handler.Init()
+	return handler, err
+}
+
+// Init - init the storage handler
+func (h *Handler) Init() error {
+	return nil
 }
