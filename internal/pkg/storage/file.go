@@ -27,9 +27,6 @@ import (
 	"../act"
 )
 
-const fileTypeLogLine = "LogLine"
-const fileTypeCombatant = "Combatant"
-
 // FileHandler - handles file storage
 type FileHandler struct {
 	BaseHandler
@@ -83,12 +80,12 @@ func (f *FileHandler) Store(data []interface{}) error {
 					break
 				}
 				// must be of same uid/type as last item
-				if (uid != "" && logLine.EncounterUID != uid) || (dType != "" && dType != fileTypeLogLine) {
+				if (uid != "" && logLine.EncounterUID != uid) || (dType != "" && dType != StoreTypeLogLine) {
 					return fmt.Errorf("cannot store multiple items of different uid or types")
 				}
 				byteData = logLine.ToBytes()
 				uid = logLine.EncounterUID
-				dType = fileTypeLogLine
+				dType = StoreTypeLogLine
 				break
 			}
 		case *act.Combatant:
@@ -99,12 +96,12 @@ func (f *FileHandler) Store(data []interface{}) error {
 					break
 				}
 				// must be of same uid/type as last item
-				if (uid != "" && combatant.EncounterUID != uid) || (dType != "" && dType != fileTypeCombatant) {
+				if (uid != "" && combatant.EncounterUID != uid) || (dType != "" && dType != StoreTypeCombatant) {
 					return fmt.Errorf("cannot store multiple items of different uid or types")
 				}
 				byteData = combatant.ToBytes()
 				uid = combatant.EncounterUID
-				dType = fileTypeCombatant
+				dType = StoreTypeCombatant
 				break
 			}
 		}

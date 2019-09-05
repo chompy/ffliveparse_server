@@ -31,6 +31,7 @@ const DataTypeCombatantSnapshots byte = 6
 // Combatant - Data about a combatant
 type Combatant struct {
 	ByteEncodable
+	UserID         int64     `json:"user_id"`
 	Player         Player    `json:"player"`
 	EncounterUID   string    `json:"encounter_uid"`
 	ActEncounterID uint32    `json:"act_encounter_id"`

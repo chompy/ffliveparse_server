@@ -23,6 +23,15 @@ const StoreTypeLogLine = "LogLine"
 // StoreTypeCombatant - denotes combatant storage type
 const StoreTypeCombatant = "Combatant"
 
+// StoreTypeEncounter - denotes encounter storage type
+const StoreTypeEncounter = "Encounter"
+
+// StoreTypePlayer - denotes player storage type
+const StoreTypePlayer = "Player"
+
+// StoreTypeUser - denotes user storage type
+const StoreTypeUser = "User"
+
 // BaseHandler - base storage handler
 type BaseHandler interface {
 	Init() error

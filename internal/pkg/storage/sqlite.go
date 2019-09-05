@@ -19,8 +19,10 @@ package storage
 
 import (
 	"database/sql"
+	"time"
 
 	"../act"
+	"../user"
 )
 
 // SqliteHandler - handles sqlite storage
@@ -162,13 +164,205 @@ func (s *SqliteHandler) Store(data []interface{}) error {
 		switch data[index].(type) {
 		case *act.Encounter:
 			{
+				encounter := data[index].(*act.Encounter)
+				stmt, err := s.db.Prepare(`
+					REPLACE INTO encounter
+					(uid, act_id, compare_hash, user_id, start_time, end_time, zone, damage, success_level, has_logs) VALUES
+					(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+				`)
+				if err != nil {
+					return err
+				}
+				defer stmt.Close()
+				_, err = stmt.Exec(
+					encounter.UID,
+					encounter.ActID,
+					encounter.CompareHash,
+					encounter.UserID,
+					encounter.StartTime,
+					encounter.EndTime,
+					encounter.Zone,
+					encounter.Damage,
+					encounter.SuccessLevel,
+					true,
+				)
+				if err != nil {
+					return err
+				}
 				break
 			}
-		case *act.LogLine:
+		case *act.Combatant:
 			{
+				combatant := data[index].(*act.Combatant)
+				stmt, err := s.db.Prepare(`
+					REPLACE INTO combatant
+					(user_id, encounter_uid, player_id, time, job, damage, damage_taken, damage_healed, deaths, hits, heals, kills) VALUES
+					(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+				`)
+				if err != nil {
+					return err
+				}
+				defer stmt.Close()
+				_, err = stmt.Exec(
+					combatant.UserID,
+					combatant.EncounterUID,
+					combatant.Player.ID,
+					combatant.Time,
+					combatant.Job,
+					combatant.Damage,
+					combatant.DamageTaken,
+					combatant.DamageHealed,
+					combatant.Deaths,
+					combatant.Hits,
+					combatant.Heals,
+					combatant.Kills,
+				)
+				if err != nil {
+					return err
+				}
+				break
+			}
+		case *act.Player:
+			{
+				player := data[index].(*act.Player)
+				insStmt, err := s.db.Prepare(`
+					INSERT OR IGNORE INTO player
+					(id, name, act_name) VALUES
+					(?, ?, ?)
+				`)
+				if err != nil {
+					return err
+				}
+				defer insStmt.Close()
+				_, err = insStmt.Exec(
+					player.ID,
+					player.Name,
+					player.ActName,
+				)
+				if err != nil {
+					return err
+				}
+				if player.World != "" {
+					updateStmt, err := s.db.Prepare(`
+						UPDATE player SET world_name = ? WHERE id = ?
+					`)
+					if err != nil {
+						return err
+					}
+					defer updateStmt.Close()
+					_, err = updateStmt.Exec(
+						player.World,
+						player.ID,
+					)
+					if err != nil {
+						return err
+					}
+				}
+				break
+			}
+		case *user.Data:
+			{
+				user := data[index].(*user.Data)
+				// insert
+				if user.ID == 0 {
+					stmt, err := s.db.Prepare(`
+						INSERT INTO user
+						(created, accessed, upload_key, web_key) VALUES
+						(?, ?, ?, ?)
+					`)
+					if err != nil {
+						return err
+					}
+					defer stmt.Close()
+					res, err := stmt.Exec(
+						user.Created,
+						time.Now(),
+						user.UploadKey,
+						user.WebKey,
+					)
+					if err != nil {
+						return err
+					}
+					user.ID, err = res.LastInsertId()
+					return err
+				}
+				// update
+				stmt, err := s.db.Prepare(`
+					UPDATE user SET accessed = ? WHERE id = ?
+				`)
+				if err != nil {
+					return err
+				}
+				defer stmt.Close()
+				_, err = stmt.Exec(
+					user.Accessed,
+					user.ID,
+				)
+				if err != nil {
+					return err
+				}
 				break
 			}
 		}
 	}
 	return nil
+}
+
+// FetchBytes - retrieve data bytes from sqlite (gzip compressed)
+func (s *SqliteHandler) FetchBytes(params map[string]interface{}) ([]byte, error) {
+	return nil, nil
+}
+
+// appendWhereQueryString - append whery query string
+func (s *SqliteHandler) appendWhereQueryString(original string, append string) string {
+	if original != "" {
+		original += " AND "
+	}
+	original += append
+	return original
+}
+
+// Fetch - retrieve data from sqlite
+func (s *SqliteHandler) Fetch(params map[string]interface{}) ([]interface{}, error) {
+	dType := ParamsGetType(params)
+	if dType == "" {
+		return nil, nil
+	}
+	output := make([]interface{}, 0)
+	switch dType {
+	case StoreTypeEncounter:
+		{
+			sqlQueryParams := make([]interface{}, 0)
+			sqlQueryStr := `
+				SELECT uid, act_id, compare_hash, start_time, end_time, zone, damage, success_level 
+				FROM encounter 
+				WHERE
+			`
+			sqlWhereQueryStr := ""
+
+			for key := range params {
+				switch key {
+				case "uid":
+					{
+						val := ParamGetUID(params)
+						sqlWhereQueryStr = s.appendWhereQueryString(sqlWhereQueryStr, "uid = ?")
+						sqlQueryParams = append(sqlQueryParams, val)
+						break
+					}
+				case "query":
+					{
+						val := ParamGetString(params, "query")
+						sqlWhereQueryStr = s.appendWhereQueryString(sqlWhereQueryStr, "(zone LIKE ? OR player.name LIKE ?)")
+						sqlQueryParams = append(sqlQueryParams, "%"+val+"%", "%"+val+"%")
+						break
+					}
+				}
+			}
+			if sqlWhereQueryStr != "" {
+				// do stuff
+			}
+			break
+		}
+	}
+	return output, nil
 }

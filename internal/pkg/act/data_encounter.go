@@ -28,6 +28,7 @@ const DataTypeEncounter byte = 2
 // Encounter - Data about an encounter
 type Encounter struct {
 	ByteEncodable
+	UserID       int64     `json:"user_id"`
 	UID          string    `json:"uid"`
 	ActID        uint32    `json:"act_id"`
 	CompareHash  string    `json:"compare_hash"`
