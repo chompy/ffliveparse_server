@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"../act"
+	"../app"
 	"../user"
 )
 
@@ -184,7 +185,7 @@ func (s *SqliteHandler) Store(data []interface{}) error {
 					encounter.Zone,
 					encounter.Damage,
 					encounter.SuccessLevel,
-					true,
+					encounter.HasLogs,
 				)
 				if err != nil {
 					return err
@@ -309,8 +310,9 @@ func (s *SqliteHandler) Store(data []interface{}) error {
 }
 
 // FetchBytes - retrieve data bytes from sqlite (gzip compressed)
-func (s *SqliteHandler) FetchBytes(params map[string]interface{}) ([]byte, error) {
-	return nil, nil
+func (s *SqliteHandler) FetchBytes(params map[string]interface{}) ([]byte, int, error) {
+	// not used
+	return nil, 0, nil
 }
 
 // appendWhereQueryString - append whery query string
@@ -323,46 +325,224 @@ func (s *SqliteHandler) appendWhereQueryString(original string, append string) s
 }
 
 // Fetch - retrieve data from sqlite
-func (s *SqliteHandler) Fetch(params map[string]interface{}) ([]interface{}, error) {
+func (s *SqliteHandler) Fetch(params map[string]interface{}) ([]interface{}, int, error) {
 	dType := ParamsGetType(params)
 	if dType == "" {
-		return nil, nil
+		return nil, 0, nil
 	}
+	totalCount := 0
 	output := make([]interface{}, 0)
 	switch dType {
 	case StoreTypeEncounter:
 		{
+			// build 'WHERE' query based on params
 			sqlQueryParams := make([]interface{}, 0)
-			sqlQueryStr := `
-				SELECT uid, act_id, compare_hash, start_time, end_time, zone, damage, success_level 
-				FROM encounter 
-				WHERE
-			`
 			sqlWhereQueryStr := ""
-
 			for key := range params {
 				switch key {
 				case "uid":
 					{
-						val := ParamGetUID(params)
+						val := ParamGetString(params, key)
 						sqlWhereQueryStr = s.appendWhereQueryString(sqlWhereQueryStr, "uid = ?")
+						sqlQueryParams = append(sqlQueryParams, val)
+						break
+					}
+				case "user_id":
+					{
+						val := ParamGetInt(params, key)
+						sqlWhereQueryStr = s.appendWhereQueryString(sqlWhereQueryStr, "user_id = ?")
 						sqlQueryParams = append(sqlQueryParams, val)
 						break
 					}
 				case "query":
 					{
-						val := ParamGetString(params, "query")
+						val := ParamGetString(params, key)
 						sqlWhereQueryStr = s.appendWhereQueryString(sqlWhereQueryStr, "(zone LIKE ? OR player.name LIKE ?)")
 						sqlQueryParams = append(sqlQueryParams, "%"+val+"%", "%"+val+"%")
+						break
+					}
+				case "start":
+				case "start_time":
+				case "start_date":
+					{
+						val := ParamGetTime(params, key)
+						sqlWhereQueryStr = s.appendWhereQueryString(sqlWhereQueryStr, "DATETIME(start_time) >= ?")
+						sqlQueryParams = append(sqlQueryParams, val.UTC())
+						break
+					}
+				case "end":
+				case "end_time":
+				case "end_date":
+					{
+						val := ParamGetTime(params, key)
+						sqlWhereQueryStr = s.appendWhereQueryString(sqlWhereQueryStr, "DATETIME(end_time) >= ?")
+						sqlQueryParams = append(sqlQueryParams, val.UTC())
 						break
 					}
 				}
 			}
 			if sqlWhereQueryStr != "" {
-				// do stuff
+				sqlWhereQueryStr = "WHERE " + sqlWhereQueryStr
+			}
+			// build the rest of the query
+			sqlQueryStr := `
+				SELECT 
+				uid, act_id, compare_hash, start_time, end_time, zone, damage, success_level, has_logs
+				(SELECT COUNT(*) FROM encounter ` + sqlWhereQueryStr + `)
+				FROM 
+				encounter 
+				` + sqlWhereQueryStr + `
+				LIMIT ?
+				OFFSET ?
+			`
+			// double up query params for COUNT query
+			sqlQueryParams = append(sqlQueryParams, sqlQueryParams...)
+			// offset/limit
+			sqlQueryParams = append(sqlQueryParams, ParamGetInt(params, "offset"))
+			sqlQueryParams = append(sqlQueryParams, app.PastEncounterFetchLimit)
+			// fetch results
+			rows, err := s.db.Query(
+				sqlQueryStr,
+				sqlQueryParams,
+			)
+			if err != nil {
+				return nil, 0, err
+			}
+			defer rows.Close()
+			// itterate rows, add to output
+			for rows.Next() {
+				encounter := act.Encounter{}
+				var compareHash sql.NullString
+				err := rows.Scan(
+					&encounter.UID,
+					&encounter.ActID,
+					&compareHash,
+					&encounter.StartTime,
+					&encounter.EndTime,
+					&encounter.Zone,
+					&encounter.Damage,
+					&encounter.SuccessLevel,
+					&encounter.HasLogs,
+					&totalCount,
+				)
+				if err != nil {
+					return nil, 0, err
+				}
+				if compareHash.Valid {
+					encounter.CompareHash = compareHash.String
+				}
+				output = append(output, encounter)
 			}
 			break
 		}
+	case StoreTypeCombatant:
+		{
+			// build 'WHERE' query based on params
+			sqlQueryParams := make([]interface{}, 0)
+			sqlWhereQueryStr := ""
+			for key := range params {
+				switch key {
+				case "uid":
+				case "encounter_uid":
+					{
+						val := ParamGetString(params, key)
+						sqlWhereQueryStr = s.appendWhereQueryString(sqlWhereQueryStr, "encounter_uid = ?")
+						sqlQueryParams = append(sqlQueryParams, val)
+						break
+					}
+				case "user_id":
+					{
+						val := ParamGetInt(params, key)
+						sqlWhereQueryStr = s.appendWhereQueryString(sqlWhereQueryStr, "user_id = ?")
+						sqlQueryParams = append(sqlQueryParams, val)
+						break
+					}
+				}
+			}
+			if sqlWhereQueryStr != "" {
+				sqlWhereQueryStr = "WHERE " + sqlWhereQueryStr
+			}
+			// build rest of query
+			sqlQueryStr := `
+				SELECT 
+				encounter_uid, player_id, time, job, damage, damage_taken, damage_healed, deaths, hits, heals, kills,
+				player.name, player.act_name, player.world_name
+				(SELECT COUNT(*) FROM combatant ` + sqlWhereQueryStr + `)
+				FROM
+				combatant
+				INNER JOIN 
+				player ON player.id = combatant.player_id
+				` + sqlWhereQueryStr + `
+				ORDER BY DATETIME(time) ASC
+			`
+			// fetch results
+			rows, err := s.db.Query(
+				sqlQueryStr,
+				sqlQueryParams,
+			)
+			if err != nil {
+				return nil, 0, err
+			}
+			defer rows.Close()
+			// itterate rows, add to output
+			var worldName sql.NullString
+			var actName sql.NullString
+			var combatantTime NullTime
+			for rows.Next() {
+				player := act.Player{}
+				combatant := act.Combatant{}
+				err := rows.Scan(
+					&player.ID,
+					&combatant.EncounterUID,
+					&combatantTime,
+					&combatant.Job,
+					&combatant.Damage,
+					&combatant.DamageTaken,
+					&combatant.DamageHealed,
+					&combatant.Deaths,
+					&combatant.Hits,
+					&combatant.Heals,
+					&combatant.Kills,
+					&player.Name,
+					&actName,
+					&worldName,
+					&totalCount,
+				)
+				if combatantTime.Valid {
+					combatant.Time = combatantTime.Time
+				}
+				if worldName.Valid {
+					player.World = worldName.String
+				}
+				if actName.Valid {
+					player.ActName = actName.String
+				}
+				if err != nil {
+					return nil, 0, err
+				}
+				output = append(output, combatant)
+			}
+
+			break
+		}
 	}
-	return output, nil
+	return output, totalCount, nil
+}
+
+// CleanUp - perform clean up operations
+func (s *SqliteHandler) CleanUp() error {
+	// delete encounters older then EncounterDeleteDays days
+	cleanUpDate := time.Now().Add(time.Duration(-app.EncounterDeleteDays*24) * time.Hour)
+	_, err := s.db.Exec(
+		"DELETE FROM encounter WHERE DATETIME(start_time) < ? AND NOT has_logs",
+		cleanUpDate,
+	)
+	if err != nil {
+		return err
+	}
+	// delete all combatants that don't have an encounter
+	_, err = s.db.Exec(
+		"DELETE FROM combatant WHERE (SELECT COUNT(*) FROM encounter WHERE uid = combatant.encounter_uid) = 0",
+	)
+	return err
 }

@@ -36,6 +36,7 @@ const StoreTypeUser = "User"
 type BaseHandler interface {
 	Init() error
 	Store(data []interface{}) error
-	FetchBytes(params map[string]interface{}) ([]byte, error)
-	Fetch(params map[string]interface{}) ([]interface{}, error)
+	FetchBytes(params map[string]interface{}) ([]byte, int, error)
+	Fetch(params map[string]interface{}) ([]interface{}, int, error)
+	CleanUp() error
 }

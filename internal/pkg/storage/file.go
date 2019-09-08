@@ -123,19 +123,26 @@ func (f *FileHandler) Store(data []interface{}) error {
 }
 
 // FetchBytes - retrieve data bytes from file system (gzip compressed)
-func (f *FileHandler) FetchBytes(params map[string]interface{}) ([]byte, error) {
+func (f *FileHandler) FetchBytes(params map[string]interface{}) ([]byte, int, error) {
 	dType := ParamsGetType(params)
 	if dType == "" {
-		return nil, nil
+		return nil, 0, nil
 	}
 	uid := ParamGetUID(params)
 	if uid == "" {
-		return nil, nil
+		return nil, 0, nil
 	}
-	return ioutil.ReadFile(f.getFilePath(dType, uid))
+	res, err := ioutil.ReadFile(f.getFilePath(dType, uid))
+	return res, 1, err
 }
 
 // Fetch - retrieve data from file system
-func (f *FileHandler) Fetch(params map[string]interface{}) ([]interface{}, error) {
-	return nil, nil
+func (f *FileHandler) Fetch(params map[string]interface{}) ([]interface{}, int, error) {
+	// not used
+	return nil, 0, nil
+}
+
+// CleanUp - perform clean up operations
+func (f *FileHandler) CleanUp() error {
+	return nil
 }

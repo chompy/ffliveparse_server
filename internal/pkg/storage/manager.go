@@ -78,22 +78,37 @@ func (m *Manager) Store(data []interface{}) error {
 }
 
 // FetchBytes - fetch stored object bytes
-func (m *Manager) FetchBytes(params map[string]interface{}) ([][]byte, error) {
+func (m *Manager) FetchBytes(params map[string]interface{}) ([][]byte, int, error) {
 	output := make([][]byte, 0)
+	totalCount := 0
 	for index := range m.handlers {
-		byteData, err := m.handlers[index].FetchBytes(params)
+		byteData, count, err := m.handlers[index].FetchBytes(params)
 		if err != nil {
-			return nil, err
+			return nil, 0, err
 		}
 		output = append(
 			output,
 			byteData,
 		)
+		totalCount += count
 	}
-	return output, nil
+	return output, totalCount, nil
 }
 
 // Fetch - fetch stored object
-func (m *Manager) Fetch(params map[string]interface{}) ([]interface{}, error) {
-	return nil, nil
+func (m *Manager) Fetch(params map[string]interface{}) ([]interface{}, int, error) {
+	output := make([]interface{}, 0)
+	totalCount := 0
+	for index := range m.handlers {
+		res, count, err := m.handlers[index].Fetch(params)
+		if err != nil {
+			return nil, 0, err
+		}
+		output = append(
+			output,
+			res...,
+		)
+		totalCount += count
+	}
+	return output, totalCount, nil
 }
