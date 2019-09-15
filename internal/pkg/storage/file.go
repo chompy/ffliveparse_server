@@ -131,13 +131,37 @@ func (f *FileHandler) FetchBytes(params map[string]interface{}) ([]byte, int, er
 	if uid == "" {
 		return nil, 0, nil
 	}
-	res, err := ioutil.ReadFile(f.getFilePath(dType, uid))
-	return res, 1, err
+	res, _ := ioutil.ReadFile(f.getFilePath(dType, uid))
+	if len(res) > 0 {
+		return res, 1, nil
+	}
+	return nil, 0, nil
 }
 
 // Fetch - retrieve data from file system
 func (f *FileHandler) Fetch(params map[string]interface{}) ([]interface{}, int, error) {
-	// not used
+	/*byteData, count, err := f.FetchBytes(params)
+	if err != nil {
+		return nil, 0, err
+	}
+	if count == 0 {
+		return nil, 0, nil
+	}
+	dType := ParamsGetType(params)
+	switch dType {
+	case StoreTypeCombatant:
+		{
+			combatants, _, err := data.DecodeCombatantBytesFile(byteData)
+			if err != nil {
+				return nil, 0, err
+			}
+			output := make([]interface{}, len(combatants))
+			for index, combatant := range combatants {
+				output[index] = combatant
+			}
+			return output, len(combatants), nil
+		}
+	}*/
 	return nil, 0, nil
 }
 

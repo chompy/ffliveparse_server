@@ -1,3 +1,8 @@
+1.38
+- Created storage abstraction layer to better handle storing to database + filesystem.
+- Other behind the scenes reworkings.
+- Increased global stat generation to 6 hours.
+
 1.37
 - Added 'Overview' view with raid DPS, boss HP, est time to kill, etc.
 - Encounters that are manually restarted mid encounter should no longer count as a clear.

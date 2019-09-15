@@ -55,3 +55,36 @@ func (l *LogLine) FromBytes(data []byte) error {
 	l.LogLine = readString(data, &pos)
 	return nil
 }
+
+// DecodeLogLineBytesFile - Create LogLine struct from data stored in log file
+func DecodeLogLineBytesFile(data []byte) ([]LogLine, int, error) {
+	// should be compressed
+	logBytes, err := DecompressBytes(data)
+	if err != nil {
+		return nil, 0, err
+	}
+	// itterate log bytes and convert to log line
+	pos := 0
+	logLines := make([]LogLine, 0)
+	for pos < len(logBytes) {
+		// check 'type' byte
+		if logBytes[pos] != DataTypeLogLine {
+			return nil, 0, errors.New("invalid data type for LogLine")
+		}
+		// read data
+		pos = pos + 1
+		encounterUID := readString(logBytes, &pos)
+		time := readTime(logBytes, &pos)
+		logLineString := readString(logBytes, &pos)
+		// append to log lines array
+		logLines = append(
+			logLines,
+			LogLine{
+				EncounterUID: encounterUID,
+				Time:         time,
+				LogLine:      logLineString,
+			},
+		)
+	}
+	return logLines, pos, nil
+}

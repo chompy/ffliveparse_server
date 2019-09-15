@@ -126,7 +126,7 @@ func (s *SqliteHandler) createCombatantTable() error {
 			hits INTEGER,
 			heals INTEGER,
 			kills INTEGER,
-			CONSTRAINT combatant_unique UNIQUE (user_id, encounter_uid, player_id, time)
+			CONSTRAINT combatant_unique UNIQUE (user_id, encounter_uid, player_id)
 		)
 	`)
 	if err != nil {
@@ -645,6 +645,8 @@ func (s *SqliteHandler) Fetch(params map[string]interface{}) ([]interface{}, int
 				INNER JOIN player ON player.id = combatant.player_id
 				WHERE combatant.hits > 0 AND combatant.time > 0 AND encounter.compare_hash != "" AND encounter.success_level = 1
 				GROUP BY encounter.compare_hash, combatant.player_id
+				ORDER BY DATETIME(encounter.start_time) DESC
+				LIMIT 3000
 			`
 			// fetch results
 			rows, err := s.db.Query(

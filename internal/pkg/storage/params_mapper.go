@@ -53,7 +53,11 @@ func ParamGetID(params map[string]interface{}) int {
 
 // ParamGetUID - fetch uid from param list
 func ParamGetUID(params map[string]interface{}) string {
-	return ParamGetString(params, "uid")
+	val := ParamGetString(params, "uid")
+	if val == "" {
+		val = ParamGetString(params, "encounter_uid")
+	}
+	return val
 }
 
 // ParamGetDate - fetch date from param list

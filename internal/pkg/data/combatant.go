@@ -92,25 +92,52 @@ func CombatantsToBytes(value *[]Combatant) []byte {
 
 // FromBytes - Convert bytes to combatant
 func (c *Combatant) FromBytes(data []byte) error {
+	pos := 0
+	return CombatantFromBytes(data, &pos, c)
+}
+
+// CombatantFromBytes - read combatant from bytes
+func CombatantFromBytes(data []byte, pos *int, c *Combatant) error {
 	if data[0] != DataTypeCombatant {
 		return errors.New("invalid data type for Combatant")
 	}
-	pos := 1
-	actEncounterID := readUint32(data, &pos)
+	*pos++
+	actEncounterID := readUint32(data, pos)
 	c.Player = Player{
-		ID:   readInt32(data, &pos),
-		Name: readString(data, &pos),
+		ID:   readInt32(data, pos),
+		Name: readString(data, pos),
 	}
 	c.Player.ActName = c.Player.Name
 	c.ActEncounterID = actEncounterID
-	c.Job = readString(data, &pos)
-	c.Damage = readInt32(data, &pos)
-	c.DamageTaken = readInt32(data, &pos)
-	c.DamageHealed = readInt32(data, &pos)
-	c.Deaths = readInt32(data, &pos)
-	c.Hits = readInt32(data, &pos)
-	c.Heals = readInt32(data, &pos)
-	c.Kills = readInt32(data, &pos)
+	c.Job = readString(data, pos)
+	c.Damage = readInt32(data, pos)
+	c.DamageTaken = readInt32(data, pos)
+	c.DamageHealed = readInt32(data, pos)
+	c.Deaths = readInt32(data, pos)
+	c.Hits = readInt32(data, pos)
+	c.Heals = readInt32(data, pos)
+	c.Kills = readInt32(data, pos)
 	c.Time = time.Now()
 	return nil
+}
+
+// DecodeCombatantBytesFile - Create combatant struct from data stored in combatant file
+func DecodeCombatantBytesFile(data []byte) ([]Combatant, int, error) {
+	// should be compressed
+	combatantBytes, err := DecompressBytes(data)
+	if err != nil {
+		return nil, 0, err
+	}
+	// itterate log bytes and convert to log line
+	pos := 0
+	combatants := make([]Combatant, 0)
+	for pos < len(combatantBytes) {
+		combatant := Combatant{}
+		err := CombatantFromBytes(combatantBytes, &pos, &combatant)
+		if err != nil {
+			return combatants, pos, err
+		}
+		combatants = append(combatants, combatant)
+	}
+	return combatants, pos, nil
 }

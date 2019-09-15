@@ -14,3 +14,4 @@ function fflpFixFooter()
 }
 window.addEventListener("load", fflpFixFooter);
 window.addEventListener("resize", fflpFixFooter);
+setInterval(fflpFixFooter, 1000);
