@@ -96,7 +96,7 @@ func HTTPStartServer(
 	events *emitter.Emitter,
 	storageManager *storage.Manager,
 	usageStatCollector *app.StatCollector,
-	playerStatTracker *data.StatsTracker,
+	playerStatTracker *act.StatsTracker,
 	devMode bool,
 ) {
 	// load html templates
@@ -449,7 +449,7 @@ func HTTPStartServer(
 		job := r.URL.Query().Get("job")
 		// fetch zones
 		zones := make([][]*data.PlayerStat, 0)
-		for _, zoneName := range data.StatTrackerZones {
+		for _, zoneName := range act.StatTrackerZones {
 			zones = append(
 				zones,
 				playerStatTracker.GetZoneStats(zoneName, job, statSort),

@@ -102,7 +102,7 @@ func (m *Manager) LoadFromWebIDString(webIDString string) (data.User, error) {
 // Save - save user data
 func (m *Manager) Save(ud *data.User) {
 	store := make([]interface{}, 1)
-	store[0] = &ud
+	store[0] = ud
 	m.storage.Store(store)
 	// TODO no error return?
 }

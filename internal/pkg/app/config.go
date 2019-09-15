@@ -71,7 +71,7 @@ const EncounterDeleteDays = 180
 const EncounterCleanUpRate = 1800000 // 30 minutes
 
 // StatTrackerRefreshRate - Rate at which stat tracker refreshes
-const StatTrackerRefreshRate = 300000 // 5 minutes
+const StatTrackerRefreshRate = 21600000 // 6 hours
 
 // GetVersionString - get version as string in format X.XX
 func GetVersionString() string {

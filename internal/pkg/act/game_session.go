@@ -201,6 +201,7 @@ func (s *GameSession) SaveEncounter() error {
 	}
 	s.EncounterCollector.Encounter.CompareHash = fmt.Sprintf("%x", h.Sum(nil))
 	// insert in to encounter table
+	s.EncounterCollector.Encounter.UserID = s.User.ID
 	store := make([]interface{}, 1)
 	store[0] = &s.EncounterCollector.Encounter
 	s.storage.Store(store)
@@ -209,12 +210,11 @@ func (s *GameSession) SaveEncounter() error {
 		// insert combatant
 		for _, combatant := range combatantSnapshots {
 			combatant.EncounterUID = s.EncounterCollector.Encounter.UID
-			store := make([]interface{}, 1)
+			combatant.UserID = s.User.ID
 			store[0] = &combatant
 			s.storage.Store(store)
 		}
 		// insert player
-		store := make([]interface{}, 1)
 		store[0] = &combatantSnapshots[0].Player
 		s.storage.Store(store)
 	}

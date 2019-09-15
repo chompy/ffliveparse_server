@@ -169,6 +169,7 @@ func (s *SqliteHandler) Store(objs []interface{}) error {
 		case *data.Encounter:
 			{
 				encounter := objs[index].(*data.Encounter)
+				log.Printf("[STORAGE][SQLITE] Store encounter '%s.'", encounter.UID)
 				stmt, err := s.db.Prepare(`
 					REPLACE INTO encounter
 					(uid, act_id, compare_hash, user_id, start_time, end_time, zone, damage, success_level, has_logs) VALUES
@@ -198,6 +199,7 @@ func (s *SqliteHandler) Store(objs []interface{}) error {
 		case *data.Combatant:
 			{
 				combatant := objs[index].(*data.Combatant)
+				log.Printf("[STORAGE][SQLITE] Store combatant '%d' from encounter '%s.'", combatant.Player.ID, combatant.EncounterUID)
 				stmt, err := s.db.Prepare(`
 					REPLACE INTO combatant
 					(user_id, encounter_uid, player_id, time, job, damage, damage_taken, damage_healed, deaths, hits, heals, kills) VALUES
@@ -229,6 +231,7 @@ func (s *SqliteHandler) Store(objs []interface{}) error {
 		case *data.Player:
 			{
 				player := objs[index].(*data.Player)
+				log.Printf("[STORAGE][SQLITE] Store player '%d.'", player.ID)
 				insStmt, err := s.db.Prepare(`
 					INSERT OR IGNORE INTO player
 					(id, name, act_name) VALUES
@@ -267,6 +270,7 @@ func (s *SqliteHandler) Store(objs []interface{}) error {
 		case *data.User:
 			{
 				user := objs[index].(*data.User)
+				log.Printf("[STORAGE][SQLITE] Store user '%d'", user.ID)
 				// insert
 				if user.ID == 0 {
 					stmt, err := s.db.Prepare(`
@@ -398,6 +402,13 @@ func (s *SqliteHandler) Fetch(params map[string]interface{}) ([]interface{}, int
 						}
 						sqlWhereQueryStr = s.appendWhereQueryString(sqlWhereQueryStr, "DATETIME(end_time) >= ?")
 						sqlQueryParams = append(sqlQueryParams, val.UTC())
+						break
+					}
+				case "log_clean":
+					{
+						cleanUpDate := time.Now().Add(time.Duration(-app.EncounterLogDeleteDays*24) * time.Hour)
+						sqlWhereQueryStr = s.appendWhereQueryString(sqlWhereQueryStr, "DATETIME(start_time) < ?")
+						sqlQueryParams = append(sqlQueryParams, cleanUpDate.UTC())
 						break
 					}
 				}
@@ -620,6 +631,73 @@ func (s *SqliteHandler) Fetch(params map[string]interface{}) ([]interface{}, int
 					return nil, 0, err
 				}
 				output = append(output, user)
+			}
+			break
+		}
+	case StoreTypePlayerStat:
+		{
+			sqlQueryStr := `
+				SELECT encounter.uid, encounter.compare_hash, encounter.zone, encounter.start_time, encounter.end_time,
+				encounter.user_id, player.id, player.name, player.world_name,
+				job, MAX(combatant.damage), combatant.damage_taken, combatant.damage_healed,
+				combatant.deaths, combatant.hits, combatant.heals, combatant.kills FROM combatant
+				INNER JOIN encounter ON encounter.uid = combatant.encounter_uid
+				INNER JOIN player ON player.id = combatant.player_id
+				WHERE combatant.hits > 0 AND combatant.time > 0 AND encounter.compare_hash != "" AND encounter.success_level = 1
+				GROUP BY encounter.compare_hash, combatant.player_id
+			`
+			// fetch results
+			rows, err := s.db.Query(
+				sqlQueryStr,
+			)
+			if err != nil {
+				return nil, 0, err
+			}
+			defer rows.Close()
+			// itterate rows, add to output
+			for rows.Next() {
+				combatant := data.Combatant{
+					Player: data.Player{},
+				}
+				encounter := data.Encounter{}
+				var worldName sql.NullString
+				userID := int64(0)
+				err := rows.Scan(
+					&encounter.UID,
+					&encounter.CompareHash,
+					&encounter.Zone,
+					&encounter.StartTime,
+					&encounter.EndTime,
+					&userID,
+					&combatant.Player.ID,
+					&combatant.Player.Name,
+					&worldName,
+					&combatant.Job,
+					&combatant.Damage,
+					&combatant.DamageTaken,
+					&combatant.DamageHealed,
+					&combatant.Deaths,
+					&combatant.Hits,
+					&combatant.Heals,
+					&combatant.Kills,
+				)
+				if err != nil {
+					return nil, 0, err
+				}
+				if worldName.Valid {
+					combatant.Player.World = worldName.String
+				}
+				combatant.EncounterUID = encounter.UID
+				encounterTime := encounter.EndTime.Sub(encounter.StartTime)
+				webIDStr, _ := data.GetWebIDStringFromID(userID)
+				playerStat := data.PlayerStat{
+					Combatant: combatant,
+					Encounter: encounter,
+					DPS:       float64(combatant.Damage) / float64(encounterTime.Seconds()),
+					HPS:       float64(combatant.DamageHealed) / float64(encounterTime.Seconds()),
+					URL:       "/" + webIDStr + "/" + encounter.UID,
+				}
+				output = append(output, playerStat)
 			}
 			break
 		}

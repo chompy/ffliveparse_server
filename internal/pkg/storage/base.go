@@ -32,6 +32,9 @@ const StoreTypePlayer = "Player"
 // StoreTypeUser - denotes user storage type
 const StoreTypeUser = "User"
 
+// StoreTypePlayerStat - denotes player stat storage type
+const StoreTypePlayerStat = "PlayerStat"
+
 // BaseHandler - base storage handler
 type BaseHandler interface {
 	Init() error

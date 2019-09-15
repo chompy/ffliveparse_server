@@ -17,7 +17,12 @@ along with FFLiveParse.  If not, see <https://www.gnu.org/licenses/>.
 
 package storage
 
-import "time"
+import (
+	"log"
+	"time"
+
+	"../app"
+)
 
 // Manager - manage object storage
 type Manager struct {
@@ -111,4 +116,16 @@ func (m *Manager) Fetch(params map[string]interface{}) ([]interface{}, int, erro
 		totalCount += count
 	}
 	return output, totalCount, nil
+}
+
+// StartCleanUp - start clean up process
+func (m *Manager) StartCleanUp() {
+	for range time.Tick(app.EncounterCleanUpRate * time.Millisecond) {
+		start := time.Now()
+		log.Println("[STORAGE] Begin storage clean up.")
+		for index := range m.handlers {
+			m.handlers[index].CleanUp()
+		}
+		log.Println("[STORAGE] Storage clean up complete. (", time.Now().Sub(start), ")")
+	}
 }

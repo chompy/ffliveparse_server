@@ -8,7 +8,6 @@ import (
 
 	"./internal/pkg/act"
 	"./internal/pkg/app"
-	"./internal/pkg/database"
 	"./internal/pkg/storage"
 	"./internal/pkg/user"
 	"./internal/pkg/web"
@@ -57,13 +56,6 @@ func main() {
 		panic(err)
 	}
 
-	// create database handler
-	dbHandler, err := database.NewHandler(&events)
-	if err != nil {
-		panic(err)
-	}
-	go dbHandler.Handle()
-
 	// create user manager
 	userManager := user.NewManager(&storageManager)
 
@@ -73,20 +65,15 @@ func main() {
 	defer actManager.ClearAllSessions()
 
 	// player stat tracker on seperate threads
-	/*psEvents := emitter.Emitter{}
-	psDbHandler, err := database.NewHandler(&psEvents)
-	go psDbHandler.Handle()
-	if err != nil {
-		panic(err)
-	}
-	//playerStatTracker := act.NewStatsTracker(&psEvents)
-	go playerStatTracker.Start()*/
+	playerStatTracker := act.NewStatsTracker(&storageManager)
+	go playerStatTracker.Start()
 
 	// clean up old encounters
-	// TODO
+	go storageManager.StartCleanUp()
+	go act.CleanUpEncounters(&storageManager)
 
 	// start http server
-	go web.HTTPStartServer(uint16(*httpPort), &userManager, &actManager, &events, &storageManager, &usageStatCollector, nil, *devModePtr)
+	go web.HTTPStartServer(uint16(*httpPort), &userManager, &actManager, &events, &storageManager, &usageStatCollector, &playerStatTracker, *devModePtr)
 
 	// start act listen server
 	act.Listen(uint16(*actPort), &actManager)
