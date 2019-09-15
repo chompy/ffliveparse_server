@@ -20,12 +20,11 @@ package database
 import (
 	"database/sql"
 
-	"../act"
-	"../user"
+	"../data"
 )
 
 // FindPlayerStats - player stats for given zone
-func FindPlayerStats(db *sql.DB, playerStats *[]act.PlayerStat) error {
+func FindPlayerStats(db *sql.DB, playerStats *[]data.PlayerStat) error {
 	// build query
 	dbQueryStr := `
 	SELECT encounter.uid, encounter.compare_hash, encounter.zone, encounter.start_time, encounter.end_time,
@@ -46,10 +45,10 @@ func FindPlayerStats(db *sql.DB, playerStats *[]act.PlayerStat) error {
 	}
 	defer rows.Close()
 	for rows.Next() {
-		combatant := act.Combatant{
-			Player: act.Player{},
+		combatant := data.Combatant{
+			Player: data.Player{},
 		}
-		encounter := act.Encounter{}
+		encounter := data.Encounter{}
 		var worldName sql.NullString
 		userID := int64(0)
 		err := rows.Scan(
@@ -79,8 +78,8 @@ func FindPlayerStats(db *sql.DB, playerStats *[]act.PlayerStat) error {
 		}
 		combatant.EncounterUID = encounter.UID
 		encounterTime := encounter.EndTime.Sub(encounter.StartTime)
-		webIDStr, _ := user.GetWebIDStringFromID(userID)
-		playerStat := act.PlayerStat{
+		webIDStr, _ := data.GetWebIDStringFromID(userID)
+		playerStat := data.PlayerStat{
 			Combatant: combatant,
 			Encounter: encounter,
 			DPS:       float64(combatant.Damage) / float64(encounterTime.Seconds()),

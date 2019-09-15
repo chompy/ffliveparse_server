@@ -24,12 +24,11 @@ import (
 	"os"
 	"path/filepath"
 
-	"../act"
+	"../data"
 )
 
 // FileHandler - handles file storage
 type FileHandler struct {
-	BaseHandler
 	path string
 }
 
@@ -62,20 +61,20 @@ func (f *FileHandler) Init() error {
 	return nil
 }
 
-// Store - store data to file system
-func (f *FileHandler) Store(data []interface{}) error {
+// Store - store data objects to file system
+func (f *FileHandler) Store(objs []interface{}) error {
 	uid := ""
 	dType := ""
 	var dFile *os.File
 	var gzWriter *gzip.Writer
 	// itterate data to store
-	for index := range data {
+	for index := range objs {
 		var byteData []byte
-		switch data[index].(type) {
-		case *act.LogLine:
+		switch objs[index].(type) {
+		case *data.LogLine:
 			{
 				// log line
-				logLine := data[index].(*act.LogLine)
+				logLine := objs[index].(*data.LogLine)
 				if logLine.EncounterUID == "" {
 					break
 				}
@@ -88,10 +87,10 @@ func (f *FileHandler) Store(data []interface{}) error {
 				dType = StoreTypeLogLine
 				break
 			}
-		case *act.Combatant:
+		case *data.Combatant:
 			{
 				// combatant
-				combatant := data[index].(*act.Combatant)
+				combatant := objs[index].(*data.Combatant)
 				if combatant.EncounterUID == "" {
 					break
 				}

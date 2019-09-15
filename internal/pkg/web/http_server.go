@@ -44,6 +44,8 @@ import (
 
 	"../act"
 	"../app"
+	"../data"
+	"../storage"
 	"../user"
 )
 
@@ -55,7 +57,7 @@ var htmlTemplates map[string]*template.Template
 
 // templateData - Struct containing data to be made available to html template
 type templateData struct {
-	User                    user.Data
+	User                    data.User
 	HasUser                 bool
 	WebIDString             string
 	EncounterUID            string
@@ -83,7 +85,7 @@ type templateData struct {
 // websocketConnection - Websocket connection data associated with user data
 type websocketConnection struct {
 	connection *websocket.Conn
-	userData   user.Data
+	userData   data.User
 }
 
 // HTTPStartServer - Start HTTP server
@@ -92,8 +94,9 @@ func HTTPStartServer(
 	userManager *user.Manager,
 	actManager *act.Manager,
 	events *emitter.Emitter,
+	storageManager *storage.Manager,
 	usageStatCollector *app.StatCollector,
-	playerStatTracker *act.StatsTracker,
+	playerStatTracker *data.StatsTracker,
 	devMode bool,
 ) {
 	// load html templates
@@ -174,7 +177,7 @@ func HTTPStartServer(
 		}
 		// log
 
-		log.Println("[WEB] New web socket session for ACT user", userData.ID, "from", ws.Request().RemoteAddr)
+		log.Println("[WEB] New web socket session for user", userData.ID, "from", ws.Request().RemoteAddr)
 		// get act data from web ID
 		actSession, err := actManager.GetSessionWithWebID(userID)
 		if err != nil {
@@ -184,7 +187,7 @@ func HTTPStartServer(
 		// relay previous encounter data if encounter id was provided
 		if encounterUID != "" && (actSession == nil || encounterUID != actSession.EncounterCollector.Encounter.UID) {
 			log.Println("[WEB] Load previous encounter data (EncounterUID:", encounterUID, ", UserID:", userData.ID, ")")
-			previousEncounter, err := act.GetPreviousEncounter(events, userData, encounterUID)
+			previousEncounter, err := act.GetPreviousEncounter(storageManager, userData, encounterUID)
 			if err != nil {
 				log.Println("[WEB] Error when retreiving previous encounter", encounterUID, "for user", userData.ID, ",", err)
 				return
@@ -388,7 +391,7 @@ func HTTPStartServer(
 		}
 		totalEncounterCount := 0
 		td.Encounters, err = act.GetPreviousEncounters(
-			events,
+			storageManager,
 			userData,
 			int(offset),
 			td.HistorySearchQuery,
@@ -445,8 +448,8 @@ func HTTPStartServer(
 		}
 		job := r.URL.Query().Get("job")
 		// fetch zones
-		zones := make([][]*act.PlayerStat, 0)
-		for _, zoneName := range act.StatTrackerZones {
+		zones := make([][]*data.PlayerStat, 0)
+		for _, zoneName := range data.StatTrackerZones {
 			zones = append(
 				zones,
 				playerStatTracker.GetZoneStats(zoneName, job, statSort),
@@ -697,7 +700,7 @@ func getBaseTemplateData() templateData {
 	}
 }
 
-func addUserToTemplateData(td *templateData, u user.Data) {
+func addUserToTemplateData(td *templateData, u data.User) {
 	td.User = u
 	td.WebIDString, _ = u.GetWebIDString()
 	td.HasUser = true
@@ -711,7 +714,7 @@ func displayError(w http.ResponseWriter, message string, statusCode int) {
 	htmlTemplates["error.tmpl"].ExecuteTemplate(w, "base.tmpl", td)
 }
 
-func getWebKeyCookie(user user.Data, r *http.Request) http.Cookie {
+func getWebKeyCookie(user data.User, r *http.Request) http.Cookie {
 	return http.Cookie{
 		Name:    webKeyCookieName,
 		Value:   user.WebKey,
@@ -735,23 +738,23 @@ func sendInitData(ws *websocket.Conn, gameSession *act.GameSession) {
 		for _, combatantSnapshots := range combatants {
 			if len(combatantSnapshots) > 0 {
 				combatantSnapshots[0].EncounterUID = encounterUID
-				dataBytes = append(dataBytes, act.CombatantsToBytes(&combatantSnapshots)...)
+				dataBytes = append(dataBytes, data.CombatantsToBytes(&combatantSnapshots)...)
 			}
 		}
 	}
 	// add flag indicating if ACT is active
-	isActiveFlag := act.Flag{
+	isActiveFlag := data.Flag{
 		Name:  "active",
 		Value: gameSession != nil && gameSession.IsActive(),
 	}
 	dataBytes = append(dataBytes, isActiveFlag.ToBytes()...)
 	// compress
-	compressData, err := act.CompressBytes(dataBytes)
+	compressData, err := data.CompressBytes(dataBytes)
 	if err != nil {
 		log.Println("[WEB] Error when compressing init data,", err)
 		return
 	}
-	log.Println("[WEB] Send", len(compressData), "bytes (encounter/combatants) of data to", ws.RemoteAddr)
+	log.Println("[WEB] Send", len(compressData), "bytes (encounter/combatants) of data to", ws.Request().RemoteAddr)
 	websocket.Message.Send(ws, compressData)
 	// send logs
 	if gameSession != nil && gameSession.EncounterCollector.Encounter.UID != "" {
@@ -763,12 +766,12 @@ func sendInitData(ws *websocket.Conn, gameSession *act.GameSession) {
 		}
 		// compress if from temp path
 		if logPath == gameSession.GetLogTempPath() {
-			logBytes, err = act.CompressBytes(logBytes)
+			logBytes, err = data.CompressBytes(logBytes)
 			if err != nil {
 				log.Println("[WEB] Error when compressing log line data,", err)
 			}
 		}
-		log.Println("[WEB] Send", len(logBytes), "bytes (log) of data to", ws.RemoteAddr)
+		log.Println("[WEB] Send", len(logBytes), "bytes (log) of data to", ws.Request().RemoteAddr)
 		websocket.Message.Send(ws, logBytes)
 	}
 

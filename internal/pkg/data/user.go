@@ -15,7 +15,7 @@ You should have received a copy of the GNU General Public License
 along with FFLiveParse.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-package user
+package data
 
 import (
 	"errors"
@@ -27,8 +27,8 @@ import (
 
 const webIDSalt = "aedb2d139b653ee8aeeed9010ed053e94cb01$#!756"
 
-// Data - data about an user
-type Data struct {
+// User - data about an user
+type User struct {
 	ID        int64
 	Created   time.Time
 	Accessed  time.Time
@@ -37,11 +37,11 @@ type Data struct {
 	webIDHash string
 }
 
-// NewData - create new user data
-func NewData() Data {
+// NewUser - create new user data
+func NewUser() User {
 	uploadKeyGen := xid.New()
 	webKeyGen := xid.New()
-	return Data{
+	return User{
 		Created:   time.Now(),
 		Accessed:  time.Now(),
 		UploadKey: uploadKeyGen.String(),
@@ -50,16 +50,16 @@ func NewData() Data {
 }
 
 // GetWebIDString - get web id string used to access data
-func (d *Data) GetWebIDString() (string, error) {
-	if d.webIDHash != "" {
-		return d.webIDHash, nil
+func (u *User) GetWebIDString() (string, error) {
+	if u.webIDHash != "" {
+		return u.webIDHash, nil
 	}
 	var err error
-	d.webIDHash, err = GetWebIDStringFromID(d.ID)
+	u.webIDHash, err = GetWebIDStringFromID(u.ID)
 	if err != nil {
 		return "", err
 	}
-	return d.webIDHash, nil
+	return u.webIDHash, nil
 }
 
 // GetWebIDStringFromID - convert user id to web id string

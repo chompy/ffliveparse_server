@@ -15,12 +15,10 @@ You should have received a copy of the GNU General Public License
 along with FFLiveParse.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-package act
+package data
 
-// Player - Data about a player
-type Player struct {
-	ID      int32  `json:"id"`
-	Name    string `json:"name"`
-	ActName string `json:"act_name"`
-	World   string `json:"world"`
+// ByteEncodable - data that can be encoded to and from bytes
+type ByteEncodable interface {
+	ToBytes() []byte
+	FromBytes(data []byte) error
 }

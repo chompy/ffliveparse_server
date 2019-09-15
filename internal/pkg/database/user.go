@@ -21,7 +21,7 @@ import (
 	"database/sql"
 	"time"
 
-	"../user"
+	"../data"
 )
 
 // CreateUserTable - create user database table
@@ -47,7 +47,7 @@ func CreateUserTable(db *sql.DB) error {
 }
 
 // SaveUser - save user to database
-func SaveUser(user *user.Data, db *sql.DB) error {
+func SaveUser(user *data.User, db *sql.DB) error {
 	// insert
 	if user.ID == 0 {
 		stmt, err := db.Prepare(`
@@ -87,7 +87,7 @@ func SaveUser(user *user.Data, db *sql.DB) error {
 }
 
 // FetchUser - fetch user from database
-func FetchUser(userID int, db *sql.DB, user *user.Data) error {
+func FetchUser(userID int, db *sql.DB, user *data.User) error {
 	rows, err := db.Query(
 		`SELECT id, created, accessed, upload_key, web_key FROM user WHERE id = ? LIMIT 1`,
 		userID,
@@ -110,7 +110,7 @@ func FetchUser(userID int, db *sql.DB, user *user.Data) error {
 }
 
 // FindUsers - find user with upload key or web key
-func FindUsers(webKey string, uploadKey string, db *sql.DB, users *[]user.Data) error {
+func FindUsers(webKey string, uploadKey string, db *sql.DB, users *[]data.User) error {
 	rows, err := db.Query(
 		`SELECT id, created, accessed, upload_key, web_key FROM user 
 			WHERE (web_key != "" AND web_key = ?) OR (upload_key != "" AND upload_key = ?)`,
@@ -122,7 +122,7 @@ func FindUsers(webKey string, uploadKey string, db *sql.DB, users *[]user.Data) 
 	}
 	defer rows.Close()
 	for rows.Next() {
-		user := user.Data{}
+		user := data.User{}
 		err = rows.Scan(
 			&user.ID,
 			&user.Created,

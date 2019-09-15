@@ -26,6 +26,8 @@ import (
 	"github.com/olebedev/emitter"
 
 	"../app"
+	"../data"
+	"../storage"
 	"../user"
 )
 
@@ -33,17 +35,19 @@ import (
 type Manager struct {
 	sessions    []GameSession
 	events      *emitter.Emitter
+	storage     *storage.Manager
 	userManager *user.Manager
 	devMode     bool
 }
 
 // NewManager - create new act manager
-func NewManager(events *emitter.Emitter, userManager *user.Manager, devMode bool) Manager {
+func NewManager(events *emitter.Emitter, sm *storage.Manager, userManager *user.Manager, devMode bool) Manager {
 	return Manager{
 		sessions:    make([]GameSession, 0),
 		events:      events,
 		userManager: userManager,
 		devMode:     devMode,
+		storage:     sm,
 	}
 }
 
@@ -51,10 +55,10 @@ func NewManager(events *emitter.Emitter, userManager *user.Manager, devMode bool
 func (m *Manager) ParseDataString(dataStr []byte, addr *net.UDPAddr) (*GameSession, error) {
 	sessObj := m.GetSessionWithAddr(addr)
 	switch dataStr[0] {
-	case DataTypeSession:
+	case data.DataTypeSession:
 		{
 			// decode session data string
-			sessionData := Session{}
+			sessionData := data.Session{}
 			err := sessionData.FromBytes(dataStr)
 			if err != nil {
 				return nil, err
@@ -76,7 +80,7 @@ func (m *Manager) ParseDataString(dataStr []byte, addr *net.UDPAddr) (*GameSessi
 					}
 				}
 				// create new data
-				gameSession, err := NewGameSession(sessionData, user, m.events)
+				gameSession, err := NewGameSession(sessionData, user, m.storage)
 				if err != nil {
 					return nil, err
 				}
@@ -91,8 +95,8 @@ func (m *Manager) ParseDataString(dataStr []byte, addr *net.UDPAddr) (*GameSessi
 				m.userManager.Save(&user)
 				log.Println("[ USER", gameSession.User.ID, "] Loaded ACT session for user ", user.ID, "from", addr, "(LoadedDataCount:", m.SessionCount(), ")")
 				// emit act active event
-				activeFlag := Flag{Name: "active", Value: true}
-				activeFlagBytes, err := CompressBytes(activeFlag.ToBytes())
+				activeFlag := data.Flag{Name: "active", Value: true}
+				activeFlagBytes, err := data.CompressBytes(activeFlag.ToBytes())
 				if err != nil {
 					return nil, err
 				}
@@ -110,14 +114,14 @@ func (m *Manager) ParseDataString(dataStr []byte, addr *net.UDPAddr) (*GameSessi
 			log.Println("[ USER", sessObj.User.ID, "] Updated ACT session for user", sessObj.User.ID, "from", addr, "(LoadedDataCount:", m.SessionCount(), ")")
 			break
 		}
-	case DataTypeEncounter:
+	case data.DataTypeEncounter:
 		{
 			// data required
 			if sessObj == nil {
 				return nil, errors.New("recieved Encounter with no matching data object")
 			}
 			// parse encounter data
-			encounter := Encounter{}
+			encounter := data.Encounter{}
 			err := encounter.FromBytes(dataStr)
 			if err != nil {
 				return nil, err
@@ -145,14 +149,14 @@ func (m *Manager) ParseDataString(dataStr []byte, addr *net.UDPAddr) (*GameSessi
 			)*/
 			break
 		}
-	case DataTypeCombatant:
+	case data.DataTypeCombatant:
 		{
 			// data required
 			if sessObj == nil {
 				return nil, errors.New("recieved Combatant with no matching data object")
 			}
 			// parse combatant data
-			combatant := Combatant{}
+			combatant := data.Combatant{}
 			err := combatant.FromBytes(dataStr)
 			if err != nil {
 				return nil, err
@@ -180,14 +184,14 @@ func (m *Manager) ParseDataString(dataStr []byte, addr *net.UDPAddr) (*GameSessi
 				")",
 			)*/
 		}
-	case DataTypeLogLine:
+	case data.DataTypeLogLine:
 		{
 			// data required
 			if sessObj == nil {
 				return nil, errors.New("recieved LogLine with no matching data object")
 			}
 			// parse log line data
-			logLine := LogLine{}
+			logLine := data.LogLine{}
 			err := logLine.FromBytes(dataStr)
 			if err != nil {
 				return nil, err
@@ -206,65 +210,63 @@ func (m *Manager) ParseDataString(dataStr []byte, addr *net.UDPAddr) (*GameSessi
 // doTick - ticks every app.TickRate milliseconds
 func (m *Manager) doTick(userID int64) {
 	for range time.Tick(app.TickRate * time.Millisecond) {
-		data := m.GetSessionWithUserID(userID)
-		if data == nil {
+		dataObj := m.GetSessionWithUserID(userID)
+		if dataObj == nil {
 			log.Println("[ USER", userID, "] Tick with no session data, killing thread.")
 			return
 		}
 		// clear session if no longer active
-		if !data.IsActive() {
-			webIDStr, _ := data.User.GetWebIDString()
+		if !dataObj.IsActive() {
+			webIDStr, _ := dataObj.User.GetWebIDString()
 			log.Println("[", webIDStr, "] Session inactive.")
-			m.ClearSession(data)
+			m.ClearSession(dataObj)
 			return
 		}
-		if data.EncounterCollector.Encounter.UID == "" {
+		if dataObj.EncounterCollector.Encounter.UID == "" {
 			continue
 		}
 		// check if encounter should be made inactive
-		if data.EncounterCollector.Encounter.Active {
-			data.EncounterCollector.CheckInactive()
-			if !data.EncounterCollector.Encounter.Active {
-				data.SaveEncounter()
-				data.NewTickData = true
+		if dataObj.EncounterCollector.Encounter.Active {
+			dataObj.EncounterCollector.CheckInactive()
+			if !dataObj.EncounterCollector.Encounter.Active {
+				dataObj.SaveEncounter()
+				dataObj.NewTickData = true
 			}
 		}
 		// ensure there is new data to send
-		if !data.NewTickData {
+		if !dataObj.NewTickData {
 			continue
 		}
-		data.NewTickData = false
+		dataObj.NewTickData = false
 		//log.Println("Tick for user", data.User.ID, "send data for encounter", data.EncounterCollector.Encounter.UID)
 		// gz compress encounter data and emit event
-		compressData, err := CompressBytes(data.EncounterCollector.Encounter.ToBytes())
+		compressData, err := data.CompressBytes(dataObj.EncounterCollector.Encounter.ToBytes())
 		if err != nil {
 			log.Println("[ USER", userID, "] Error while compressing encounter data,", err)
 			continue
 		}
 		go m.events.Emit(
 			"act:encounter",
-			data.User.ID,
+			dataObj.User.ID,
 			compressData,
 		)
 		// emit combatant events
 		sendBytes := make([]byte, 0)
-		for _, combatantSnapshots := range data.CombatantCollector.GetCombatants() {
-			combatants := make([]Combatant, 1)
+		for _, combatantSnapshots := range dataObj.CombatantCollector.GetCombatants() {
+			combatants := make([]data.Combatant, 1)
 			combatants[0] = combatantSnapshots[len(combatantSnapshots)-1]
-			combatants[0].EncounterUID = data.EncounterCollector.Encounter.UID
-			for _, combatant := range combatants {
-				sendBytes = append(sendBytes, combatant.ToBytes()...)
-			}
+			combatants[0].EncounterUID = dataObj.EncounterCollector.Encounter.UID
+			sendBytes = append(sendBytes, data.CombatantsToBytes(&combatants)...)
 		}
 		if len(sendBytes) > 0 {
-			compressData, err := CompressBytes(sendBytes)
+			compressData, err := data.CompressBytes(sendBytes)
 			if err != nil {
 				log.Println("[ USER", userID, "] Error while compressing combatant data,", err)
 				continue
 			}
 			go m.events.Emit(
 				"act:combatant",
-				data.User.ID,
+				dataObj.User.ID,
 				compressData,
 			)
 		}
@@ -274,35 +276,35 @@ func (m *Manager) doTick(userID int64) {
 // doLogTick - ticks every app.LogTickRate milliseconds
 func (m *Manager) doLogTick(userID int64) {
 	for range time.Tick(app.LogTickRate * time.Millisecond) {
-		data := m.GetSessionWithUserID(userID)
-		if data == nil {
+		dataObj := m.GetSessionWithUserID(userID)
+		if dataObj == nil {
 			log.Println("[ USER", userID, "] Log tick with no session data, killing thread.")
 			return
 		}
-		if len(data.LogLineBuffer) == 0 {
+		if len(dataObj.LogLineBuffer) == 0 {
 			continue
 		}
 		// emit log line events
 		sendBytes := make([]byte, 0)
-		for _, logLine := range data.LogLineBuffer {
+		for _, logLine := range dataObj.LogLineBuffer {
 			sendBytes = append(sendBytes, logLine.ToBytes()...)
 		}
 		if len(sendBytes) > 0 {
 			// dump log buffer
-			err := data.DumpLogLineBuffer()
+			err := dataObj.DumpLogLineBuffer()
 			if err != nil {
 				log.Println("[ USER", userID, "] Error while dumping log lines,", err)
 				continue
 			}
 			// compress log lines and send
-			compressData, err := CompressBytes(sendBytes)
+			compressData, err := data.CompressBytes(sendBytes)
 			if err != nil {
 				log.Println("[ USER", userID, "] Error while compressing log line data,", err)
 				continue
 			}
 			go m.events.Emit(
 				"act:logLine",
-				data.User.ID,
+				dataObj.User.ID,
 				compressData,
 			)
 		}
@@ -329,12 +331,10 @@ func (m *Manager) SnapshotListener() {
 			if timeDiff > 0 {
 				statSnapshot.LogLinesPerMinute = logLineCount / timeDiff
 			}
-			encounterCount := GetTotalEncounterCount(m.events)
-			combatantCount := GetTotalCombatantCount(m.events)
-			userCount := GetTotalUserCount(m.events)
-			statSnapshot.TotalEncounters = encounterCount
-			statSnapshot.TotalCombatants = combatantCount
-			statSnapshot.TotalUsers = userCount
+			// TODO
+			statSnapshot.TotalEncounters = 0
+			statSnapshot.TotalCombatants = 0
+			statSnapshot.TotalUsers = 0
 		}
 	}
 }
@@ -372,7 +372,7 @@ func (m *Manager) GetSessionWithUserID(userID int64) *GameSession {
 
 // GetSessionWithWebID - retrieve data with web id string
 func (m *Manager) GetSessionWithWebID(webID string) (*GameSession, error) {
-	userID, err := user.GetIDFromWebIDString(webID)
+	userID, err := data.GetIDFromWebIDString(webID)
 	if err != nil {
 		return nil, err
 	}

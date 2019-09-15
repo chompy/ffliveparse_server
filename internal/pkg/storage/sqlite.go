@@ -19,16 +19,16 @@ package storage
 
 import (
 	"database/sql"
+	"fmt"
+	"log"
 	"time"
 
-	"../act"
 	"../app"
-	"../user"
+	"../data"
 )
 
 // SqliteHandler - handles sqlite storage
 type SqliteHandler struct {
-	BaseHandler
 	path string
 	db   *sql.DB
 }
@@ -158,14 +158,17 @@ func (s *SqliteHandler) createUserTable() error {
 	return err
 }
 
-// Store - store data to sqlite database
-func (s *SqliteHandler) Store(data []interface{}) error {
+// Store - store data objects to sqlite database
+func (s *SqliteHandler) Store(objs []interface{}) error {
+	if s.db == nil {
+		return fmt.Errorf("database not initialized")
+	}
 	// itterate data to store
-	for index := range data {
-		switch data[index].(type) {
-		case *act.Encounter:
+	for index := range objs {
+		switch objs[index].(type) {
+		case *data.Encounter:
 			{
-				encounter := data[index].(*act.Encounter)
+				encounter := objs[index].(*data.Encounter)
 				stmt, err := s.db.Prepare(`
 					REPLACE INTO encounter
 					(uid, act_id, compare_hash, user_id, start_time, end_time, zone, damage, success_level, has_logs) VALUES
@@ -192,9 +195,9 @@ func (s *SqliteHandler) Store(data []interface{}) error {
 				}
 				break
 			}
-		case *act.Combatant:
+		case *data.Combatant:
 			{
-				combatant := data[index].(*act.Combatant)
+				combatant := objs[index].(*data.Combatant)
 				stmt, err := s.db.Prepare(`
 					REPLACE INTO combatant
 					(user_id, encounter_uid, player_id, time, job, damage, damage_taken, damage_healed, deaths, hits, heals, kills) VALUES
@@ -223,9 +226,9 @@ func (s *SqliteHandler) Store(data []interface{}) error {
 				}
 				break
 			}
-		case *act.Player:
+		case *data.Player:
 			{
-				player := data[index].(*act.Player)
+				player := objs[index].(*data.Player)
 				insStmt, err := s.db.Prepare(`
 					INSERT OR IGNORE INTO player
 					(id, name, act_name) VALUES
@@ -261,9 +264,9 @@ func (s *SqliteHandler) Store(data []interface{}) error {
 				}
 				break
 			}
-		case *user.Data:
+		case *data.User:
 			{
-				user := data[index].(*user.Data)
+				user := objs[index].(*data.User)
 				// insert
 				if user.ID == 0 {
 					stmt, err := s.db.Prepare(`
@@ -326,6 +329,9 @@ func (s *SqliteHandler) appendWhereQueryString(original string, append string) s
 
 // Fetch - retrieve data from sqlite
 func (s *SqliteHandler) Fetch(params map[string]interface{}) ([]interface{}, int, error) {
+	if s.db == nil {
+		return nil, 0, fmt.Errorf("database not initialized")
+	}
 	dType := ParamsGetType(params)
 	if dType == "" {
 		return nil, 0, nil
@@ -343,6 +349,9 @@ func (s *SqliteHandler) Fetch(params map[string]interface{}) ([]interface{}, int
 				case "uid":
 					{
 						val := ParamGetString(params, key)
+						if val == "" {
+							break
+						}
 						sqlWhereQueryStr = s.appendWhereQueryString(sqlWhereQueryStr, "uid = ?")
 						sqlQueryParams = append(sqlQueryParams, val)
 						break
@@ -350,6 +359,9 @@ func (s *SqliteHandler) Fetch(params map[string]interface{}) ([]interface{}, int
 				case "user_id":
 					{
 						val := ParamGetInt(params, key)
+						if val == 0 {
+							break
+						}
 						sqlWhereQueryStr = s.appendWhereQueryString(sqlWhereQueryStr, "user_id = ?")
 						sqlQueryParams = append(sqlQueryParams, val)
 						break
@@ -357,6 +369,9 @@ func (s *SqliteHandler) Fetch(params map[string]interface{}) ([]interface{}, int
 				case "query":
 					{
 						val := ParamGetString(params, key)
+						if val == "" {
+							break
+						}
 						sqlWhereQueryStr = s.appendWhereQueryString(sqlWhereQueryStr, "(zone LIKE ? OR player.name LIKE ?)")
 						sqlQueryParams = append(sqlQueryParams, "%"+val+"%", "%"+val+"%")
 						break
@@ -366,6 +381,9 @@ func (s *SqliteHandler) Fetch(params map[string]interface{}) ([]interface{}, int
 				case "start_date":
 					{
 						val := ParamGetTime(params, key)
+						if (val == time.Time{}) {
+							break
+						}
 						sqlWhereQueryStr = s.appendWhereQueryString(sqlWhereQueryStr, "DATETIME(start_time) >= ?")
 						sqlQueryParams = append(sqlQueryParams, val.UTC())
 						break
@@ -375,6 +393,9 @@ func (s *SqliteHandler) Fetch(params map[string]interface{}) ([]interface{}, int
 				case "end_date":
 					{
 						val := ParamGetTime(params, key)
+						if (val == time.Time{}) {
+							break
+						}
 						sqlWhereQueryStr = s.appendWhereQueryString(sqlWhereQueryStr, "DATETIME(end_time) >= ?")
 						sqlQueryParams = append(sqlQueryParams, val.UTC())
 						break
@@ -387,31 +408,33 @@ func (s *SqliteHandler) Fetch(params map[string]interface{}) ([]interface{}, int
 			// build the rest of the query
 			sqlQueryStr := `
 				SELECT 
-				uid, act_id, compare_hash, start_time, end_time, zone, damage, success_level, has_logs
+				uid, act_id, compare_hash, start_time, end_time, zone, damage, success_level, has_logs,
 				(SELECT COUNT(*) FROM encounter ` + sqlWhereQueryStr + `)
 				FROM 
 				encounter 
 				` + sqlWhereQueryStr + `
+				ORDER BY DATETIME(start_time) DESC
 				LIMIT ?
 				OFFSET ?
 			`
 			// double up query params for COUNT query
 			sqlQueryParams = append(sqlQueryParams, sqlQueryParams...)
 			// offset/limit
-			sqlQueryParams = append(sqlQueryParams, ParamGetInt(params, "offset"))
 			sqlQueryParams = append(sqlQueryParams, app.PastEncounterFetchLimit)
+			sqlQueryParams = append(sqlQueryParams, ParamGetInt(params, "offset"))
 			// fetch results
 			rows, err := s.db.Query(
 				sqlQueryStr,
-				sqlQueryParams,
+				sqlQueryParams...,
 			)
 			if err != nil {
+				log.Println(sqlQueryStr, sqlQueryParams)
 				return nil, 0, err
 			}
 			defer rows.Close()
 			// itterate rows, add to output
 			for rows.Next() {
-				encounter := act.Encounter{}
+				encounter := data.Encounter{}
 				var compareHash sql.NullString
 				err := rows.Scan(
 					&encounter.UID,
@@ -446,14 +469,14 @@ func (s *SqliteHandler) Fetch(params map[string]interface{}) ([]interface{}, int
 				case "encounter_uid":
 					{
 						val := ParamGetString(params, key)
-						sqlWhereQueryStr = s.appendWhereQueryString(sqlWhereQueryStr, "encounter_uid = ?")
+						sqlWhereQueryStr = s.appendWhereQueryString(sqlWhereQueryStr, "combatant.encounter_uid = ?")
 						sqlQueryParams = append(sqlQueryParams, val)
 						break
 					}
 				case "user_id":
 					{
 						val := ParamGetInt(params, key)
-						sqlWhereQueryStr = s.appendWhereQueryString(sqlWhereQueryStr, "user_id = ?")
+						sqlWhereQueryStr = s.appendWhereQueryString(sqlWhereQueryStr, "combatant.user_id = ?")
 						sqlQueryParams = append(sqlQueryParams, val)
 						break
 					}
@@ -465,8 +488,9 @@ func (s *SqliteHandler) Fetch(params map[string]interface{}) ([]interface{}, int
 			// build rest of query
 			sqlQueryStr := `
 				SELECT 
-				encounter_uid, player_id, time, job, damage, damage_taken, damage_healed, deaths, hits, heals, kills,
-				player.name, player.act_name, player.world_name
+				combatant.encounter_uid, combatant.player_id, combatant.time, combatant.job, combatant.damage, 
+				combatant.damage_taken, combatant.damage_healed, combatant.deaths, combatant.hits, combatant.heals,
+				combatant.kills, player.name, player.act_name, player.world_name,
 				(SELECT COUNT(*) FROM combatant ` + sqlWhereQueryStr + `)
 				FROM
 				combatant
@@ -475,12 +499,15 @@ func (s *SqliteHandler) Fetch(params map[string]interface{}) ([]interface{}, int
 				` + sqlWhereQueryStr + `
 				ORDER BY DATETIME(time) ASC
 			`
+			// double up query params for COUNT query
+			sqlQueryParams = append(sqlQueryParams, sqlQueryParams...)
 			// fetch results
 			rows, err := s.db.Query(
 				sqlQueryStr,
-				sqlQueryParams,
+				sqlQueryParams...,
 			)
 			if err != nil {
+				log.Println(sqlQueryStr, sqlQueryParams)
 				return nil, 0, err
 			}
 			defer rows.Close()
@@ -489,11 +516,11 @@ func (s *SqliteHandler) Fetch(params map[string]interface{}) ([]interface{}, int
 			var actName sql.NullString
 			var combatantTime NullTime
 			for rows.Next() {
-				player := act.Player{}
-				combatant := act.Combatant{}
+				player := data.Player{}
+				combatant := data.Combatant{}
 				err := rows.Scan(
-					&player.ID,
 					&combatant.EncounterUID,
+					&player.ID,
 					&combatantTime,
 					&combatant.Job,
 					&combatant.Damage,
@@ -508,6 +535,9 @@ func (s *SqliteHandler) Fetch(params map[string]interface{}) ([]interface{}, int
 					&worldName,
 					&totalCount,
 				)
+				if err != nil {
+					return nil, 0, err
+				}
 				if combatantTime.Valid {
 					combatant.Time = combatantTime.Time
 				}
@@ -517,12 +547,80 @@ func (s *SqliteHandler) Fetch(params map[string]interface{}) ([]interface{}, int
 				if actName.Valid {
 					player.ActName = actName.String
 				}
+				combatant.Player = player
+				output = append(output, combatant)
+			}
+			break
+		}
+	case StoreTypeUser:
+		{
+			// build 'WHERE' query based on params
+			sqlQueryParams := make([]interface{}, 0)
+			sqlWhereQueryStr := ""
+			for key := range params {
+				switch key {
+				case "id":
+					{
+						val := ParamGetInt(params, key)
+						sqlWhereQueryStr = s.appendWhereQueryString(sqlWhereQueryStr, "id = ?")
+						sqlQueryParams = append(sqlQueryParams, val)
+						break
+					}
+				case "web_key":
+					{
+						val := ParamGetString(params, key)
+						sqlWhereQueryStr = s.appendWhereQueryString(sqlWhereQueryStr, "web_key = ?")
+						sqlQueryParams = append(sqlQueryParams, val)
+						break
+					}
+				case "upload_key":
+					{
+						val := ParamGetString(params, key)
+						sqlWhereQueryStr = s.appendWhereQueryString(sqlWhereQueryStr, "upload_key = ?")
+						sqlQueryParams = append(sqlQueryParams, val)
+						break
+					}
+				}
+			}
+			if sqlWhereQueryStr != "" {
+				sqlWhereQueryStr = "WHERE " + sqlWhereQueryStr
+			}
+			// build rest of query
+			sqlQueryStr := `
+				SELECT 
+				id, created, accessed, upload_key, web_key,
+				(SELECT COUNT(*) FROM combatant ` + sqlWhereQueryStr + `)
+				FROM
+				user
+				` + sqlWhereQueryStr + `
+			`
+			// double up query params for COUNT query
+			sqlQueryParams = append(sqlQueryParams, sqlQueryParams...)
+			// fetch results
+			rows, err := s.db.Query(
+				sqlQueryStr,
+				sqlQueryParams...,
+			)
+			if err != nil {
+				return nil, 0, err
+			}
+			defer rows.Close()
+			// itterate rows, add to output
+			for rows.Next() {
+				user := data.User{}
+				err := rows.Scan(
+					&user.ID,
+					&user.Created,
+					&user.Accessed,
+					&user.UploadKey,
+					&user.WebKey,
+					&totalCount,
+				)
 				if err != nil {
 					return nil, 0, err
 				}
-				output = append(output, combatant)
+				output = append(output, user)
 			}
-
 			break
 		}
 	}
@@ -544,5 +642,6 @@ func (s *SqliteHandler) CleanUp() error {
 	_, err = s.db.Exec(
 		"DELETE FROM combatant WHERE (SELECT COUNT(*) FROM encounter WHERE uid = combatant.encounter_uid) = 0",
 	)
+	// TODO - delete users that never uploaded
 	return err
 }

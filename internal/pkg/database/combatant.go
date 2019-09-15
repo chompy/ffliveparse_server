@@ -20,7 +20,7 @@ package database
 import (
 	"database/sql"
 
-	"../act"
+	"../data"
 )
 
 // CreateCombatantTable - create combatant database table
@@ -51,7 +51,7 @@ func CreateCombatantTable(db *sql.DB) error {
 }
 
 // SaveCombatant - save combatant to database
-func SaveCombatant(userID int, combatant *act.Combatant, db *sql.DB) error {
+func SaveCombatant(userID int, combatant *data.Combatant, db *sql.DB) error {
 	stmt, err := db.Prepare(`
 		REPLACE INTO combatant
 		(user_id, encounter_uid, player_id, time, job, damage, damage_taken, damage_healed, deaths, hits, heals, kills) VALUES
@@ -79,7 +79,7 @@ func SaveCombatant(userID int, combatant *act.Combatant, db *sql.DB) error {
 }
 
 // FindEncounterCombatants - find all combatant records for an encounter
-func FindEncounterCombatants(userID int, encounterUID string, db *sql.DB, combatants *[]act.Combatant) error {
+func FindEncounterCombatants(userID int, encounterUID string, db *sql.DB, combatants *[]data.Combatant) error {
 	dbQueryStr := "SELECT player_id, time, job, damage, damage_taken, damage_healed, deaths, hits, heals, kills,"
 	dbQueryStr += " player.name, player.act_name, player.world_name FROM combatant"
 	dbQueryStr += " INNER JOIN player ON player.id = combatant.player_id WHERE user_id = ? AND encounter_uid = ?"
@@ -97,8 +97,8 @@ func FindEncounterCombatants(userID int, encounterUID string, db *sql.DB, combat
 	var actName sql.NullString
 	var combatantTime NullTime
 	for rows.Next() {
-		player := act.Player{}
-		combatant := act.Combatant{}
+		player := data.Player{}
+		combatant := data.Combatant{}
 		combatant.EncounterUID = encounterUID
 		err := rows.Scan(
 			&player.ID,

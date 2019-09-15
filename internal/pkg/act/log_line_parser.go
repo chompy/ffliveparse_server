@@ -24,6 +24,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"../data"
 )
 
 // LogTypeGameLog - Log type identifier, game logs
@@ -186,7 +188,7 @@ func hexToInt(hexString string) (int, error) {
 }
 
 // ParseLogLine - Parse log line in to data structure
-func ParseLogLine(logLine LogLine) (LogLineData, error) {
+func ParseLogLine(logLine data.LogLine) (LogLineData, error) {
 	logLineString := logLine.LogLine
 	if len(logLineString) <= 15 {
 		return LogLineData{}, fmt.Errorf("tried to parse log line with too few characters")

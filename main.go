@@ -9,6 +9,7 @@ import (
 	"./internal/pkg/act"
 	"./internal/pkg/app"
 	"./internal/pkg/database"
+	"./internal/pkg/storage"
 	"./internal/pkg/user"
 	"./internal/pkg/web"
 )
@@ -40,6 +41,22 @@ func main() {
 	usageStatCollector.TakeSnapshot()
 	go usageStatCollector.Start()
 
+	// create storage handler
+	sqliteStorageHandler, err := storage.NewSqliteHandler(app.DatabasePath)
+	if err != nil {
+		panic(err)
+	}
+	fileStorageHandler, err := storage.NewFileHandler(app.FileStorePath)
+	storageManager := storage.NewManager()
+	err = storageManager.AddHandler(&fileStorageHandler)
+	if err != nil {
+		panic(err)
+	}
+	err = storageManager.AddHandler(&sqliteStorageHandler)
+	if err != nil {
+		panic(err)
+	}
+
 	// create database handler
 	dbHandler, err := database.NewHandler(&events)
 	if err != nil {
@@ -48,30 +65,28 @@ func main() {
 	go dbHandler.Handle()
 
 	// create user manager
-	userManager := user.Manager{
-		Events: &events,
-	}
+	userManager := user.NewManager(&storageManager)
 
 	// create act manager
-	actManager := act.NewManager(&events, &userManager, *devModePtr)
+	actManager := act.NewManager(&events, &storageManager, &userManager, *devModePtr)
 	go actManager.SnapshotListener()
 	defer actManager.ClearAllSessions()
 
 	// player stat tracker on seperate threads
-	psEvents := emitter.Emitter{}
+	/*psEvents := emitter.Emitter{}
 	psDbHandler, err := database.NewHandler(&psEvents)
 	go psDbHandler.Handle()
 	if err != nil {
 		panic(err)
 	}
-	playerStatTracker := act.NewStatsTracker(&psEvents)
-	go playerStatTracker.Start()
+	//playerStatTracker := act.NewStatsTracker(&psEvents)
+	go playerStatTracker.Start()*/
 
 	// clean up old encounters
-	go act.CleanUpEncounters(&events)
+	// TODO
 
 	// start http server
-	go web.HTTPStartServer(uint16(*httpPort), &userManager, &actManager, &events, &usageStatCollector, &playerStatTracker, *devModePtr)
+	go web.HTTPStartServer(uint16(*httpPort), &userManager, &actManager, &events, &storageManager, &usageStatCollector, nil, *devModePtr)
 
 	// start act listen server
 	act.Listen(uint16(*actPort), &actManager)

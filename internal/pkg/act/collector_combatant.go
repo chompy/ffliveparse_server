@@ -21,14 +21,14 @@ import (
 	"log"
 	"time"
 
-	"../user"
+	"../data"
 )
 
 // combatantTracker - Data used to track combatant
 type combatantTracker struct {
-	Player    Player
-	Snapshots []Combatant // combatant data captured at points in time
-	Offset    Combatant
+	Player    data.Player
+	Snapshots []data.Combatant // combatant data captured at points in time
+	Offset    data.Combatant
 }
 
 // CombatantCollector - Combatant data collector
@@ -38,7 +38,7 @@ type CombatantCollector struct {
 }
 
 // NewCombatantCollector - create new combatant collector
-func NewCombatantCollector(user *user.Data) CombatantCollector {
+func NewCombatantCollector(user *data.User) CombatantCollector {
 	userIDHash, _ := user.GetWebIDString()
 	cc := CombatantCollector{
 		userIDHash: userIDHash,
@@ -53,7 +53,7 @@ func (c *CombatantCollector) Reset() {
 }
 
 // combatantAdd - add the values of two combatants together
-func combatantAdd(c1 Combatant, c2 Combatant) Combatant {
+func combatantAdd(c1 data.Combatant, c2 data.Combatant) data.Combatant {
 	c1.Damage += c2.Damage
 	c1.DamageHealed += c2.DamageHealed
 	c1.DamageTaken += c2.DamageTaken
@@ -65,7 +65,7 @@ func combatantAdd(c1 Combatant, c2 Combatant) Combatant {
 }
 
 // combatantSub - subtract the values of two combatants
-func combatantSub(c1 Combatant, c2 Combatant) Combatant {
+func combatantSub(c1 data.Combatant, c2 data.Combatant) data.Combatant {
 	c1.Damage -= c2.Damage
 	c1.DamageHealed -= c2.DamageHealed
 	c1.DamageTaken -= c2.DamageTaken
@@ -77,7 +77,7 @@ func combatantSub(c1 Combatant, c2 Combatant) Combatant {
 }
 
 // UpdateCombatantTracker - Sync ACT combatant data
-func (c *CombatantCollector) UpdateCombatantTracker(combatant Combatant) {
+func (c *CombatantCollector) UpdateCombatantTracker(combatant data.Combatant) {
 	// ignore non player combatants
 	if combatant.Player.ID > 1000000000 {
 		return
@@ -87,7 +87,7 @@ func (c *CombatantCollector) UpdateCombatantTracker(combatant Combatant) {
 		for _, ct := range c.CombatantTrackers {
 			if ct.Player.ID == combatant.Player.ID {
 				combatant.Job = "LB"
-				combatant.Player = Player{
+				combatant.Player = data.Player{
 					ID:      -99,
 					ActName: "Limit Break",
 					Name:    "Limit Break",
@@ -108,7 +108,7 @@ func (c *CombatantCollector) UpdateCombatantTracker(combatant Combatant) {
 				// if act still has previous encounter but we want a new encounter in
 				// live parse create an offset with the last snapshot as a negative offset
 				c.CombatantTrackers[index].Offset = combatantSub(
-					Combatant{},
+					data.Combatant{},
 					lastSnapshot,
 				)
 			} else if lastSnapshot.ActEncounterID != combatant.ActEncounterID {
@@ -131,8 +131,8 @@ func (c *CombatantCollector) UpdateCombatantTracker(combatant Combatant) {
 	log.Println("[", c.userIDHash, "][ Combatant", combatant.Player.ID, "] Added", combatant.Player.Name, "(", combatant.Job, ")")
 	ct := combatantTracker{
 		Player:    combatant.Player,
-		Snapshots: make([]Combatant, 0),
-		Offset:    Combatant{},
+		Snapshots: make([]data.Combatant, 0),
+		Offset:    data.Combatant{},
 	}
 	ct.Snapshots = append(ct.Snapshots, combatant)
 	c.CombatantTrackers = append(c.CombatantTrackers, ct)
@@ -178,10 +178,10 @@ func (c *CombatantCollector) ReadLogLine(l *LogLineData) {
 }
 
 // GetCombatants - Compile all combatants
-func (c *CombatantCollector) GetCombatants() [][]Combatant {
-	combatants := make([][]Combatant, 0)
+func (c *CombatantCollector) GetCombatants() [][]data.Combatant {
+	combatants := make([][]data.Combatant, 0)
 	for _, ct := range c.CombatantTrackers {
-		snapshots := make([]Combatant, 0)
+		snapshots := make([]data.Combatant, 0)
 		lastSnapshotTime := time.Time{}
 		for _, snapshot := range ct.Snapshots {
 			if snapshot.Time.Sub(lastSnapshotTime) > time.Duration(time.Second*3) {

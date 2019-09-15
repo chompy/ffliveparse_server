@@ -21,8 +21,8 @@ import (
 	"database/sql"
 	"time"
 
-	"../act"
 	"../app"
+	"../data"
 )
 
 // CreateEncounterTable - create encounter database table
@@ -51,7 +51,7 @@ func CreateEncounterTable(db *sql.DB) error {
 }
 
 // SaveEncounter - save encounter to database
-func SaveEncounter(userID int, encounter *act.Encounter, db *sql.DB) error {
+func SaveEncounter(userID int, encounter *data.Encounter, db *sql.DB) error {
 	stmt, err := db.Prepare(`
 		REPLACE INTO encounter
 		(uid, act_id, compare_hash, user_id, start_time, end_time, zone, damage, success_level, has_logs) VALUES
@@ -77,7 +77,7 @@ func SaveEncounter(userID int, encounter *act.Encounter, db *sql.DB) error {
 }
 
 // FetchEncounter - fetch encounter of given UID
-func FetchEncounter(userID int, encounterUID string, db *sql.DB, encounter *act.Encounter) error {
+func FetchEncounter(userID int, encounterUID string, db *sql.DB, encounter *data.Encounter) error {
 	// fetch encounter
 	rows, err := db.Query(
 		"SELECT uid, act_id, compare_hash, start_time, end_time, zone, damage, success_level FROM encounter WHERE user_id = ? AND uid = ? LIMIT 1",
@@ -119,7 +119,7 @@ func FindEncounters(
 	start *time.Time,
 	end *time.Time,
 	db *sql.DB,
-	encounters *[]act.Encounter,
+	encounters *[]data.Encounter,
 	totalResults *int,
 ) error {
 	// build query
@@ -166,7 +166,7 @@ func FindEncounters(
 	// build encounter datas
 	for rows.Next() {
 		// build encounter
-		encounter := act.Encounter{}
+		encounter := data.Encounter{}
 		var compareHash sql.NullString
 		fetchTotalResults := 0
 		err := rows.Scan(

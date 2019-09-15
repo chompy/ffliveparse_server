@@ -32,7 +32,10 @@ const ActPluginMaxVersionNumber int32 = 6
 const Name string = "FFLiveParse"
 
 // DatabasePath - path to database file
-const DatabasePath = "./data/database/db.sqlite"
+const DatabasePath = "./data/store/db.sqlite"
+
+// FileStorePath - path to file system storage
+const FileStorePath = "./data/store"
 
 // GlobalStatBanPath - path to global stat ban file
 const GlobalStatBanPath = "./data/conf/global_stat_bans.txt"

@@ -15,29 +15,12 @@ You should have received a copy of the GNU General Public License
 along with FFLiveParse.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-package act
+package data
 
-// DataTypeFlag - Data type, boolean flag
-const DataTypeFlag byte = 99
-
-// Flag - Boolean flag with name
-type Flag struct {
-	ByteEncodable
-	Name  string
-	Value bool
-}
-
-// ToBytes - Convert to bytes
-func (f *Flag) ToBytes() []byte {
-	data := make([]byte, 1)
-	data[0] = DataTypeFlag
-	writeString(&data, f.Name)
-	writeBool(&data, f.Value)
-	return data
-}
-
-// FromBytes - Convert bytes to flag
-func (f *Flag) FromBytes(data []byte) error {
-	// unused
-	return nil
+// Player - Data about a player
+type Player struct {
+	ID      int32  `json:"id"`
+	Name    string `json:"name"`
+	ActName string `json:"act_name"`
+	World   string `json:"world"`
 }

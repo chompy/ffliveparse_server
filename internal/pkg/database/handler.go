@@ -22,9 +22,8 @@ import (
 	"log"
 	"time"
 
-	"../act"
 	"../app"
-	"../user"
+	"../data"
 
 	_ "github.com/mattn/go-sqlite3" // sqlite driver
 	"github.com/olebedev/emitter"
@@ -93,26 +92,26 @@ func (h *Handler) Handle() error {
 				{
 					saveObj := event.Args[1]
 					switch saveObj.(type) {
-					case *user.Data:
+					case *data.User:
 						{
-							err = SaveUser(saveObj.(*user.Data), h.database)
+							err = SaveUser(saveObj.(*data.User), h.database)
 							break
 						}
-					case *act.Encounter:
+					case *data.Encounter:
 						{
 							userID := event.Int(2)
-							err = SaveEncounter(userID, saveObj.(*act.Encounter), h.database)
+							err = SaveEncounter(userID, saveObj.(*data.Encounter), h.database)
 							break
 						}
-					case *act.Combatant:
+					case *data.Combatant:
 						{
 							userID := event.Int(2)
-							err = SaveCombatant(userID, saveObj.(*act.Combatant), h.database)
+							err = SaveCombatant(userID, saveObj.(*data.Combatant), h.database)
 							break
 						}
-					case *act.Player:
+					case *data.Player:
 						{
-							err = SavePlayer(saveObj.(*act.Player), h.database)
+							err = SavePlayer(saveObj.(*data.Player), h.database)
 							break
 						}
 					}
@@ -122,17 +121,17 @@ func (h *Handler) Handle() error {
 				{
 					fetchObj := event.Args[1]
 					switch fetchObj.(type) {
-					case *user.Data:
+					case *data.User:
 						{
 							userID := event.Int(2)
-							err = FetchUser(userID, h.database, fetchObj.(*user.Data))
+							err = FetchUser(userID, h.database, fetchObj.(*data.User))
 							break
 						}
-					case *act.Encounter:
+					case *data.Encounter:
 						{
 							userID := event.Int(2)
 							encounterUID := event.String(3)
-							err = FetchEncounter(userID, encounterUID, h.database, fetchObj.(*act.Encounter))
+							err = FetchEncounter(userID, encounterUID, h.database, fetchObj.(*data.Encounter))
 							break
 						}
 					}
@@ -142,14 +141,14 @@ func (h *Handler) Handle() error {
 				{
 					findObjs := event.Args[1]
 					switch findObjs.(type) {
-					case *[]user.Data:
+					case *[]data.User:
 						{
 							webKey := event.String(2)
 							uploadKey := event.String(3)
-							err = FindUsers(webKey, uploadKey, h.database, findObjs.(*[]user.Data))
+							err = FindUsers(webKey, uploadKey, h.database, findObjs.(*[]data.User))
 							break
 						}
-					case *[]act.Encounter:
+					case *[]data.Encounter:
 						{
 							userID := event.Int(2)
 							offset := event.Int(3)
@@ -164,21 +163,21 @@ func (h *Handler) Handle() error {
 								start,
 								end,
 								h.database,
-								findObjs.(*[]act.Encounter),
+								findObjs.(*[]data.Encounter),
 								totalResults,
 							)
 							break
 						}
-					case *[]act.Combatant:
+					case *[]data.Combatant:
 						{
 							userID := event.Int(2)
 							encounterUID := event.String(3)
-							err = FindEncounterCombatants(userID, encounterUID, h.database, findObjs.(*[]act.Combatant))
+							err = FindEncounterCombatants(userID, encounterUID, h.database, findObjs.(*[]data.Combatant))
 							break
 						}
-					case *[]act.PlayerStat:
+					case *[]data.PlayerStat:
 						{
-							err = FindPlayerStats(h.database, findObjs.(*[]act.PlayerStat))
+							err = FindPlayerStats(h.database, findObjs.(*[]data.PlayerStat))
 						}
 					}
 					break

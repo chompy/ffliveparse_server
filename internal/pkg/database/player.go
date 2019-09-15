@@ -20,7 +20,7 @@ package database
 import (
 	"database/sql"
 
-	"../act"
+	"../data"
 )
 
 // CreatePlayerTable - create player database table
@@ -44,7 +44,7 @@ func CreatePlayerTable(db *sql.DB) error {
 }
 
 // SavePlayer - save player to database
-func SavePlayer(player *act.Player, db *sql.DB) error {
+func SavePlayer(player *data.Player, db *sql.DB) error {
 	insStmt, err := db.Prepare(`
 		INSERT OR IGNORE INTO player
 		(id, name, act_name) VALUES
@@ -82,7 +82,7 @@ func SavePlayer(player *act.Player, db *sql.DB) error {
 }
 
 // FetchPlayer - fetch player from database
-func FetchPlayer(id int, db *sql.DB, player *act.Player) error {
+func FetchPlayer(id int, db *sql.DB, player *data.Player) error {
 	return nil
 }
 

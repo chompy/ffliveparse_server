@@ -24,7 +24,7 @@ import (
 	"strings"
 	"time"
 
-	"../user"
+	"../data"
 	"github.com/rs/xid"
 )
 
@@ -49,7 +49,7 @@ type encounterCollectorCombatantTracker struct {
 
 // EncounterCollector - Encounter data collector
 type EncounterCollector struct {
-	Encounter        Encounter
+	Encounter        data.Encounter
 	LastActionTime   time.Time
 	CombatantTracker []encounterCollectorCombatantTracker
 	userIDHash       string
@@ -62,7 +62,7 @@ type EncounterCollector struct {
 }
 
 // NewEncounterCollector - Create new encounter collector
-func NewEncounterCollector(user *user.Data) EncounterCollector {
+func NewEncounterCollector(user *data.User) EncounterCollector {
 	userIDHash, _ := user.GetWebIDString()
 	ec := EncounterCollector{
 		userIDHash: userIDHash,
@@ -76,7 +76,7 @@ func NewEncounterCollector(user *user.Data) EncounterCollector {
 // Reset - Reset encounter, start new
 func (ec *EncounterCollector) Reset() {
 	encounterUIDGenerator := xid.New()
-	ec.Encounter = Encounter{
+	ec.Encounter = data.Encounter{
 		Active:       false,
 		StartTime:    time.Now(),
 		EndTime:      time.Now(),
@@ -93,7 +93,7 @@ func (ec *EncounterCollector) Reset() {
 }
 
 // UpdateEncounter - Sync encounter data from ACT
-func (ec *EncounterCollector) UpdateEncounter(encounter Encounter) {
+func (ec *EncounterCollector) UpdateEncounter(encounter data.Encounter) {
 	if !ec.Encounter.Active {
 		return
 	}

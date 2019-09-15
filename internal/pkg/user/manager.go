@@ -20,92 +20,89 @@ package user
 import (
 	"fmt"
 
-	"github.com/olebedev/emitter"
+	"../data"
+	"../storage"
 
 	_ "github.com/mattn/go-sqlite3" // sqlite driver
 )
 
 // Manager - manages users data
 type Manager struct {
-	Events *emitter.Emitter
+	storage *storage.Manager
+}
+
+// NewManager - create new user manager
+func NewManager(sm *storage.Manager) Manager {
+	return Manager{
+		storage: sm,
+	}
 }
 
 // New - create a new user
-func (m *Manager) New() Data {
-	ud := NewData()
+func (m *Manager) New() data.User {
+	ud := data.NewUser()
 	m.Save(&ud)
 	return ud
 }
 
 // LoadFromID - load user from id
-func (m *Manager) LoadFromID(ID int64) (Data, error) {
-	fin := make(chan bool)
-	ud := Data{}
-	m.Events.Emit(
-		"database:fetch",
-		fin,
-		&ud,
-		int(ID),
-	)
-	<-fin
-	if ud.ID == 0 {
-		return Data{}, fmt.Errorf("could not find user data with ID %d", ID)
+func (m *Manager) LoadFromID(ID int64) (data.User, error) {
+	res, count, err := m.storage.Fetch(map[string]interface{}{
+		"type": storage.StoreTypeUser,
+		"id":   int(ID),
+	})
+	if err != nil {
+		return data.User{}, err
 	}
-	return ud, nil
+	if count == 0 {
+		return data.User{}, fmt.Errorf("no user found with ID '%d'", ID)
+	}
+	return res[0].(data.User), nil
 }
 
 // LoadFromUploadKey - load user from upload key
-func (m *Manager) LoadFromUploadKey(uploadKey string) (Data, error) {
-	fin := make(chan bool)
-	ud := make([]Data, 0)
-	m.Events.Emit(
-		"database:find",
-		fin,
-		&ud,
-		"",        // event arg 1 == web key
-		uploadKey, // event arg 2 == upload key
-	)
-	<-fin
-	if len(ud) == 0 {
-		return Data{}, fmt.Errorf("could not find user data with upload key %s", uploadKey)
+func (m *Manager) LoadFromUploadKey(uploadKey string) (data.User, error) {
+	res, count, err := m.storage.Fetch(map[string]interface{}{
+		"type":       storage.StoreTypeUser,
+		"upload_key": uploadKey,
+	})
+	if err != nil {
+		return data.User{}, err
 	}
-	return ud[0], nil
+	if count == 0 {
+		return data.User{}, fmt.Errorf("no user found with upload key '%s'", uploadKey)
+	}
+	return res[0].(data.User), nil
 }
 
 // LoadFromWebKey - load user from web key
-func (m *Manager) LoadFromWebKey(webKey string) (Data, error) {
-	fin := make(chan bool)
-	ud := make([]Data, 0)
-	m.Events.Emit(
-		"database:find",
-		fin,
-		&ud,
-		webKey, // event arg 1 == web key
-		"",     // event arg 2 == upload key
-	)
-	<-fin
-	if len(ud) == 0 {
-		return Data{}, fmt.Errorf("could not find user data with web key %s", webKey)
+func (m *Manager) LoadFromWebKey(webKey string) (data.User, error) {
+	res, count, err := m.storage.Fetch(map[string]interface{}{
+		"type":    storage.StoreTypeUser,
+		"web_key": webKey,
+	})
+	if err != nil {
+		return data.User{}, err
 	}
-	return ud[0], nil
+	if count == 0 {
+		return data.User{}, fmt.Errorf("no user found with web key '%s'", webKey)
+	}
+	return res[0].(data.User), nil
 }
 
 // LoadFromWebIDString - load user from web ID string
-func (m *Manager) LoadFromWebIDString(webIDString string) (Data, error) {
-	userID, err := GetIDFromWebIDString(webIDString)
+func (m *Manager) LoadFromWebIDString(webIDString string) (data.User, error) {
+	userID, err := data.GetIDFromWebIDString(webIDString)
 	if err != nil {
-		return Data{}, err
+		return data.User{}, err
 	}
 	return m.LoadFromID(userID)
 }
 
 // Save - save user data
-func (m *Manager) Save(ud *Data) {
-	fin := make(chan bool)
-	m.Events.Emit(
-		"database:save",
-		fin,
-		ud,
-	)
-	<-fin
+func (m *Manager) Save(ud *data.User) {
+	store := make([]interface{}, 1)
+	store[0] = &ud
+	m.storage.Store(store)
+	// TODO no error return?
 }

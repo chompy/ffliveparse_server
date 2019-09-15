@@ -15,40 +15,29 @@ You should have received a copy of the GNU General Public License
 along with FFLiveParse.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-package act
+package data
 
-import (
-	"errors"
-	"time"
-)
+// DataTypeFlag - Data type, boolean flag
+const DataTypeFlag byte = 99
 
-// DataTypeLogLine - Data type, log line
-const DataTypeLogLine byte = 5
-
-// LogLine - Log line from Act
-type LogLine struct {
+// Flag - Boolean flag with name
+type Flag struct {
 	ByteEncodable
-	EncounterUID   string
-	ActEncounterID uint32
-	Time           time.Time
-	LogLine        string
+	Name  string
+	Value bool
 }
 
 // ToBytes - Convert to bytes
-func (l *LogLine) ToBytes() []byte {
+func (f *Flag) ToBytes() []byte {
 	data := make([]byte, 1)
-	data[0] = DataTypeLogLine
+	data[0] = DataTypeFlag
+	writeString(&data, f.Name)
+	writeBool(&data, f.Value)
 	return data
 }
 
-// FromBytes - Convert bytes to log line
-func (l *LogLine) FromBytes(data []byte) error {
-	if data[0] != DataTypeLogLine {
-		return errors.New("invalid data type for LogLine")
-	}
-	pos := 1
-	l.ActEncounterID = readUint32(data, &pos)
-	l.Time = readTime(data, &pos)
-	l.LogLine = readString(data, &pos)
+// FromBytes - Convert bytes to flag
+func (f *Flag) FromBytes(data []byte) error {
+	// unused
 	return nil
 }

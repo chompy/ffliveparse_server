@@ -31,10 +31,9 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/olebedev/emitter"
-
 	"../app"
-	"../user"
+	"../data"
+	"../storage"
 
 	_ "github.com/mattn/go-sqlite3" // sqlite driver
 )
@@ -44,21 +43,21 @@ const logLineRetainCount = 1000
 
 // GameSession - data about an ACT session
 type GameSession struct {
-	Session            Session
-	User               user.Data
+	Session            data.Session
+	User               data.User
 	EncounterCollector EncounterCollector
 	CombatantCollector CombatantCollector
-	LogLineBuffer      []LogLine
+	LogLineBuffer      []data.LogLine
 	LastUpdate         time.Time
 	NewTickData        bool
 	HasValidSession    bool
 	HasLogs            bool
 	LogLineCounter     int
-	events             *emitter.Emitter
+	storage            *storage.Manager
 }
 
 // NewGameSession - create new ACT session data
-func NewGameSession(session Session, user user.Data, events *emitter.Emitter) (GameSession, error) {
+func NewGameSession(session data.Session, user data.User, storage *storage.Manager) (GameSession, error) {
 	return GameSession{
 		Session:            session,
 		User:               user,
@@ -67,12 +66,12 @@ func NewGameSession(session Session, user user.Data, events *emitter.Emitter) (G
 		LastUpdate:         time.Now(),
 		HasValidSession:    false,
 		LogLineCounter:     0,
-		events:             events,
+		storage:            storage,
 	}, nil
 }
 
 // UpdateEncounter - Add or update encounter data
-func (s *GameSession) UpdateEncounter(encounter Encounter) {
+func (s *GameSession) UpdateEncounter(encounter data.Encounter) {
 	if time.Now().Sub(encounter.StartTime) > time.Hour {
 		return
 	}
@@ -82,7 +81,7 @@ func (s *GameSession) UpdateEncounter(encounter Encounter) {
 }
 
 // UpdateCombatant - Add or update combatant data
-func (s *GameSession) UpdateCombatant(combatant Combatant) {
+func (s *GameSession) UpdateCombatant(combatant data.Combatant) {
 	// ensure there is an active encounter
 	if !s.EncounterCollector.Encounter.Active {
 		return
@@ -113,7 +112,7 @@ func (s *GameSession) GetLogPath() string {
 }
 
 // UpdateLogLine - Add log line to buffer
-func (s *GameSession) UpdateLogLine(logLine LogLine) {
+func (s *GameSession) UpdateLogLine(logLine data.LogLine) {
 	if time.Now().Sub(logLine.Time) > time.Hour {
 		return
 	}
@@ -150,7 +149,7 @@ func (s *GameSession) UpdateLogLine(logLine LogLine) {
 
 // ClearLogLines - Clear log lines from current session
 func (s *GameSession) ClearLogLines() {
-	s.LogLineBuffer = make([]LogLine, 0)
+	s.LogLineBuffer = make([]data.LogLine, 0)
 	os.Remove(s.GetLogTempPath())
 }
 
@@ -172,7 +171,7 @@ func (s *GameSession) DumpLogLineBuffer() error {
 		}
 	}
 	// clear buffer
-	s.LogLineBuffer = make([]LogLine, 0)
+	s.LogLineBuffer = make([]data.LogLine, 0)
 	return nil
 }
 
@@ -202,36 +201,22 @@ func (s *GameSession) SaveEncounter() error {
 	}
 	s.EncounterCollector.Encounter.CompareHash = fmt.Sprintf("%x", h.Sum(nil))
 	// insert in to encounter table
-	finE := make(chan bool)
-	s.events.Emit(
-		"database:save",
-		finE,
-		&s.EncounterCollector.Encounter,
-		int(s.User.ID),
-	)
-	<-finE
+	store := make([]interface{}, 1)
+	store[0] = &s.EncounterCollector.Encounter
+	s.storage.Store(store)
 	// insert in to combatant+player tables
 	for _, combatantSnapshots := range combatants {
 		// insert combatant
 		for _, combatant := range combatantSnapshots {
 			combatant.EncounterUID = s.EncounterCollector.Encounter.UID
-			finC := make(chan bool)
-			s.events.Emit(
-				"database:save",
-				finC,
-				&combatant,
-				int(s.User.ID),
-			)
-			<-finC
+			store := make([]interface{}, 1)
+			store[0] = &combatant
+			s.storage.Store(store)
 		}
 		// insert player
-		finP := make(chan bool)
-		s.events.Emit(
-			"database:save",
-			finP,
-			&combatantSnapshots[0].Player,
-		)
-		<-finP
+		store := make([]interface{}, 1)
+		store[0] = &combatantSnapshots[0].Player
+		s.storage.Store(store)
 	}
 	// dump log lines
 	err := s.DumpLogLineBuffer()
@@ -283,43 +268,42 @@ func (s *GameSession) ClearEncounter() {
 }
 
 // getEncounterCombatants - fetch all combatants in an encounter
-func getEncounterCombatants(events *emitter.Emitter, user user.Data, encounterUID string) (CombatantCollector, error) {
-	combatants := make([]Combatant, 0)
-	fin := make(chan bool)
-	events.Emit(
-		"database:find",
-		fin,
-		&combatants,
-		int(user.ID),
-		encounterUID,
-	)
-	<-fin
+func getEncounterCombatants(sm *storage.Manager, user data.User, encounterUID string) (CombatantCollector, error) {
+	combatants, _, err := sm.Fetch(map[string]interface{}{
+		"type":          storage.StoreTypeCombatant,
+		"user_id":       int(user.ID),
+		"encounter_uid": encounterUID,
+	})
+	if err != nil {
+		return CombatantCollector{}, err
+	}
 	combatantCollector := NewCombatantCollector(&user)
 	for _, combatant := range combatants {
-		combatantCollector.UpdateCombatantTracker(combatant)
+		combatantCollector.UpdateCombatantTracker(combatant.(data.Combatant))
 	}
 	for index := range combatantCollector.CombatantTrackers {
-		combatantCollector.CombatantTrackers[index].Offset = Combatant{}
+		combatantCollector.CombatantTrackers[index].Offset = data.Combatant{}
 	}
 	return combatantCollector, nil
 }
 
 // GetPreviousEncounter - retrieve previous encounter data from database
-func GetPreviousEncounter(events *emitter.Emitter, user user.Data, encounterUID string) (GameSession, error) {
+func GetPreviousEncounter(sm *storage.Manager, user data.User, encounterUID string) (GameSession, error) {
 	// fetch encounter
-	encounter := Encounter{}
-	fin := make(chan bool)
-	events.Emit(
-		"database:fetch",
-		fin,
-		&encounter,
-		int(user.ID),
-		encounterUID,
-	)
-	<-fin
+	encounters, count, err := sm.Fetch(map[string]interface{}{
+		"type":    storage.StoreTypeEncounter,
+		"user_id": int(user.ID),
+		"uid":     encounterUID,
+	})
+	if err != nil {
+		return GameSession{}, err
+	}
+	if count == 0 {
+		return GameSession{}, fmt.Errorf("no previous encounter found with user id '%d' and encounter uid '%s'", user.ID, encounterUID)
+	}
 	// fetch combatants
 	combatantCollector, err := getEncounterCombatants(
-		events,
+		sm,
 		user,
 		encounterUID,
 	)
@@ -328,7 +312,7 @@ func GetPreviousEncounter(events *emitter.Emitter, user user.Data, encounterUID 
 	}
 	// build encounter collector
 	encounterCollector := NewEncounterCollector(&user)
-	encounterCollector.Encounter = encounter
+	encounterCollector.Encounter = encounters[0].(data.Encounter)
 	// return data set
 	s := GameSession{
 		User:               user,
@@ -340,8 +324,8 @@ func GetPreviousEncounter(events *emitter.Emitter, user user.Data, encounterUID 
 
 // GetPreviousEncounters - retrieve list of previous encounters
 func GetPreviousEncounters(
-	events *emitter.Emitter,
-	user user.Data,
+	sm *storage.Manager,
+	user data.User,
 	offset int,
 	query string,
 	start *time.Time,
@@ -349,31 +333,29 @@ func GetPreviousEncounters(
 	totalCount *int,
 ) ([]GameSession, error) {
 
-	encounters := make([]Encounter, 0)
-	fin := make(chan bool)
-	events.Emit(
-		"database:find",
-		fin,
-		&encounters,
-		int(user.ID),
-		offset,
-		query,
-		start,
-		end,
-		totalCount,
-	)
-	<-fin
+	encounters, count, err := sm.Fetch(map[string]interface{}{
+		"type":    storage.StoreTypeEncounter,
+		"user_id": int(user.ID),
+		"query":   query,
+		"start":   start,
+		"end":     end,
+		"offset":  offset,
+	})
+	*totalCount = count
 	sessionRes := make([]GameSession, 0)
+	if err != nil {
+		return sessionRes, err
+	}
 	for _, encounter := range encounters {
 		// build collectors
 		encounterCollector := NewEncounterCollector(&user)
-		encounterCollector.Encounter = encounter
+		encounterCollector.Encounter = encounter.(data.Encounter)
 		// build data object
 		sess := GameSession{
 			User:               user,
 			EncounterCollector: encounterCollector,
 			CombatantCollector: CombatantCollector{},
-			HasLogs:            encounter.HasLogs,
+			HasLogs:            encounter.(data.Encounter).HasLogs,
 		}
 		sessionRes = append(sessionRes, sess)
 	}
@@ -384,113 +366,4 @@ func GetPreviousEncounters(
 func (s *GameSession) IsActive() bool {
 	dur := time.Now().Sub(s.LastUpdate)
 	return dur < time.Duration(app.LastUpdateInactiveTime*time.Millisecond)
-}
-
-// CleanUpEncounters - delete log files for old encounters
-func CleanUpEncounters(events *emitter.Emitter) {
-	for range time.Tick(app.EncounterCleanUpRate * time.Millisecond) {
-		log.Println("[CLEAN] Begin log clean up.")
-		// fetch encounters
-		encounterUIDs := make([]string, 0)
-		fin := make(chan bool)
-		events.Emit(
-			"database:find_encounter_log_clean",
-			fin,
-			&encounterUIDs,
-		)
-		<-fin
-		// itterate uids and clean up log entries
-		cleanUpCount := 0
-		for _, uid := range encounterUIDs {
-			// flag removal of log
-			finC := make(chan bool)
-			events.Emit(
-				"database:flag_encounter_log_clean",
-				finC,
-				uid,
-			)
-			<-finC
-			// check if log exists
-			logPath := getPermanentLogPath(uid)
-			if _, err := os.Stat(logPath); os.IsNotExist(err) {
-				// update database if log file is missing
-				log.Println("[CLEAN] Delete log for", uid, "(log flag missing from database)")
-				continue
-			}
-			// delete log file
-			err := os.Remove(logPath)
-			if err != nil {
-				log.Println("[CLEAN] Error", uid, err.Error())
-				continue
-			}
-			log.Println("[CLEAN] Delete log for", uid)
-			cleanUpCount++
-		}
-		// delete encounters
-		encountersDeleted := int64(0)
-		fin2 := make(chan bool)
-		events.Emit(
-			"database:encounter_clean",
-			fin2,
-			&encountersDeleted,
-		)
-		<-fin2
-		log.Println("[CLEAN] Completes. Removed", cleanUpCount, "log(s) and", encountersDeleted, "encounters(s).")
-	}
-}
-
-// GetTotalEncounterCount - get total number of encounters
-func GetTotalEncounterCount(events *emitter.Emitter) int {
-	res := int(0)
-	fin := make(chan bool)
-	events.Emit(
-		"database:total_count",
-		fin,
-		&res,
-		"encounter",
-	)
-	<-fin
-	return res
-}
-
-// GetTotalCombatantCount - get total number of combatants
-func GetTotalCombatantCount(events *emitter.Emitter) int {
-	res := int(0)
-	fin := make(chan bool)
-	events.Emit(
-		"database:total_count",
-		fin,
-		&res,
-		"combatant",
-	)
-	<-fin
-	return res
-}
-
-// GetTotalPlayerCount - get total number of players
-func GetTotalPlayerCount(events *emitter.Emitter) int {
-	res := int(0)
-	fin := make(chan bool)
-	events.Emit(
-		"database:total_count",
-		fin,
-		&res,
-		"player",
-	)
-	<-fin
-	return res
-}
-
-// GetTotalUserCount - get total number of users
-func GetTotalUserCount(events *emitter.Emitter) int {
-	res := int(0)
-	fin := make(chan bool)
-	events.Emit(
-		"database:total_count",
-		fin,
-		&res,
-		"user",
-	)
-	<-fin
-	return res
 }
