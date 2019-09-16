@@ -21,7 +21,10 @@ import (
 	"crypto/md5"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
+	"os"
+	"path"
 	"sort"
 	"strconv"
 	"time"
@@ -127,20 +130,27 @@ func (s *GameSession) ClearLogLines() {
 	s.LogLineBuffer = make([]data.LogLine, 0)
 }
 
+// GetLogTempPath - Get path to temp log lines file
+func (s *GameSession) GetLogTempPath() string {
+	return path.Join(os.TempDir(), fmt.Sprintf("fflp_LogLine_%s.dat", s.EncounterCollector.Encounter.UID))
+}
+
 // DumpLogLineBuffer - Dump log line buffer to file storage
 func (s *GameSession) DumpLogLineBuffer() error {
-	// no encounter
-	if s.EncounterCollector.Encounter.UID == "" {
-		return nil
+	logBytes := make([]byte, 0)
+	for _, logLine := range s.LogLineBuffer {
+		logBytes = append(logBytes, logLine.ToBytes()...)
 	}
-	// dump loglines to storage
-	store := make([]interface{}, len(s.LogLineBuffer))
-	for index, logLine := range s.LogLineBuffer {
-		store[index] = &logLine
-	}
-	err := s.Storage.Store(store)
-	if err != nil {
-		return err
+	if len(logBytes) > 0 {
+		f, err := os.OpenFile(s.GetLogTempPath(), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
+		if err != nil {
+			return err
+		}
+		defer f.Close()
+		_, err = f.Write(logBytes)
+		if err != nil {
+			return err
+		}
 	}
 	// clear buffer
 	s.LogLineBuffer = make([]data.LogLine, 0)
@@ -183,19 +193,37 @@ func (s *GameSession) SaveEncounter() error {
 		for _, combatant := range combatantSnapshots {
 			combatant.EncounterUID = s.EncounterCollector.Encounter.UID
 			combatant.UserID = s.User.ID
+			combatant.Player = combatantSnapshots[0].Player
 			store[0] = &combatant
 			s.Storage.Store(store)
 		}
-		// insert player
-		store[0] = &combatantSnapshots[0].Player
-		s.Storage.Store(store)
 	}
 	// dump log lines
 	err := s.DumpLogLineBuffer()
 	if err != nil {
 		return err
 	}
-	return nil
+	// save log lines
+	logBytes, err := ioutil.ReadFile(s.GetLogTempPath())
+	if err != nil {
+		if err == os.ErrNotExist {
+			return nil
+		}
+		return err
+	}
+	logLines, _, err := data.DecodeLogLineBytesFile(logBytes)
+	if err != nil {
+		return err
+	}
+	logStore := make([]interface{}, len(logBytes))
+	for index := range logLines {
+		logStore[index] = &logLines[index]
+	}
+	err = s.Storage.Store(logStore)
+	if err != nil {
+		return err
+	}
+	return os.Remove(s.GetLogTempPath())
 }
 
 // ClearEncounter - delete all data for current encounter from memory

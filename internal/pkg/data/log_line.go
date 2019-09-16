@@ -69,12 +69,7 @@ func (l *LogLine) FromBytes(data []byte) error {
 }
 
 // DecodeLogLineBytesFile - Create LogLine struct from data stored in log file
-func DecodeLogLineBytesFile(data []byte) ([]LogLine, int, error) {
-	// should be compressed
-	logBytes, err := DecompressBytes(data)
-	if err != nil {
-		return nil, 0, err
-	}
+func DecodeLogLineBytesFile(logBytes []byte) ([]LogLine, int, error) {
 	// itterate log bytes and convert to log line
 	pos := 0
 	logLines := make([]LogLine, 0)

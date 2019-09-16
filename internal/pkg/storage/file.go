@@ -113,7 +113,8 @@ func (f *FileHandler) Store(objs []interface{}) error {
 		// data to write
 		if len(byteData) > 0 && uid != "" && dType != "" {
 			if dFile == nil {
-				dFile, err := f.getWriteFile(dType, uid)
+				var err error
+				dFile, err = f.getWriteFile(dType, uid)
 				if err != nil {
 					return err
 				}

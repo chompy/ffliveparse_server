@@ -758,30 +758,39 @@ func sendInitData(ws *websocket.Conn, gameSession *act.GameSession) {
 	websocket.Message.Send(ws, compressData)
 	// send logs
 	if gameSession != nil && gameSession.Storage != nil && gameSession.EncounterCollector.Encounter.UID != "" {
-		logBytes, _, err := gameSession.Storage.FetchBytes(map[string]interface{}{
-			"type": storage.StoreTypeLogLine,
-			"uid":  gameSession.EncounterCollector.Encounter.UID,
-		})
-		if err != nil {
-			log.Println("[WEB] Error when opening log line file,", err)
-			return
+
+		var logBytes []byte
+
+		// active encounter
+		if gameSession.EncounterCollector.Encounter.Active {
+			// read from temp log lines
+			var err error
+			logBytes, err = ioutil.ReadFile(gameSession.GetLogTempPath())
+			if err != nil && err != os.ErrNotExist {
+				log.Println("[WEB] Error when opening log line file,", err)
+				return
+			}
+			logBytes, err = data.CompressBytes(logBytes)
+			if err != nil {
+				log.Println("[WEB] Error when opening log line file,", err)
+				return
+			}
+		} else {
+			logFetchBytes, _, err := gameSession.Storage.FetchBytes(map[string]interface{}{
+				"type": storage.StoreTypeLogLine,
+				"uid":  gameSession.EncounterCollector.Encounter.UID,
+			})
+			if err != nil {
+				log.Println("[WEB] Error when opening log line file,", err)
+				return
+			}
+			if len(logFetchBytes) == 0 || len(logFetchBytes[0]) == 0 {
+				return
+			}
+			logBytes = logFetchBytes[0]
 		}
-		if len(logBytes) == 0 || len(logBytes[0]) == 0 {
-			return
-		}
-		// needed? why?
-		output, err := data.DecompressBytes(logBytes[0])
-		if err != nil {
-			log.Println("[WEB] Error when opening log line file,", err)
-			return
-		}
-		output, err = data.CompressBytes(output)
-		if err != nil {
-			log.Println("[WEB] Error when opening log line file,", err)
-			return
-		}
-		log.Println("[WEB] Send", len(output), "bytes (log) of data to", ws.Request().RemoteAddr)
-		websocket.Message.Send(ws, output)
+		log.Println("[WEB] Send", len(logBytes), "bytes (log) of data to", ws.Request().RemoteAddr)
+		websocket.Message.Send(ws, logBytes)
 	}
 
 }
