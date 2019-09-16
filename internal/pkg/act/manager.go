@@ -157,7 +157,8 @@ func (m *Manager) ParseDataString(dataStr []byte, addr *net.UDPAddr) (*GameSessi
 			}
 			// parse combatant data
 			combatant := data.Combatant{}
-			err := combatant.FromBytes(dataStr)
+			pos := 0
+			err := data.CombatantFromActBytes(dataStr, &pos, &combatant)
 			if err != nil {
 				return nil, err
 			}
@@ -192,7 +193,7 @@ func (m *Manager) ParseDataString(dataStr []byte, addr *net.UDPAddr) (*GameSessi
 			}
 			// parse log line data
 			logLine := data.LogLine{}
-			err := logLine.FromBytes(dataStr)
+			err := logLine.FromActBytes(dataStr)
 			if err != nil {
 				return nil, err
 			}

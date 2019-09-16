@@ -209,7 +209,7 @@ class ViewBase
      */
     getViewWidth()
     {
-        return window.innerWidth;
+        return document.documentElement.clientWidth;
     }
 
     /**

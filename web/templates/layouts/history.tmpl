@@ -14,7 +14,7 @@
 
         <div class="encounter-search">
             <form name="encounter-search" method="GET" action="">
-                <input type="text" name="search" placeholder="Player name, zone name" value="{{ .HistorySearchQuery }}" />
+                <!-- <input type="text" name="search" placeholder="Player name, zone name" value="{{ .HistorySearchQuery }}" /> -->
                 <label>
                     From
                     <input type="date" name="start" value="{{ .HistoryStartDate }}" />
@@ -39,7 +39,6 @@
         <div class="encounter-item{{ if eq $val.EncounterCollector.Encounter.SuccessLevel 1 }} encounter-success{{ end }}">
             <div class="encounter-flags">
                 {{ if eq $val.EncounterCollector.Encounter.SuccessLevel 1 }}<span class="encounter-flag encounter-flag-success" title="Cleared">C</span>{{ end }}
-                {{ if eq $val.HasLogs true }}<span class="encounter-flag encounter-flag-logs" title="Log Data Available">L</span>{{ end }}
             </div>
             <div class="encounter-time" data-timestamp="{{ $val.EncounterCollector.Encounter.StartTime.Unix }}"><a href="/{{ $val.User.GetWebIDString }}/{{ $val.EncounterCollector.Encounter.UID }}">?</a></div>
             <div class="encounter-zone" title="{{ $val.EncounterCollector.Encounter.Zone }}">{{ $val.EncounterCollector.Encounter.Zone }}</div>

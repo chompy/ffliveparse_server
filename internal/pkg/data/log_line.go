@@ -44,13 +44,25 @@ func (l *LogLine) ToBytes() []byte {
 	return data
 }
 
+// FromActBytes - Convert act bytes to log line
+func (l *LogLine) FromActBytes(data []byte) error {
+	if data[0] != DataTypeLogLine {
+		return errors.New("invalid data type for LogLine")
+	}
+	pos := 1
+	l.ActEncounterID = readUint32(data, &pos)
+	l.Time = readTime(data, &pos)
+	l.LogLine = readString(data, &pos)
+	return nil
+}
+
 // FromBytes - Convert bytes to log line
 func (l *LogLine) FromBytes(data []byte) error {
 	if data[0] != DataTypeLogLine {
 		return errors.New("invalid data type for LogLine")
 	}
 	pos := 1
-	l.ActEncounterID = readUint32(data, &pos)
+	l.EncounterUID = readString(data, &pos)
 	l.Time = readTime(data, &pos)
 	l.LogLine = readString(data, &pos)
 	return nil

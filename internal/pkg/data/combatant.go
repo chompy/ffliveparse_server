@@ -96,8 +96,8 @@ func (c *Combatant) FromBytes(data []byte) error {
 	return CombatantFromBytes(data, &pos, c)
 }
 
-// CombatantFromBytes - read combatant from bytes
-func CombatantFromBytes(data []byte, pos *int, c *Combatant) error {
+// CombatantFromActBytes - read combatant from bytes recieved from ACT
+func CombatantFromActBytes(data []byte, pos *int, c *Combatant) error {
 	if data[0] != DataTypeCombatant {
 		return errors.New("invalid data type for Combatant")
 	}
@@ -118,6 +118,31 @@ func CombatantFromBytes(data []byte, pos *int, c *Combatant) error {
 	c.Heals = readInt32(data, pos)
 	c.Kills = readInt32(data, pos)
 	c.Time = time.Now()
+	return nil
+}
+
+// CombatantFromBytes - read combatant from bytes
+func CombatantFromBytes(data []byte, pos *int, c *Combatant) error {
+	if data[0] != DataTypeCombatant {
+		return errors.New("invalid data type for Combatant")
+	}
+	*pos++
+	c.EncounterUID = readString(data, pos)
+	c.Player = Player{
+		ID:    readInt32(data, pos),
+		Name:  readString(data, pos),
+		World: readString(data, pos),
+	}
+	c.Player.ActName = c.Player.Name
+	c.Job = readString(data, pos)
+	c.Damage = readInt32(data, pos)
+	c.DamageTaken = readInt32(data, pos)
+	c.DamageHealed = readInt32(data, pos)
+	c.Deaths = readInt32(data, pos)
+	c.Hits = readInt32(data, pos)
+	c.Heals = readInt32(data, pos)
+	c.Kills = readInt32(data, pos)
+	c.Time = readTime(data, pos)
 	return nil
 }
 

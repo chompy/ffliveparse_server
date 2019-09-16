@@ -38,12 +38,12 @@ func ParamGetInt(params map[string]interface{}, key string) int {
 }
 
 // ParamGetTime - fetch time from param list
-func ParamGetTime(params map[string]interface{}, key string) time.Time {
+func ParamGetTime(params map[string]interface{}, key string) *time.Time {
 	val := params[key]
 	if val == nil {
-		return time.Time{}
+		return nil
 	}
-	return val.(time.Time)
+	return val.(*time.Time)
 }
 
 // ParamGetID - fetch id from param list
@@ -61,7 +61,7 @@ func ParamGetUID(params map[string]interface{}) string {
 }
 
 // ParamGetDate - fetch date from param list
-func ParamGetDate(params map[string]interface{}) time.Time {
+func ParamGetDate(params map[string]interface{}) *time.Time {
 	return ParamGetTime(params, "date")
 }
 

@@ -251,6 +251,7 @@ class ViewOverview extends ViewBase
         this._processCooldownQueue();
         this._updateElements();
         this._updateCooldowns();
+        this.onResize();
         var t = this;
         this.tickTimeout = setTimeout(
             function() { t.tick(); },

@@ -18,15 +18,10 @@ along with FFLiveParse.  If not, see <https://www.gnu.org/licenses/>.
 package act
 
 import (
-	"bufio"
-	"compress/gzip"
 	"crypto/md5"
 	"fmt"
 	"io"
 	"log"
-	"os"
-	"path"
-	"path/filepath"
 	"sort"
 	"strconv"
 	"time"
@@ -38,7 +33,7 @@ import (
 	_ "github.com/mattn/go-sqlite3" // sqlite driver
 )
 
-// logLineRetainCount - Number of log lines to retain in memory before dumping to temp file
+// logLineRetainCount - Number of log lines to retain in memory before dumping to file
 const logLineRetainCount = 1000
 
 // GameSession - data about an ACT session
@@ -51,9 +46,8 @@ type GameSession struct {
 	LastUpdate         time.Time
 	NewTickData        bool
 	HasValidSession    bool
-	HasLogs            bool
 	LogLineCounter     int
-	storage            *storage.Manager
+	Storage            *storage.Manager
 }
 
 // NewGameSession - create new ACT session data
@@ -66,7 +60,7 @@ func NewGameSession(session data.Session, user data.User, storage *storage.Manag
 		LastUpdate:         time.Now(),
 		HasValidSession:    false,
 		LogLineCounter:     0,
-		storage:            storage,
+		Storage:            storage,
 	}, nil
 }
 
@@ -90,25 +84,6 @@ func (s *GameSession) UpdateCombatant(combatant data.Combatant) {
 	s.NewTickData = true
 	// update combatant collector
 	s.CombatantCollector.UpdateCombatantTracker(combatant)
-}
-
-// GetLogTempPath - Get path to temp log lines file
-func (s *GameSession) GetLogTempPath() string {
-	return path.Join(os.TempDir(), fmt.Sprintf("fflp_LogLine_%s.dat", s.EncounterCollector.Encounter.UID))
-}
-
-// getPermanentLogPath - Get path to permanent log file from uid
-func getPermanentLogPath(uid string) string {
-	return filepath.Join(app.LogPath, uid+"_LogLines.dat")
-}
-
-// GetLogPath - Get path to log lines file
-func (s *GameSession) GetLogPath() string {
-	tempPath := s.GetLogTempPath()
-	if _, err := os.Stat(tempPath); os.IsNotExist(err) {
-		return getPermanentLogPath(s.EncounterCollector.Encounter.UID)
-	}
-	return tempPath
 }
 
 // UpdateLogLine - Add log line to buffer
@@ -150,25 +125,22 @@ func (s *GameSession) UpdateLogLine(logLine data.LogLine) {
 // ClearLogLines - Clear log lines from current session
 func (s *GameSession) ClearLogLines() {
 	s.LogLineBuffer = make([]data.LogLine, 0)
-	os.Remove(s.GetLogTempPath())
 }
 
-// DumpLogLineBuffer - Dump log line buffer to temp file
+// DumpLogLineBuffer - Dump log line buffer to file storage
 func (s *GameSession) DumpLogLineBuffer() error {
-	logBytes := make([]byte, 0)
-	for _, logLine := range s.LogLineBuffer {
-		logBytes = append(logBytes, logLine.ToBytes()...)
+	// no encounter
+	if s.EncounterCollector.Encounter.UID == "" {
+		return nil
 	}
-	if len(logBytes) > 0 {
-		f, err := os.OpenFile(s.GetLogTempPath(), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
-		if err != nil {
-			return err
-		}
-		defer f.Close()
-		_, err = f.Write(logBytes)
-		if err != nil {
-			return err
-		}
+	// dump loglines to storage
+	store := make([]interface{}, len(s.LogLineBuffer))
+	for index, logLine := range s.LogLineBuffer {
+		store[index] = &logLine
+	}
+	err := s.Storage.Store(store)
+	if err != nil {
+		return err
 	}
 	// clear buffer
 	s.LogLineBuffer = make([]data.LogLine, 0)
@@ -204,7 +176,7 @@ func (s *GameSession) SaveEncounter() error {
 	s.EncounterCollector.Encounter.UserID = s.User.ID
 	store := make([]interface{}, 1)
 	store[0] = &s.EncounterCollector.Encounter
-	s.storage.Store(store)
+	s.Storage.Store(store)
 	// insert in to combatant+player tables
 	for _, combatantSnapshots := range combatants {
 		// insert combatant
@@ -212,51 +184,17 @@ func (s *GameSession) SaveEncounter() error {
 			combatant.EncounterUID = s.EncounterCollector.Encounter.UID
 			combatant.UserID = s.User.ID
 			store[0] = &combatant
-			s.storage.Store(store)
+			s.Storage.Store(store)
 		}
 		// insert player
 		store[0] = &combatantSnapshots[0].Player
-		s.storage.Store(store)
+		s.Storage.Store(store)
 	}
 	// dump log lines
 	err := s.DumpLogLineBuffer()
 	if err != nil {
 		return err
 	}
-	// open temp log file
-	tempLogFile, err := os.Open(s.GetLogTempPath())
-	if err != nil {
-		return err
-	}
-	defer tempLogFile.Close()
-	// open output log file
-	logFilePath := filepath.Join(app.LogPath, s.EncounterCollector.Encounter.UID+"_LogLines.dat")
-	outLogFile, err := os.OpenFile(logFilePath, os.O_WRONLY|os.O_CREATE, 0664)
-	if err != nil {
-		return err
-	}
-	defer outLogFile.Close()
-	// create gzip writer
-	gzOutLogFile := gzip.NewWriter(outLogFile)
-	defer gzOutLogFile.Close()
-	gzFw := bufio.NewWriter(gzOutLogFile)
-	// itterate log lines and write to output
-	var logBuf []byte
-	for {
-		logBuf = make([]byte, 4096)
-		_, err := tempLogFile.Read(logBuf)
-		if err != nil {
-			if err == io.EOF {
-				break
-			}
-			return err
-		}
-		_, err = gzFw.Write(logBuf)
-		if err != nil {
-			return err
-		}
-	}
-	gzFw.Flush()
 	return nil
 }
 
@@ -318,6 +256,7 @@ func GetPreviousEncounter(sm *storage.Manager, user data.User, encounterUID stri
 		User:               user,
 		EncounterCollector: encounterCollector,
 		CombatantCollector: combatantCollector,
+		Storage:            sm,
 	}
 	return s, nil
 }
@@ -332,7 +271,6 @@ func GetPreviousEncounters(
 	end *time.Time,
 	totalCount *int,
 ) ([]GameSession, error) {
-
 	encounters, count, err := sm.Fetch(map[string]interface{}{
 		"type":    storage.StoreTypeEncounter,
 		"user_id": int(user.ID),
@@ -355,7 +293,7 @@ func GetPreviousEncounters(
 			User:               user,
 			EncounterCollector: encounterCollector,
 			CombatantCollector: CombatantCollector{},
-			HasLogs:            encounter.(data.Encounter).HasLogs,
+			Storage:            sm,
 		}
 		sessionRes = append(sessionRes, sess)
 	}

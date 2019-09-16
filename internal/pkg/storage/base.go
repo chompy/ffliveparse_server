@@ -18,7 +18,7 @@ along with FFLiveParse.  If not, see <https://www.gnu.org/licenses/>.
 package storage
 
 // StoreTypeLogLine - denotes log line storage type
-const StoreTypeLogLine = "LogLine"
+const StoreTypeLogLine = "LogLines"
 
 // StoreTypeCombatant - denotes combatant storage type
 const StoreTypeCombatant = "Combatant"
@@ -41,5 +41,6 @@ type BaseHandler interface {
 	Store(data []interface{}) error
 	FetchBytes(params map[string]interface{}) ([]byte, int, error)
 	Fetch(params map[string]interface{}) ([]interface{}, int, error)
+	Remove(params map[string]interface{}) (int, error)
 	CleanUp() error
 }

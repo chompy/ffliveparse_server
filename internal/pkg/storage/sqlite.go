@@ -78,7 +78,6 @@ func (s *SqliteHandler) createEncounterTable() error {
 			zone VARCHAR(256),
 			damage INTEGER,
 			success_level INTEGER,
-			has_logs BOOL,
 			CONSTRAINT encounter_uid_unique UNIQUE (uid)
 		)
 	`)
@@ -172,8 +171,8 @@ func (s *SqliteHandler) Store(objs []interface{}) error {
 				log.Printf("[STORAGE][SQLITE] Store encounter '%s.'", encounter.UID)
 				stmt, err := s.db.Prepare(`
 					REPLACE INTO encounter
-					(uid, act_id, compare_hash, user_id, start_time, end_time, zone, damage, success_level, has_logs) VALUES
-					(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+					(uid, act_id, compare_hash, user_id, start_time, end_time, zone, damage, success_level) VALUES
+					(?, ?, ?, ?, ?, ?, ?, ?, ?)
 				`)
 				if err != nil {
 					return err
@@ -189,7 +188,6 @@ func (s *SqliteHandler) Store(objs []interface{}) error {
 					encounter.Zone,
 					encounter.Damage,
 					encounter.SuccessLevel,
-					encounter.HasLogs,
 				)
 				if err != nil {
 					return err
@@ -366,41 +364,27 @@ func (s *SqliteHandler) Fetch(params map[string]interface{}) ([]interface{}, int
 						if val == 0 {
 							break
 						}
-						sqlWhereQueryStr = s.appendWhereQueryString(sqlWhereQueryStr, "user_id = ?")
+						sqlWhereQueryStr = s.appendWhereQueryString(sqlWhereQueryStr, "encounter.user_id = ?")
 						sqlQueryParams = append(sqlQueryParams, val)
 						break
 					}
-				case "query":
-					{
-						val := ParamGetString(params, key)
-						if val == "" {
-							break
-						}
-						sqlWhereQueryStr = s.appendWhereQueryString(sqlWhereQueryStr, "(zone LIKE ? OR player.name LIKE ?)")
-						sqlQueryParams = append(sqlQueryParams, "%"+val+"%", "%"+val+"%")
-						break
-					}
-				case "start":
-				case "start_time":
-				case "start_date":
+				case "start", "start_time", "start_date":
 					{
 						val := ParamGetTime(params, key)
-						if (val == time.Time{}) {
+						if val == nil {
 							break
 						}
 						sqlWhereQueryStr = s.appendWhereQueryString(sqlWhereQueryStr, "DATETIME(start_time) >= ?")
 						sqlQueryParams = append(sqlQueryParams, val.UTC())
 						break
 					}
-				case "end":
-				case "end_time":
-				case "end_date":
+				case "end", "end_time", "end_date":
 					{
 						val := ParamGetTime(params, key)
-						if (val == time.Time{}) {
+						if val == nil {
 							break
 						}
-						sqlWhereQueryStr = s.appendWhereQueryString(sqlWhereQueryStr, "DATETIME(end_time) >= ?")
+						sqlWhereQueryStr = s.appendWhereQueryString(sqlWhereQueryStr, "DATETIME(end_time) <= ?")
 						sqlQueryParams = append(sqlQueryParams, val.UTC())
 						break
 					}
@@ -419,10 +403,10 @@ func (s *SqliteHandler) Fetch(params map[string]interface{}) ([]interface{}, int
 			// build the rest of the query
 			sqlQueryStr := `
 				SELECT 
-				uid, act_id, compare_hash, start_time, end_time, zone, damage, success_level, has_logs,
+				uid, act_id, compare_hash, start_time, end_time, zone, encounter.damage, success_level,
 				(SELECT COUNT(*) FROM encounter ` + sqlWhereQueryStr + `)
 				FROM 
-				encounter 
+				encounter
 				` + sqlWhereQueryStr + `
 				ORDER BY DATETIME(start_time) DESC
 				LIMIT ?
@@ -456,7 +440,6 @@ func (s *SqliteHandler) Fetch(params map[string]interface{}) ([]interface{}, int
 					&encounter.Zone,
 					&encounter.Damage,
 					&encounter.SuccessLevel,
-					&encounter.HasLogs,
 					&totalCount,
 				)
 				if err != nil {
@@ -476,8 +459,7 @@ func (s *SqliteHandler) Fetch(params map[string]interface{}) ([]interface{}, int
 			sqlWhereQueryStr := ""
 			for key := range params {
 				switch key {
-				case "uid":
-				case "encounter_uid":
+				case "uid", "encounter_uid":
 					{
 						val := ParamGetString(params, key)
 						sqlWhereQueryStr = s.appendWhereQueryString(sqlWhereQueryStr, "combatant.encounter_uid = ?")
@@ -707,21 +689,34 @@ func (s *SqliteHandler) Fetch(params map[string]interface{}) ([]interface{}, int
 	return output, totalCount, nil
 }
 
+// Remove - remove objects from database
+func (s *SqliteHandler) Remove(params map[string]interface{}) (int, error) {
+	return 0, nil
+}
+
 // CleanUp - perform clean up operations
 func (s *SqliteHandler) CleanUp() error {
+	startTime := time.Now()
+	count := int64(0)
+	log.Println("[STORAGE][SQLITE] Begin database clean up.")
 	// delete encounters older then EncounterDeleteDays days
 	cleanUpDate := time.Now().Add(time.Duration(-app.EncounterDeleteDays*24) * time.Hour)
-	_, err := s.db.Exec(
-		"DELETE FROM encounter WHERE DATETIME(start_time) < ? AND NOT has_logs",
+	res, err := s.db.Exec(
+		"DELETE FROM encounter WHERE DATETIME(start_time) < ?",
 		cleanUpDate,
 	)
 	if err != nil {
 		return err
 	}
+	rowCount, _ := res.RowsAffected()
+	count += rowCount
 	// delete all combatants that don't have an encounter
-	_, err = s.db.Exec(
+	res, err = s.db.Exec(
 		"DELETE FROM combatant WHERE (SELECT COUNT(*) FROM encounter WHERE uid = combatant.encounter_uid) = 0",
 	)
+	rowCount, _ = res.RowsAffected()
+	count += rowCount
 	// TODO - delete users that never uploaded
+	log.Println("[STORAGE][SQLITE] Database clean up complete. (", count, "records removed. ) (", time.Now().Sub(startTime), ")")
 	return err
 }

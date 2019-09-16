@@ -757,22 +757,31 @@ func sendInitData(ws *websocket.Conn, gameSession *act.GameSession) {
 	log.Println("[WEB] Send", len(compressData), "bytes (encounter/combatants) of data to", ws.Request().RemoteAddr)
 	websocket.Message.Send(ws, compressData)
 	// send logs
-	if gameSession != nil && gameSession.EncounterCollector.Encounter.UID != "" {
-		logPath := gameSession.GetLogPath()
-		logBytes, err := ioutil.ReadFile(logPath)
+	if gameSession != nil && gameSession.Storage != nil && gameSession.EncounterCollector.Encounter.UID != "" {
+		logBytes, _, err := gameSession.Storage.FetchBytes(map[string]interface{}{
+			"type": storage.StoreTypeLogLine,
+			"uid":  gameSession.EncounterCollector.Encounter.UID,
+		})
 		if err != nil {
 			log.Println("[WEB] Error when opening log line file,", err)
 			return
 		}
-		// compress if from temp path
-		if logPath == gameSession.GetLogTempPath() {
-			logBytes, err = data.CompressBytes(logBytes)
-			if err != nil {
-				log.Println("[WEB] Error when compressing log line data,", err)
-			}
+		if len(logBytes) == 0 || len(logBytes[0]) == 0 {
+			return
 		}
-		log.Println("[WEB] Send", len(logBytes), "bytes (log) of data to", ws.Request().RemoteAddr)
-		websocket.Message.Send(ws, logBytes)
+		// needed? why?
+		output, err := data.DecompressBytes(logBytes[0])
+		if err != nil {
+			log.Println("[WEB] Error when opening log line file,", err)
+			return
+		}
+		output, err = data.CompressBytes(output)
+		if err != nil {
+			log.Println("[WEB] Error when opening log line file,", err)
+			return
+		}
+		log.Println("[WEB] Send", len(output), "bytes (log) of data to", ws.Request().RemoteAddr)
+		websocket.Message.Send(ws, output)
 	}
 
 }

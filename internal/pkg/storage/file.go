@@ -18,12 +18,16 @@ along with FFLiveParse.  If not, see <https://www.gnu.org/licenses/>.
 package storage
 
 import (
+	"bufio"
 	"compress/gzip"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"os"
 	"path/filepath"
+	"time"
 
+	"../app"
 	"../data"
 )
 
@@ -67,6 +71,8 @@ func (f *FileHandler) Store(objs []interface{}) error {
 	dType := ""
 	var dFile *os.File
 	var gzWriter *gzip.Writer
+	var gzFw *bufio.Writer
+
 	// itterate data to store
 	for index := range objs {
 		var byteData []byte
@@ -112,11 +118,18 @@ func (f *FileHandler) Store(objs []interface{}) error {
 					return err
 				}
 				gzWriter = gzip.NewWriter(dFile)
+				gzFw = bufio.NewWriter(gzWriter)
 				defer gzWriter.Close()
 				defer dFile.Close()
 			}
-			gzWriter.Write(byteData)
+			gzFw.Write(byteData)
 		}
+	}
+	if gzFw != nil {
+		gzFw.Flush()
+		gzWriter.Flush()
+		gzWriter.Close()
+		dFile.Close()
 	}
 	return nil
 }
@@ -140,7 +153,7 @@ func (f *FileHandler) FetchBytes(params map[string]interface{}) ([]byte, int, er
 
 // Fetch - retrieve data from file system
 func (f *FileHandler) Fetch(params map[string]interface{}) ([]interface{}, int, error) {
-	/*byteData, count, err := f.FetchBytes(params)
+	byteData, count, err := f.FetchBytes(params)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -161,11 +174,48 @@ func (f *FileHandler) Fetch(params map[string]interface{}) ([]interface{}, int, 
 			}
 			return output, len(combatants), nil
 		}
-	}*/
+	}
 	return nil, 0, nil
+}
+
+// Remove - remove data from file system
+func (f *FileHandler) Remove(params map[string]interface{}) (int, error) {
+	dType := ParamsGetType(params)
+	if dType == "" {
+		return 0, nil
+	}
+	uid := ParamGetUID(params)
+	if uid == "" {
+		return 0, nil
+	}
+	err := os.Remove(f.getFilePath(dType, uid))
+	if err != nil {
+		if err == os.ErrNotExist {
+			return 0, nil
+		}
+		return 0, err
+	}
+	return 1, nil
 }
 
 // CleanUp - perform clean up operations
 func (f *FileHandler) CleanUp() error {
-	return nil
+	startTime := time.Now()
+	cleanCount := 0
+	log.Println("[STORAGE][FILE] Begin file clean up.")
+	cleanUpDate := time.Now().Add(time.Duration(-app.EncounterLogDeleteDays*24) * time.Hour)
+	err := filepath.Walk(f.path, func(path string, info os.FileInfo, err error) error {
+		if info.IsDir() || filepath.Ext(path) != ".dat" {
+			return nil
+		}
+		if info.ModTime().Before(cleanUpDate) {
+			cleanCount++
+			return os.Remove(path)
+		}
+		return nil
+	})
+	if err == nil {
+		log.Println("[STORAGE][FILE] File clean up completed. (", cleanCount, "files removed. ) (", time.Now().Sub(startTime), ")")
+	}
+	return err
 }

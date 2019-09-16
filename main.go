@@ -68,12 +68,20 @@ func main() {
 	playerStatTracker := act.NewStatsTracker(&storageManager)
 	go playerStatTracker.Start()
 
-	// clean up old encounters
+	// clean up old data
 	go storageManager.StartCleanUp()
-	go act.CleanUpEncounters(&storageManager)
 
 	// start http server
-	go web.HTTPStartServer(uint16(*httpPort), &userManager, &actManager, &events, &storageManager, &usageStatCollector, &playerStatTracker, *devModePtr)
+	go web.HTTPStartServer(
+		uint16(*httpPort),
+		&userManager,
+		&actManager,
+		&events,
+		&storageManager,
+		&usageStatCollector,
+		&playerStatTracker,
+		*devModePtr,
+	)
 
 	// start act listen server
 	act.Listen(uint16(*actPort), &actManager)

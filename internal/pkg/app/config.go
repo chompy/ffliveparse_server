@@ -40,9 +40,6 @@ const FileStorePath = "./data/store"
 // GlobalStatBanPath - path to global stat ban file
 const GlobalStatBanPath = "./data/conf/global_stat_bans.txt"
 
-// LogPath - path where log data is stored
-const LogPath = "./data/logs"
-
 // TickRate - how often combatant and encounter data should be sent to web user in ms
 const TickRate = 3000
 
