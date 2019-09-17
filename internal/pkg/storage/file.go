@@ -29,6 +29,7 @@ import (
 
 	"../app"
 	"../data"
+	times "gopkg.in/djherbis/times.v1"
 )
 
 // FileHandler - handles file storage
@@ -209,7 +210,8 @@ func (f *FileHandler) CleanUp() error {
 		if info.IsDir() || filepath.Ext(path) != ".dat" {
 			return nil
 		}
-		if info.ModTime().Before(cleanUpDate) {
+		t, err := times.Stat(path)
+		if !t.HasBirthTime() || t.BirthTime().Before(cleanUpDate) {
 			cleanCount++
 			return os.Remove(path)
 		}

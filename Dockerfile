@@ -12,6 +12,7 @@ RUN cd /app && \
     go get github.com/speps/go-hashids && \
     go get github.com/rs/xid && \
     go get github.com/yosssi/gcss/... && \
+    go get gopkg.in/djherbis/times.v1 && \
     go build -o app.bin && \
     apk del git build-base
 CMD ["/app/app.bin"]

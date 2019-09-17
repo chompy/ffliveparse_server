@@ -120,12 +120,16 @@ func (m *Manager) Fetch(params map[string]interface{}) ([]interface{}, int, erro
 
 // StartCleanUp - start clean up process
 func (m *Manager) StartCleanUp() {
-	for range time.Tick(app.EncounterCleanUpRate * time.Millisecond) {
+	doClean := func() {
 		start := time.Now()
 		log.Println("[STORAGE] Begin storage clean up.")
 		for index := range m.handlers {
 			m.handlers[index].CleanUp()
 		}
 		log.Println("[STORAGE] Storage clean up complete. (", time.Now().Sub(start), ")")
+	}
+	doClean()
+	for range time.Tick(app.EncounterCleanUpRate * time.Millisecond) {
+		doClean()
 	}
 }
