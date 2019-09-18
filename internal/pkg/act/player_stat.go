@@ -19,7 +19,6 @@ package act
 
 import (
 	"bufio"
-	"log"
 	"os"
 	"sort"
 	"strings"
@@ -51,6 +50,7 @@ type StatsTracker struct {
 	PlayerStats []data.PlayerStat `json:"players"`
 	events      *emitter.Emitter
 	storage     *storage.Manager
+	log         app.Logging
 }
 
 // NewStatsTracker - create new stats tracker
@@ -58,18 +58,18 @@ func NewStatsTracker(sm *storage.Manager) StatsTracker {
 	return StatsTracker{
 		PlayerStats: make([]data.PlayerStat, 0),
 		storage:     sm,
+		log:         app.Logging{ModuleName: "PLAYER-STATS"},
 	}
 }
 
 func (st *StatsTracker) collect() {
-	startTime := time.Now()
-	log.Println("[PLAYER-STATS] Collect global player stats...")
+	st.log.Start("Start player stat collection.")
 	// collect all player stats
 	playerStats, _, err := st.storage.Fetch(map[string]interface{}{
 		"type": storage.StoreTypePlayerStat,
 	})
 	if err != nil {
-		log.Println("[PLAYER-STATS] Error...", err)
+		st.log.Error(err)
 		return
 	}
 	// get ban list
@@ -99,12 +99,12 @@ func (st *StatsTracker) collect() {
 			st.PlayerStats = append(st.PlayerStats, stat.(data.PlayerStat))
 		}
 	}
-	log.Println("[PLAYER-STATS] Done (", time.Now().Sub(startTime), ")")
+	st.log.Finish("Finish player stat collection.")
 }
 
 // Start - start the stats tracker
 func (st *StatsTracker) Start() error {
-	log.Println("[PLAYER-STATS] Start global stat tracker.")
+	st.log.Log("Start player stat tracker.")
 	st.collect()
 	for range time.Tick(app.StatTrackerRefreshRate * time.Millisecond) {
 		st.collect()

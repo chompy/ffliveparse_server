@@ -18,7 +18,6 @@ along with FFLiveParse.  If not, see <https://www.gnu.org/licenses/>.
 package app
 
 import (
-	"log"
 	"time"
 
 	"github.com/olebedev/emitter"
@@ -48,6 +47,7 @@ type StatSnapshot struct {
 type StatCollector struct {
 	events    *emitter.Emitter
 	Snapshots []StatSnapshot `json:"snapshots"`
+	log       Logging
 }
 
 // NewStatCollector - create a new stat collector
@@ -55,13 +55,14 @@ func NewStatCollector(events *emitter.Emitter) StatCollector {
 	s := StatCollector{
 		events:    events,
 		Snapshots: make([]StatSnapshot, 0),
+		log:       Logging{ModuleName: "USAGE"},
 	}
 	return s
 }
 
 // Start - start stat collection
 func (s *StatCollector) Start() {
-	log.Println("[STAT] Start stat collector.")
+	s.log.Log("Start stat collector.")
 	for range time.Tick(StatSnapshotRate * time.Millisecond) {
 		s.TakeSnapshot()
 	}
@@ -69,7 +70,7 @@ func (s *StatCollector) Start() {
 
 // TakeSnapshot - take a new snapshot
 func (s *StatCollector) TakeSnapshot() {
-	log.Println("[STAT] Snapshot.")
+	s.log.Log("Snapshot.")
 	if len(s.Snapshots) >= StatMaxSnapshots {
 		s.Snapshots = s.Snapshots[len(s.Snapshots)-StatMaxSnapshots:]
 	}

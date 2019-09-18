@@ -62,6 +62,15 @@ func (u *User) GetWebIDString() (string, error) {
 	return u.webIDHash, nil
 }
 
+// GetWebIDStringNoError - get web id string without error output
+func (u *User) GetWebIDStringNoError() string {
+	str, err := u.GetWebIDString()
+	if err != nil {
+		return ""
+	}
+	return str
+}
+
 // GetWebIDStringFromID - convert user id to web id string
 func GetWebIDStringFromID(userID int64) (string, error) {
 	hd := hashids.NewData()

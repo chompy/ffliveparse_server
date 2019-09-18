@@ -18,7 +18,6 @@ along with FFLiveParse.  If not, see <https://www.gnu.org/licenses/>.
 package storage
 
 import (
-	"log"
 	"time"
 
 	"../app"
@@ -28,6 +27,7 @@ import (
 type Manager struct {
 	handlers []BaseHandler
 	_lock    bool
+	log      app.Logging
 }
 
 // NewManager - create new storage manager
@@ -35,6 +35,7 @@ func NewManager() Manager {
 	m := Manager{
 		handlers: make([]BaseHandler, 0),
 		_lock:    false,
+		log:      app.Logging{ModuleName: "STORAGE"},
 	}
 	return m
 }
@@ -121,12 +122,11 @@ func (m *Manager) Fetch(params map[string]interface{}) ([]interface{}, int, erro
 // StartCleanUp - start clean up process
 func (m *Manager) StartCleanUp() {
 	doClean := func() {
-		start := time.Now()
-		log.Println("[STORAGE] Begin storage clean up.")
+		m.log.Start("Begin clean up.")
 		for index := range m.handlers {
 			m.handlers[index].CleanUp()
 		}
-		log.Println("[STORAGE] Storage clean up complete. (", time.Now().Sub(start), ")")
+		m.log.Finish("Finish clean up.")
 	}
 	doClean()
 	for range time.Tick(app.EncounterCleanUpRate * time.Millisecond) {

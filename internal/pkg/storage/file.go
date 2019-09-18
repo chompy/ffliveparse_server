@@ -22,7 +22,6 @@ import (
 	"compress/gzip"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"os"
 	"path/filepath"
 	"time"
@@ -35,12 +34,14 @@ import (
 // FileHandler - handles file storage
 type FileHandler struct {
 	path string
+	log  app.Logging
 }
 
 // NewFileHandler - create new file handler
 func NewFileHandler(path string) (FileHandler, error) {
 	return FileHandler{
 		path: path,
+		log:  app.Logging{ModuleName: "STORAGE/FILE"},
 	}, nil
 }
 
@@ -73,7 +74,6 @@ func (f *FileHandler) Store(objs []interface{}) error {
 	var dFile *os.File
 	var gzWriter *gzip.Writer
 	var gzFw *bufio.Writer
-
 	// itterate data to store
 	for index := range objs {
 		var byteData []byte
@@ -84,6 +84,9 @@ func (f *FileHandler) Store(objs []interface{}) error {
 				logLine := objs[index].(*data.LogLine)
 				if logLine.EncounterUID == "" {
 					break
+				}
+				if index == 0 {
+					f.log.Log(fmt.Sprintf("Store %d log line objects for encounter '%s'.", len(objs), logLine.EncounterUID))
 				}
 				// must be of same uid/type as last item
 				if (uid != "" && logLine.EncounterUID != uid) || (dType != "" && dType != StoreTypeLogLine) {
@@ -100,6 +103,9 @@ func (f *FileHandler) Store(objs []interface{}) error {
 				combatant := objs[index].(*data.Combatant)
 				if combatant.EncounterUID == "" {
 					break
+				}
+				if index == 0 {
+					f.log.Log(fmt.Sprintf("Store %d combatant objects for encounter '%s'.", len(objs), combatant.EncounterUID))
 				}
 				// must be of same uid/type as last item
 				if (uid != "" && combatant.EncounterUID != uid) || (dType != "" && dType != StoreTypeCombatant) {
@@ -202,9 +208,8 @@ func (f *FileHandler) Remove(params map[string]interface{}) (int, error) {
 
 // CleanUp - perform clean up operations
 func (f *FileHandler) CleanUp() error {
-	startTime := time.Now()
 	cleanCount := 0
-	log.Println("[STORAGE][FILE] Begin file clean up.")
+	f.log.Start("Start file clean up.")
 	cleanUpDate := time.Now().Add(time.Duration(-app.EncounterLogDeleteDays*24) * time.Hour)
 	err := filepath.Walk(f.path, func(path string, info os.FileInfo, err error) error {
 		if info.IsDir() || filepath.Ext(path) != ".dat" {
@@ -218,7 +223,7 @@ func (f *FileHandler) CleanUp() error {
 		return nil
 	})
 	if err == nil {
-		log.Println("[STORAGE][FILE] File clean up completed. (", cleanCount, "files removed. ) (", time.Now().Sub(startTime), ")")
+		f.log.Finish(fmt.Sprintf("Finish file clean up. (%d files removed.)", cleanCount))
 	}
 	return err
 }

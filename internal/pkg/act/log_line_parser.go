@@ -363,7 +363,6 @@ func ParseLogLine(logLine data.LogLine) (LogLineData, error) {
 		{
 			re, err := regexp.Compile(" 0D:([A-Za-z\\-' ]*) HP at ([0-9]*)%")
 			if err != nil {
-				log.Println("13", logLineString)
 				return data, err
 			}
 			match := re.FindStringSubmatch(logLineString)

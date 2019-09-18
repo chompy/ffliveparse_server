@@ -18,7 +18,6 @@ along with FFLiveParse.  If not, see <https://www.gnu.org/licenses/>.
 package act
 
 import (
-	"log"
 	"net"
 	"strconv"
 )
@@ -38,7 +37,7 @@ func Listen(port uint16, manager *Manager) {
 	for {
 		n, addr, err := serverConn.ReadFromUDP(buf)
 		if err != nil {
-			log.Println("Failed to read message from", addr, ",", err)
+			//log.Println("Failed to read message from", addr, ",", err)
 			continue
 		}
 		_, err = manager.ParseDataString(buf[0:n], addr)

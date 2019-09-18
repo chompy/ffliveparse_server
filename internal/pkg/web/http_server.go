@@ -24,7 +24,6 @@ import (
 	"fmt"
 	"html/template"
 	"io/ioutil"
-	"log"
 	"math"
 	"net/http"
 	"os"
@@ -99,12 +98,16 @@ func HTTPStartServer(
 	playerStatTracker *act.StatsTracker,
 	devMode bool,
 ) {
+	// init logger
+	appLog := app.Logging{ModuleName: "WEB"}
 	// load html templates
+	appLog.Start("Start loading HTML templates.")
 	var err error
 	htmlTemplates, err = getTemplates()
 	if err != nil {
-		log.Panicln("Error occured while loading HTML templates,", err)
+		appLog.Panic(err)
 	}
+	appLog.Finish("Finished loading HTML templates.")
 	// count page loads
 	pageLoads := 0
 	// websocket connection list
@@ -112,17 +115,19 @@ func HTTPStartServer(
 	// serve static assets
 	http.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("./web/static"))))
 	// compile/minify javascript, serve compiled js
+	appLog.Start("Start compiling javascript.")
 	compiledJs, err := compileJavascript()
 	if err != nil {
-		log.Panicln("Error occured while compiling javascript,", err)
+		appLog.Panic(err)
 	}
+	appLog.Finish("Finished compiling javascript.")
 	http.HandleFunc("/app.min.js", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/javascript;charset=utf-8")
 		// in dev mode recompile js every request
 		if devMode {
 			compiledJs, err = compileJavascript()
 			if err != nil {
-				log.Panicln("Error occured while compiling javascript,", err)
+				appLog.Panic(err)
 			}
 		}
 		fmt.Fprint(w, compiledJs["app.js"])
@@ -133,23 +138,25 @@ func HTTPStartServer(
 		if devMode {
 			compiledJs, err = compileJavascript()
 			if err != nil {
-				log.Panicln("Error occured while compiling javascript,", err)
+				appLog.Panic(err)
 			}
 		}
 		fmt.Fprint(w, compiledJs["worker.js"])
 	})
 	// compile/minify css, serve compiled css
+	appLog.Start("Start compiling CSS.")
 	compiledCSS, err := compileGCSS()
 	if err != nil {
-		log.Panicln("Error occured while compiling CSS,", err)
+		appLog.Panic(err)
 	}
+	appLog.Finish("Finished compiling CSS.")
 	http.HandleFunc("/app.min.css", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/css;charset=utf-8")
 		// in dev mode recompile css every request
 		if devMode {
 			compiledCSS, err = compileGCSS()
 			if err != nil {
-				log.Panicln("Error occured while compiling CSS,", err)
+				appLog.Panic(err)
 			}
 		}
 		fmt.Fprint(w, compiledCSS["app.min.css"])
@@ -169,27 +176,25 @@ func HTTPStartServer(
 		if len(urlPathParts) >= 3 {
 			encounterUID = urlPathParts[2]
 		}
+		appLog.Log(fmt.Sprintf("Start web socket connection for user '%s' from '%s.'", userID, ws.Request().RemoteAddr))
 		// fetch user data
 		userData, err := userManager.LoadFromWebIDString(userID)
 		if err != nil {
-			log.Println("[WEB] Error when attempting to retreive user", userID, ",", err)
+			appLog.Error(err)
 			return
 		}
-		// log
-
-		log.Println("[WEB] New web socket session for user", userData.ID, "from", ws.Request().RemoteAddr)
 		// get act data from web ID
 		actSession, err := actManager.GetSessionWithWebID(userID)
 		if err != nil {
-			log.Println("[WEB] Error when attempting to retreive user", userID, ",", err)
+			appLog.Error(err)
 			return
 		}
 		// relay previous encounter data if encounter id was provided
 		if encounterUID != "" && (actSession == nil || encounterUID != actSession.EncounterCollector.Encounter.UID) {
-			log.Println("[WEB] Load previous encounter data (EncounterUID:", encounterUID, ", UserID:", userData.ID, ")")
+			appLog.Log(fmt.Sprintf("Load previous encounter '%s' for user '%s.'", encounterUID, userID))
 			previousEncounter, err := act.GetPreviousEncounter(storageManager, userData, encounterUID)
 			if err != nil {
-				log.Println("[WEB] Error when retreiving previous encounter", encounterUID, "for user", userData.ID, ",", err)
+				appLog.Error(err)
 				return
 			}
 			sendInitData(ws, &previousEncounter)
@@ -197,7 +202,7 @@ func HTTPStartServer(
 			// get act data from web ID
 			actSession, err := actManager.GetSessionWithWebID(userID)
 			if err != nil {
-				log.Println("[WEB] Error when retreiving encounter", encounterUID, "for user", userData.ID, ",", err)
+				appLog.Error(err)
 				return
 			}
 			// send init data
@@ -214,7 +219,7 @@ func HTTPStartServer(
 		defer func() {
 			for index := range websocketConnections {
 				if websocketConnections[index].connection == ws {
-					log.Println("[WEB] Close web connection for", ws.RemoteAddr())
+					appLog.Log(fmt.Sprintf("Close web socket connection for '%s.'", ws.Request().RemoteAddr))
 					websocketConnections = append(websocketConnections[:index], websocketConnections[index+1:]...)
 					break
 				}
@@ -229,9 +234,10 @@ func HTTPStartServer(
 		// inc page load count
 		pageLoads++
 		// create a new user
+		appLog.Log("Create new user.")
 		userData := userManager.New()
 		if err != nil {
-			log.Println("[WEB] Error occured while creating a new user,", err)
+			appLog.Error(err)
 			displayError(
 				w,
 				"An error occured while creating a new user ID.",
@@ -264,7 +270,7 @@ func HTTPStartServer(
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		jsonBytes, err := json.Marshal(usageStatCollector)
 		if err != nil {
-			log.Println("[WEB] Error occured while displaying stats,", err)
+			appLog.Error(err)
 			displayError(
 				w,
 				"An error occured while displaying stats",
@@ -300,12 +306,12 @@ func HTTPStartServer(
 		// get user data
 		userData, err := userManager.LoadFromWebIDString(webUID)
 		if err != nil {
+			appLog.Error(err)
 			displayError(
 				w,
 				"Unable to find session for user \""+webUID+".\"",
 				http.StatusNotFound,
 			)
-			log.Println("[WEB] Error when attempting to retreive user", webUID, ",", err)
 			return
 		}
 		addUserToTemplateData(&td, userData)
@@ -346,12 +352,12 @@ func HTTPStartServer(
 		if tzOffsetStr != "" {
 			tzOffset, err = strconv.Atoi(tzOffsetStr)
 			if err != nil {
+				appLog.Error(err)
 				displayError(
 					w,
 					"Error parsing time zone \""+tzOffsetStr+".\"",
 					http.StatusInternalServerError,
 				)
-				log.Println("[WEB] Error when parsing time zone", tzOffsetStr, ",", err)
 				return
 			}
 		}
@@ -363,12 +369,12 @@ func HTTPStartServer(
 			)
 			startTime = &_startTime
 			if err != nil {
+				appLog.Error(err)
 				displayError(
 					w,
 					"Error parsing start date \""+td.HistoryStartDate+".\"",
 					http.StatusInternalServerError,
 				)
-				log.Println("[WEB] Error when parsing start date", td.HistoryStartDate, ",", err)
 				return
 			}
 		}
@@ -380,12 +386,12 @@ func HTTPStartServer(
 			)
 			endTime = &_endTime
 			if err != nil {
+				appLog.Error(err)
 				displayError(
 					w,
 					"Error parsing end date \""+td.HistoryEndDate+".\"",
 					http.StatusInternalServerError,
 				)
-				log.Println("[WEB] Error when parsing end date", td.HistoryEndDate, ",", err)
 				return
 			}
 		}
@@ -409,12 +415,12 @@ func HTTPStartServer(
 			td.EncounterPrevPageOffset = int(offset) - app.PastEncounterFetchLimit
 		}
 		if err != nil {
+			appLog.Error(err)
 			displayError(
 				w,
 				"Unable to fetch past encounters.",
 				http.StatusInternalServerError,
 			)
-			log.Println("[WEB] Error when fetching patch encounter for", webUID, ",", err)
 			return
 		}
 		// render encounters template
@@ -457,7 +463,7 @@ func HTTPStartServer(
 		}
 		jsonBytes, err := json.Marshal(zones)
 		if err != nil {
-			log.Println("[WEB] Error occured while displaying player stats,", err)
+			appLog.Error(err)
 			displayError(
 				w,
 				"An error occured while displaying player stats",
@@ -494,12 +500,12 @@ func HTTPStartServer(
 		if webID != "" {
 			userData, err := userManager.LoadFromWebIDString(webID)
 			if err != nil {
+				appLog.Error(err)
 				displayError(
 					w,
 					"Unable to find session for user \""+webID+".\"",
 					http.StatusNotFound,
 				)
-				log.Println("[WEB] Error when attempting to retreive user", webID, ",", err)
 				return
 			}
 			addUserToTemplateData(&td, userData)
@@ -513,7 +519,7 @@ func HTTPStartServer(
 			if err == nil {
 				addUserToTemplateData(&td, userData)
 			} else {
-				log.Println("[WEB] Error,", err)
+				appLog.Error(err)
 			}
 		}
 		// no web id provided, serve up home page with connection info
@@ -551,7 +557,6 @@ func getTemplates() (map[string]*template.Template, error) {
 
 // compileJavascript - Compile all javascript in to single string that can be served from memory
 func compileJavascript() (map[string]string, error) {
-	log.Println("[WEB] Compiling and minifying javascript.")
 	jsDirs := make(map[string]string)
 	jsDirs["app.js"] = "./web/static/js/main"
 	jsDirs["worker.js"] = "./web/static/js/worker"
@@ -586,7 +591,6 @@ func compileJavascript() (map[string]string, error) {
 
 // compileGCSS - Compile all GCSS in to single string that can be served from memory
 func compileGCSS() (map[string]string, error) {
-	log.Println("[WEB] Compiling and minifying [g]css.")
 	cssDirs := make(map[string]string)
 	cssDirs["app.min.css"] = "./web/static/css"
 	output := make(map[string]string)
@@ -642,11 +646,8 @@ func wsReader(ws *websocket.Conn, actManager *act.Manager) {
 		var data []byte
 		err := websocket.Message.Receive(ws, &data)
 		if err != nil {
-			log.Println("[WEB] Error occured while reading web socket message,", err)
 			break
 		}
-		// nothing todo
-		log.Println("[WEB] Recieved websocket message", data)
 	}
 }
 
@@ -725,13 +726,14 @@ func getWebKeyCookie(user data.User, r *http.Request) http.Cookie {
 
 // sendInitData - Send initial data to web user to sync their session
 func sendInitData(ws *websocket.Conn, gameSession *act.GameSession) {
+	appLog := app.Logging{ModuleName: "WEB"}
 	// prepare data
 	dataBytes := make([]byte, 0)
 	// send encounter
 	if gameSession != nil && gameSession.EncounterCollector.Encounter.UID != "" {
 		encounterUID := gameSession.EncounterCollector.Encounter.UID
 		combatants := gameSession.CombatantCollector.GetCombatants()
-		log.Println("[WEB] Send encounter data for", encounterUID, "(TotalCombatants:", len(combatants), ")")
+		appLog.Log(fmt.Sprintf("Send encounter data for '%s.'", encounterUID))
 		// add encounter
 		dataBytes = append(dataBytes, gameSession.EncounterCollector.Encounter.ToBytes()...)
 		// add combatants
@@ -751,10 +753,10 @@ func sendInitData(ws *websocket.Conn, gameSession *act.GameSession) {
 	// compress
 	compressData, err := data.CompressBytes(dataBytes)
 	if err != nil {
-		log.Println("[WEB] Error when compressing init data,", err)
+		appLog.Error(err)
 		return
 	}
-	log.Println("[WEB] Send", len(compressData), "bytes (encounter/combatants) of data to", ws.Request().RemoteAddr)
+	appLog.Log(fmt.Sprintf("Send %d bytes (encounter/combatants) of data to '%s.'", len(compressData), ws.Request().RemoteAddr))
 	websocket.Message.Send(ws, compressData)
 	// send logs
 	if gameSession != nil && gameSession.Storage != nil && gameSession.EncounterCollector.Encounter.UID != "" {
@@ -767,12 +769,12 @@ func sendInitData(ws *websocket.Conn, gameSession *act.GameSession) {
 			var err error
 			logBytes, err = ioutil.ReadFile(gameSession.GetLogTempPath())
 			if err != nil && err != os.ErrNotExist {
-				log.Println("[WEB] Error when opening log line file,", err)
+				appLog.Error(err)
 				return
 			}
 			logBytes, err = data.CompressBytes(logBytes)
 			if err != nil {
-				log.Println("[WEB] Error when opening log line file,", err)
+				appLog.Error(err)
 				return
 			}
 		} else {
@@ -781,7 +783,7 @@ func sendInitData(ws *websocket.Conn, gameSession *act.GameSession) {
 				"uid":  gameSession.EncounterCollector.Encounter.UID,
 			})
 			if err != nil {
-				log.Println("[WEB] Error when opening log line file,", err)
+				appLog.Error(err)
 				return
 			}
 			if len(logFetchBytes) == 0 || len(logFetchBytes[0]) == 0 {
@@ -789,7 +791,7 @@ func sendInitData(ws *websocket.Conn, gameSession *act.GameSession) {
 			}
 			logBytes = logFetchBytes[0]
 		}
-		log.Println("[WEB] Send", len(logBytes), "bytes (log) of data to", ws.Request().RemoteAddr)
+		appLog.Log(fmt.Sprintf("Send %d bytes (log) of data to '%s.'", len(logBytes), ws.Request().RemoteAddr))
 		websocket.Message.Send(ws, logBytes)
 	}
 

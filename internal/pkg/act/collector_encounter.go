@@ -19,11 +19,11 @@ package act
 
 import (
 	"fmt"
-	"log"
 	"regexp"
 	"strings"
 	"time"
 
+	"../app"
 	"../data"
 	"github.com/rs/xid"
 )
@@ -35,7 +35,7 @@ const encounterInactiveTime = 1000
 const combatantTimeout = 7500
 
 // reportDisplayIntervals - Interval at which to log encounter report
-const reportDisplayIntervals = 10000
+const reportDisplayIntervals = 30000
 
 // encounterCollectorCombatantTracker - Track combatants in encounter to determine active status
 type encounterCollectorCombatantTracker struct {
@@ -59,6 +59,7 @@ type EncounterCollector struct {
 	CompletionFlag   bool
 	EndFlag          bool
 	IsValid          bool
+	log              app.Logging
 }
 
 // NewEncounterCollector - Create new encounter collector
@@ -68,6 +69,7 @@ func NewEncounterCollector(user *data.User) EncounterCollector {
 		userIDHash: userIDHash,
 		PlayerTeam: 0,
 		IsValid:    true,
+		log:        app.Logging{ModuleName: fmt.Sprintf("%s/ENCOUNTER", userIDHash)},
 	}
 	ec.Reset()
 	return ec
@@ -124,7 +126,7 @@ func (ec *EncounterCollector) getCombatantTrackers(name string, maxHP int) []*en
 		return trackers
 	}
 	// new tracker
-	log.Println("[", ec.userIDHash, "][ Encounter", ec.Encounter.UID, "] New combatant", name, "(", maxHP, ")")
+	ec.log.Log(fmt.Sprintf("New combatant '%s' (MaxHP: %d).", name, maxHP))
 	newCt := encounterCollectorCombatantTracker{
 		Name:           name,
 		MaxHP:          maxHP,
@@ -165,7 +167,7 @@ func (ec *EncounterCollector) logEncounterReport() {
 		}
 		aliveString += fmt.Sprintf("TEAM %d: %d alive (%s)", team, len(teamAlive), strings.Join(teamAlive, ","))
 	}
-	log.Println("[", ec.userIDHash, "][ Encounter", ec.Encounter.UID, "]", encTimeString, aliveString)
+	ec.log.Log(fmt.Sprintf("Status %s :: %s :: %s", ec.Encounter.UID, encTimeString, aliveString))
 }
 
 // endEncounter - Flag encounter as inactive and set end time to last action time
@@ -173,15 +175,15 @@ func (ec *EncounterCollector) endEncounter() {
 	switch ec.Encounter.SuccessLevel {
 	case 1:
 		{
-			log.Println("[", ec.userIDHash, "][ Encounter", ec.Encounter.UID, "] Clear")
+			ec.log.Finish(fmt.Sprintf("Encounter '%s' CLEAR.", ec.Encounter.UID))
 		}
 	case 2, 3:
 		{
-			log.Println("[", ec.userIDHash, "][ Encounter", ec.Encounter.UID, "] Wipe")
+			ec.log.Finish(fmt.Sprintf("Encounter '%s' WIPE.", ec.Encounter.UID))
 		}
 	default:
 		{
-			log.Println("[", ec.userIDHash, "][ Encounter", ec.Encounter.UID, "] Ended")
+			ec.log.Finish(fmt.Sprintf("Encounter '%s' ENDED.", ec.Encounter.UID))
 		}
 	}
 	ec.logEncounterReport()
@@ -204,7 +206,7 @@ func (ec *EncounterCollector) ReadLogLine(l *LogLineData) {
 				if time.Now().Add(time.Duration(-encounterInactiveTime) * time.Millisecond).Before(ec.LastActionTime) {
 					break
 				}
-				log.Println("[", ec.userIDHash, "][ Encounter", ec.Encounter.UID, "] Started")
+				ec.log.Start(fmt.Sprintf("Encounter '%s' started.", ec.Encounter.UID))
 				ec.Encounter.Active = true
 				ec.Encounter.StartTime = l.Time
 				ec.LastReportTime = time.Now()
@@ -235,11 +237,11 @@ func (ec *EncounterCollector) ReadLogLine(l *LogLineData) {
 			// update combatant tracker data
 			if !ctAttacker.IsAlive {
 				ctAttacker.IsAlive = true
-				log.Println("[", ec.userIDHash, "][ Encounter", ec.Encounter.UID, "] Combatant", ctAttacker.Name, "(", ctAttacker.MaxHP, ")", "is alive")
+				//log.Println("[", ec.userIDHash, "][ Encounter", ec.Encounter.UID, "] Combatant", ctAttacker.Name, "(", ctAttacker.MaxHP, ")", "is alive")
 			}
 			if !ctTarget.IsAlive {
 				ctTarget.IsAlive = true
-				log.Println("[", ec.userIDHash, "][ Encounter", ec.Encounter.UID, "] Combatant", ctTarget.Name, "(", ctTarget.MaxHP, ")", "is alive")
+				//log.Println("[", ec.userIDHash, "][ Encounter", ec.Encounter.UID, "] Combatant", ctTarget.Name, "(", ctTarget.MaxHP, ")", "is alive")
 			}
 			ctAttacker.LastActionTime = l.Time
 			ctTarget.LastActionTime = l.Time
@@ -248,20 +250,20 @@ func (ec *EncounterCollector) ReadLogLine(l *LogLineData) {
 			if ctAttacker.Team == 0 && ctTarget.Team == 0 {
 				ctAttacker.Team = 1
 				ctTarget.Team = 2
-				log.Println("[", ec.userIDHash, "][ Encounter", ec.Encounter.UID, "] Combatant", ctAttacker.Name, "(", ctAttacker.MaxHP, ")", "is on team 1")
-				log.Println("[", ec.userIDHash, "][ Encounter", ec.Encounter.UID, "] Combatant", ctTarget.Name, "(", ctTarget.MaxHP, ")", "is on team 2")
+				ec.log.Log(fmt.Sprintf("Combatant '%s' for encounter '%d' is on team 1.", ctAttacker.Name, ec.Encounter.UID))
+				ec.log.Log(fmt.Sprintf("Combatant '%s' for encounter '%d' is on team 2.", ctTarget.Name, ec.Encounter.UID))
 			} else if ctAttacker.Team == 0 && ctTarget.Team != 0 {
 				ctAttacker.Team = 1
 				if ctTarget.Team == 1 {
 					ctAttacker.Team = 2
 				}
-				log.Println("[", ec.userIDHash, "][ Encounter", ec.Encounter.UID, "] Combatant", ctAttacker.Name, "(", ctAttacker.MaxHP, ")", "is on team", ctAttacker.Team)
+				ec.log.Log(fmt.Sprintf("Combatant '%s' for encounter '%d' is on team %d.", ctAttacker.Name, ctAttacker.Team))
 			} else if ctAttacker.Team != 0 && ctTarget.Team == 0 {
 				ctTarget.Team = 1
 				if ctAttacker.Team == 1 {
 					ctTarget.Team = 2
 				}
-				log.Println("[", ec.userIDHash, "][ Encounter", ec.Encounter.UID, "] Combatant", ctTarget.Name, "(", ctTarget.MaxHP, ")", "is on team", ctTarget.Team)
+				ec.log.Log(fmt.Sprintf("Combatant '%s' for encounter '%d' is on team %d.", ctTarget.Name, ctTarget.Team))
 			}
 			break
 		}
@@ -289,20 +291,20 @@ func (ec *EncounterCollector) ReadLogLine(l *LogLineData) {
 				}
 				if ctTarget.IsAlive {
 					ctTarget.IsAlive = false
-					log.Println("[", ec.userIDHash, "][ Encounter", ec.Encounter.UID, "] Combatant", ctTarget.Name, "(", ctTarget.MaxHP, ")", "was defeated/removed")
+					//log.Println("[", ec.userIDHash, "][ Encounter", ec.Encounter.UID, "] Combatant", ctTarget.Name, "(", ctTarget.MaxHP, ")", "was defeated/removed")
 				}
 			}
 			break
 		}
 	case LogTypeZoneChange:
 		{
-			log.Println("[", ec.userIDHash, "] Zone changed to", l.TargetName)
+			ec.log.Log(fmt.Sprintf("Zone changed to '%s.'", l.TargetName))
 			if ec.CurrentZone != l.TargetName {
 				ec.CurrentZone = l.TargetName
 				if ec.Encounter.Active {
 					ec.EndFlag = true
 					ec.IsValid = true
-					log.Println("[", ec.userIDHash, "][ Encounter", ec.Encounter.UID, "] Clear flag (change zone) detected")
+					ec.log.Log(fmt.Sprintf("Encounter '%s' clear flag (change zone) detected.", ec.Encounter.UID))
 				}
 			}
 			break
@@ -321,7 +323,7 @@ func (ec *EncounterCollector) ReadLogLine(l *LogLineData) {
 						for _, ct := range ec.CombatantTracker {
 							if ct.Name == playerName && ct.Team != 0 {
 								ec.PlayerTeam = ct.Team
-								log.Println("[", ec.userIDHash, "][ Encounter", ec.Encounter.UID, "] Player team set to", ct.Team)
+								ec.log.Log(fmt.Sprintf("Player team is %d for encounter '%s.'", ct.Team))
 								break
 							}
 						}
@@ -337,7 +339,7 @@ func (ec *EncounterCollector) ReadLogLine(l *LogLineData) {
 					// end encounter if match
 					if re.MatchString(l.Raw) && ec.Encounter.Active {
 						ec.CompletionFlag = true
-						log.Println("[", ec.userIDHash, "][ Encounter", ec.Encounter.UID, "] Clear flag (tomestones) detected")
+						ec.log.Log(fmt.Sprintf("Encounter '%s' clear flag (tomestones) detected.", ec.Encounter.UID))
 					}
 					break
 				}
@@ -351,7 +353,7 @@ func (ec *EncounterCollector) ReadLogLine(l *LogLineData) {
 					// end encounter if match
 					if re.MatchString(l.Raw) && ec.Encounter.Active {
 						ec.CompletionFlag = true
-						log.Println("[", ec.userIDHash, "][ Encounter", ec.Encounter.UID, "] Clear flag (completion time) detected")
+						ec.log.Log(fmt.Sprintf("Encounter '%s' clear flag (completion time) detected.", ec.Encounter.UID))
 					}
 					break
 				}
@@ -364,7 +366,7 @@ func (ec *EncounterCollector) ReadLogLine(l *LogLineData) {
 					// end encounter if match
 					if re.MatchString(l.Raw) && ec.Encounter.Active {
 						ec.CompletionFlag = true
-						log.Println("[", ec.userIDHash, "][ Encounter", ec.Encounter.UID, "] Clear flag (cast lots) detected")
+						ec.log.Log(fmt.Sprintf("Encounter '%s' clear flag (cast lots) detected.", ec.Encounter.UID))
 					}
 					break
 				}
@@ -378,7 +380,7 @@ func (ec *EncounterCollector) ReadLogLine(l *LogLineData) {
 					if re.MatchString(l.Raw) && ec.Encounter.Active {
 						ec.EndFlag = true
 						ec.IsValid = false
-						log.Println("[", ec.userIDHash, "][ Encounter", ec.Encounter.UID, "] End flag (end command) detected")
+						ec.log.Log(fmt.Sprintf("Encounter '%s' clear flag (end echo) detected.", ec.Encounter.UID))
 					}
 					break
 				}
@@ -391,7 +393,7 @@ func (ec *EncounterCollector) ReadLogLine(l *LogLineData) {
 					if re.MatchString(l.Raw) && ec.Encounter.Active {
 						ec.EndFlag = true
 						ec.IsValid = true
-						log.Println("[", ec.userIDHash, "][ Encounter", ec.Encounter.UID, "] End flag (countdown) detected")
+						ec.log.Log(fmt.Sprintf("Encounter '%s' clear flag (countdown) detected.", ec.Encounter.UID))
 					}
 					break
 				}

@@ -2,7 +2,7 @@ package main
 
 import (
 	"flag"
-	"log"
+	"fmt"
 
 	"github.com/olebedev/emitter"
 
@@ -20,6 +20,7 @@ const ActListenUDPPort uint16 = 31593
 const HTTPListenTCPPort uint16 = 8081
 
 func main() {
+	appLog := app.Logging{ModuleName: "MAIN"}
 	// define+parse flags
 	devModePtr := flag.Bool("dev", false, "Start server in development mode.")
 	httpPort := flag.Int("http-port", int(HTTPListenTCPPort), "Set HTTP listen port.")
@@ -27,9 +28,9 @@ func main() {
 	flag.Parse()
 
 	// log start
-	log.Printf("%s -- Version %s\n", app.Name, app.GetVersionString())
+	appLog.Log(fmt.Sprintf("%s -- Version %s\n", app.Name, app.GetVersionString()))
 	if *devModePtr {
-		log.Println("Development mode enabled.")
+		appLog.Log("Development mode enabled.")
 	}
 
 	// create event emitter

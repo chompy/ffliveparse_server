@@ -18,9 +18,10 @@ along with FFLiveParse.  If not, see <https://www.gnu.org/licenses/>.
 package act
 
 import (
-	"log"
+	"fmt"
 	"time"
 
+	"../app"
 	"../data"
 )
 
@@ -35,6 +36,7 @@ type combatantTracker struct {
 type CombatantCollector struct {
 	CombatantTrackers []combatantTracker
 	userIDHash        string
+	log               app.Logging
 }
 
 // NewCombatantCollector - create new combatant collector
@@ -42,6 +44,7 @@ func NewCombatantCollector(user *data.User) CombatantCollector {
 	userIDHash, _ := user.GetWebIDString()
 	cc := CombatantCollector{
 		userIDHash: userIDHash,
+		log:        app.Logging{ModuleName: fmt.Sprintf("%s/COMBATANT", userIDHash)},
 	}
 	cc.Reset()
 	return cc
@@ -128,7 +131,7 @@ func (c *CombatantCollector) UpdateCombatantTracker(combatant data.Combatant) {
 		}
 	}
 	// create new
-	log.Println("[", c.userIDHash, "][ Combatant", combatant.Player.ID, "] Added", combatant.Player.Name, "(", combatant.Job, ")")
+	c.log.Log(fmt.Sprintf("Added combatant '%d' (%s/%s).", combatant.Player.ID, combatant.Player.Name, combatant.Job))
 	ct := combatantTracker{
 		Player:    combatant.Player,
 		Snapshots: make([]data.Combatant, 0),
@@ -148,7 +151,7 @@ func (c *CombatantCollector) ReadLogLine(l *LogLineData) {
 				player := &c.CombatantTrackers[index].Player
 				if player.ID == int32(l.AttackerID) && player.Name != l.AttackerName {
 					player.Name = l.AttackerName
-					log.Println("[", c.userIDHash, "][ Combatant", player.ID, "] Set name", l.AttackerName)
+					c.log.Log(fmt.Sprintf("Set combatant '%d' name to '%s.'", player.ID, l.AttackerName))
 				}
 			}
 			break
@@ -164,7 +167,7 @@ func (c *CombatantCollector) ReadLogLine(l *LogLineData) {
 							player := &c.CombatantTrackers[index].Player
 							if player.Name == l.AttackerName && player.World != l.TargetName {
 								player.World = l.TargetName
-								log.Println("[", c.userIDHash, "][ Combatant", player.ID, "] Set world name", l.TargetName)
+								c.log.Log(fmt.Sprintf("Set combatant '%d' world to '%s.'", player.ID, l.TargetName))
 								break
 							}
 						}

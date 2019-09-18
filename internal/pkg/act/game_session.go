@@ -22,7 +22,6 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"log"
 	"os"
 	"path"
 	"sort"
@@ -90,9 +89,9 @@ func (s *GameSession) UpdateCombatant(combatant data.Combatant) {
 }
 
 // UpdateLogLine - Add log line to buffer
-func (s *GameSession) UpdateLogLine(logLine data.LogLine) {
+func (s *GameSession) UpdateLogLine(logLine data.LogLine) error {
 	if time.Now().Sub(logLine.Time) > time.Hour {
-		return
+		return nil
 	}
 	s.LogLineCounter++
 	// update log last update flag
@@ -100,8 +99,7 @@ func (s *GameSession) UpdateLogLine(logLine data.LogLine) {
 	// parse out log line details
 	logLineParse, err := ParseLogLine(logLine)
 	if err != nil {
-		log.Println("Error reading log line,", err)
-		return
+		return err
 	}
 	// reset encounter
 	if s.EncounterCollector.IsNewEncounter(&logLineParse) {
@@ -117,12 +115,13 @@ func (s *GameSession) UpdateLogLine(logLine data.LogLine) {
 		if wasActiveEncounter {
 			s.NewTickData = true
 		}
-		return
+		return nil
 	}
 	// set encounter UID
 	logLine.EncounterUID = s.EncounterCollector.Encounter.UID
 	// add to log line list
 	s.LogLineBuffer = append(s.LogLineBuffer, logLine)
+	return nil
 }
 
 // ClearLogLines - Clear log lines from current session
@@ -188,16 +187,18 @@ func (s *GameSession) SaveEncounter() error {
 	store[0] = &s.EncounterCollector.Encounter
 	s.Storage.Store(store)
 	// insert in to combatant+player tables
-	for _, combatantSnapshots := range combatants {
+	combatantStore := make([]interface{}, 0)
+	for cIndex := range combatants {
 		// insert combatant
-		for _, combatant := range combatantSnapshots {
+		for sIndex := range combatants[cIndex] {
+			combatant := &combatants[cIndex][sIndex]
 			combatant.EncounterUID = s.EncounterCollector.Encounter.UID
 			combatant.UserID = s.User.ID
-			combatant.Player = combatantSnapshots[0].Player
-			store[0] = &combatant
-			s.Storage.Store(store)
+			combatant.Player = combatants[cIndex][0].Player
+			combatantStore = append(combatantStore, combatant)
 		}
 	}
+	s.Storage.Store(combatantStore)
 	// dump log lines
 	err := s.DumpLogLineBuffer()
 	if err != nil {

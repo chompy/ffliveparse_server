@@ -31,6 +31,7 @@ import (
 type SqliteHandler struct {
 	path string
 	db   *sql.DB
+	log  app.Logging
 }
 
 // NewSqliteHandler - create new sqlite handler
@@ -38,6 +39,7 @@ func NewSqliteHandler(path string) (SqliteHandler, error) {
 	return SqliteHandler{
 		db:   nil,
 		path: path,
+		log:  app.Logging{ModuleName: "STORAGE/SQLITE"},
 	}, nil
 }
 
@@ -162,13 +164,14 @@ func (s *SqliteHandler) Store(objs []interface{}) error {
 	if s.db == nil {
 		return fmt.Errorf("database not initialized")
 	}
+	var lastCombatant *data.Combatant
 	// itterate data to store
 	for index := range objs {
 		switch objs[index].(type) {
 		case *data.Encounter:
 			{
 				encounter := objs[index].(*data.Encounter)
-				log.Printf("[STORAGE][SQLITE] Store encounter '%s.'", encounter.UID)
+				s.log.Log(fmt.Sprintf("Store encounter '%s.'", encounter.UID))
 				stmt, err := s.db.Prepare(`
 					REPLACE INTO encounter
 					(uid, act_id, compare_hash, user_id, start_time, end_time, zone, damage, success_level) VALUES
@@ -196,8 +199,21 @@ func (s *SqliteHandler) Store(objs []interface{}) error {
 			}
 		case *data.Combatant:
 			{
+				// capture only the last combatant for each player
 				combatant := objs[index].(*data.Combatant)
-				log.Printf("[STORAGE][SQLITE] Store combatant '%d' from encounter '%s.'", combatant.Player.ID, combatant.EncounterUID)
+				if combatant.EncounterUID == "" || combatant.Player.ID == 0 {
+					break
+				}
+				if index == len(objs)-1 {
+					lastCombatant = combatant
+				}
+				if (index != len(objs)-1) && (lastCombatant == nil || lastCombatant.Player.ID == combatant.Player.ID) {
+					lastCombatant = combatant
+					break
+				}
+				combatant = lastCombatant
+				lastCombatant = objs[index].(*data.Combatant)
+				s.log.Log(fmt.Sprintf("Store combatant '%d' for encounter '%s.'", combatant.Player.ID, combatant.EncounterUID))
 				stmt, err := s.db.Prepare(`
 					REPLACE INTO combatant
 					(user_id, encounter_uid, player_id, time, job, damage, damage_taken, damage_healed, deaths, hits, heals, kills) VALUES
@@ -229,7 +245,7 @@ func (s *SqliteHandler) Store(objs []interface{}) error {
 		case *data.Player:
 			{
 				player := objs[index].(*data.Player)
-				log.Printf("[STORAGE][SQLITE] Store player '%d.'", player.ID)
+				s.log.Log(fmt.Sprintf("Store player '%d.'", player.ID))
 				insStmt, err := s.db.Prepare(`
 					INSERT OR IGNORE INTO player
 					(id, name, act_name) VALUES
@@ -268,7 +284,7 @@ func (s *SqliteHandler) Store(objs []interface{}) error {
 		case *data.User:
 			{
 				user := objs[index].(*data.User)
-				log.Printf("[STORAGE][SQLITE] Store user '%d'", user.ID)
+				s.log.Log(fmt.Sprintf("Store user '%d.'", user.ID))
 				// insert
 				if user.ID == 0 {
 					stmt, err := s.db.Prepare(`
@@ -628,7 +644,7 @@ func (s *SqliteHandler) Fetch(params map[string]interface{}) ([]interface{}, int
 				WHERE combatant.hits > 0 AND combatant.time > 0 AND encounter.compare_hash != "" AND encounter.success_level = 1
 				GROUP BY encounter.compare_hash, combatant.player_id
 				ORDER BY DATETIME(encounter.start_time) DESC
-				LIMIT 3000
+				LIMIT 9999
 			`
 			// fetch results
 			rows, err := s.db.Query(
@@ -696,9 +712,8 @@ func (s *SqliteHandler) Remove(params map[string]interface{}) (int, error) {
 
 // CleanUp - perform clean up operations
 func (s *SqliteHandler) CleanUp() error {
-	startTime := time.Now()
 	count := int64(0)
-	log.Println("[STORAGE][SQLITE] Begin database clean up.")
+	s.log.Start("Begin clean up.")
 	// delete encounters older then EncounterDeleteDays days
 	cleanUpDate := time.Now().Add(time.Duration(-app.EncounterDeleteDays*24) * time.Hour)
 	res, err := s.db.Exec(
@@ -717,6 +732,6 @@ func (s *SqliteHandler) CleanUp() error {
 	rowCount, _ = res.RowsAffected()
 	count += rowCount
 	// TODO - delete users that never uploaded
-	log.Println("[STORAGE][SQLITE] Database clean up complete. (", count, "records removed. ) (", time.Now().Sub(startTime), ")")
+	s.log.Finish(fmt.Sprintf("Finish clean up. (%d records removed.)", count))
 	return err
 }

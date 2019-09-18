@@ -1,3 +1,8 @@
+1.39
+- Restrict sqlite combatant storage to only store one record per player.
+- Created new logging module and update all code to use it.
+- Global player stats now only pulls the last 9999 records.
+
 1.38
 - Created storage abstraction layer to better handle storing to database + filesystem.
 - Other behind the scenes reworkings.
