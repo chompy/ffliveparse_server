@@ -209,14 +209,18 @@ func (f *FileHandler) Remove(params map[string]interface{}) (int, error) {
 // CleanUp - perform clean up operations
 func (f *FileHandler) CleanUp() error {
 	cleanCount := 0
-	f.log.Start("Start file clean up.")
+	noBirthTimeCount := 0
 	cleanUpDate := time.Now().Add(time.Duration(-app.EncounterLogDeleteDays*24) * time.Hour)
+	f.log.Start(fmt.Sprintf("Start file clean up. (Clean up files older than %s.)", cleanUpDate))
 	err := filepath.Walk(f.path, func(path string, info os.FileInfo, err error) error {
 		if info.IsDir() || filepath.Ext(path) != ".dat" {
 			return nil
 		}
 		t, err := times.Stat(path)
-		if !t.HasBirthTime() || t.BirthTime().Before(cleanUpDate) {
+		if err == nil && !t.HasBirthTime() {
+			noBirthTimeCount++
+		}
+		if (err == nil && t.HasBirthTime() && t.BirthTime().Before(cleanUpDate)) || info.ModTime().Before(cleanUpDate) {
 			cleanCount++
 			return os.Remove(path)
 		}
@@ -224,6 +228,9 @@ func (f *FileHandler) CleanUp() error {
 	})
 	if err == nil {
 		f.log.Finish(fmt.Sprintf("Finish file clean up. (%d files removed.)", cleanCount))
+		if noBirthTimeCount > 0 {
+			f.log.Log(fmt.Sprintf("%d files had no creation time.", noBirthTimeCount))
+		}
 	}
 	return err
 }

@@ -250,20 +250,20 @@ func (ec *EncounterCollector) ReadLogLine(l *LogLineData) {
 			if ctAttacker.Team == 0 && ctTarget.Team == 0 {
 				ctAttacker.Team = 1
 				ctTarget.Team = 2
-				ec.log.Log(fmt.Sprintf("Combatant '%s' for encounter '%d' is on team 1.", ctAttacker.Name, ec.Encounter.UID))
-				ec.log.Log(fmt.Sprintf("Combatant '%s' for encounter '%d' is on team 2.", ctTarget.Name, ec.Encounter.UID))
+				ec.log.Log(fmt.Sprintf("Combatant '%s' for encounter '%s' is on team 1.", ctAttacker.Name, ec.Encounter.UID))
+				ec.log.Log(fmt.Sprintf("Combatant '%s' for encounter '%s' is on team 2.", ctTarget.Name, ec.Encounter.UID))
 			} else if ctAttacker.Team == 0 && ctTarget.Team != 0 {
 				ctAttacker.Team = 1
 				if ctTarget.Team == 1 {
 					ctAttacker.Team = 2
 				}
-				ec.log.Log(fmt.Sprintf("Combatant '%s' for encounter '%d' is on team %d.", ctAttacker.Name, ctAttacker.Team))
+				ec.log.Log(fmt.Sprintf("Combatant '%s' for encounter '%s' is on team %d.", ctAttacker.Name, ec.Encounter.UID, ctAttacker.Team))
 			} else if ctAttacker.Team != 0 && ctTarget.Team == 0 {
 				ctTarget.Team = 1
 				if ctAttacker.Team == 1 {
 					ctTarget.Team = 2
 				}
-				ec.log.Log(fmt.Sprintf("Combatant '%s' for encounter '%d' is on team %d.", ctTarget.Name, ctTarget.Team))
+				ec.log.Log(fmt.Sprintf("Combatant '%s' for encounter '%s is on team %d.", ctTarget.Name, ec.Encounter.UID, ctTarget.Team))
 			}
 			break
 		}
