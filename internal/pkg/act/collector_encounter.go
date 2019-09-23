@@ -52,7 +52,6 @@ type EncounterCollector struct {
 	Encounter        data.Encounter
 	LastActionTime   time.Time
 	CombatantTracker []encounterCollectorCombatantTracker
-	userIDHash       string
 	PlayerTeam       uint8
 	CurrentZone      string
 	LastReportTime   time.Time
@@ -66,7 +65,6 @@ type EncounterCollector struct {
 func NewEncounterCollector(user *data.User) EncounterCollector {
 	userIDHash, _ := user.GetWebIDString()
 	ec := EncounterCollector{
-		userIDHash: userIDHash,
 		PlayerTeam: 0,
 		IsValid:    true,
 		log:        app.Logging{ModuleName: fmt.Sprintf("%s/ENCOUNTER", userIDHash)},
@@ -94,8 +92,8 @@ func (ec *EncounterCollector) Reset() {
 	ec.EndFlag = false
 }
 
-// UpdateEncounter - Sync encounter data from ACT
-func (ec *EncounterCollector) UpdateEncounter(encounter data.Encounter) {
+// Update - Sync encounter data from ACT
+func (ec *EncounterCollector) Update(encounter data.Encounter) {
 	if !ec.Encounter.Active {
 		return
 	}
@@ -192,7 +190,7 @@ func (ec *EncounterCollector) endEncounter() {
 }
 
 // ReadLogLine - Parse log line and determine encounter status
-func (ec *EncounterCollector) ReadLogLine(l *LogLineData) {
+func (ec *EncounterCollector) ReadLogLine(l *ParsedLogLine) {
 	switch l.Type {
 	case LogTypeSingleTarget, LogTypeAoe:
 		{
@@ -312,8 +310,8 @@ func (ec *EncounterCollector) ReadLogLine(l *LogLineData) {
 	case LogTypeGameLog:
 		{
 
-			switch l.Color {
-			case LogColorCharacterWorldName:
+			switch l.GameLogType {
+			case LogMsgIDCharacterWorldName:
 				{
 					if ec.PlayerTeam > 0 {
 						break
@@ -329,7 +327,7 @@ func (ec *EncounterCollector) ReadLogLine(l *LogLineData) {
 						}
 					}
 				}
-			case LogColorObtainItem:
+			case LogMsgIDObtainItem:
 				{
 					// if message about tomestones is recieved then that should mean the encounter is over
 					re, err := regexp.Compile("00:083e:You obtain .* Allagan tomestones of|00:083e:You cannot receive any more Allagan tomestones of .* this week")
@@ -343,7 +341,7 @@ func (ec *EncounterCollector) ReadLogLine(l *LogLineData) {
 					}
 					break
 				}
-			case LogColorCompletionTime:
+			case LogMsgIDCompletionTime:
 				{
 					// if message about completion time then that should mean the encounter is over
 					re, err := regexp.Compile("00:0840:.* completion time: ")
@@ -357,7 +355,7 @@ func (ec *EncounterCollector) ReadLogLine(l *LogLineData) {
 					}
 					break
 				}
-			case LogColorCastLot:
+			case LogMsgIDCastLot:
 				{
 					re, err := regexp.Compile("00:0839:Cast your lot|00:0839:One or more party members have yet to complete this duty|00:0839:You received a player commendation")
 					if err != nil {
@@ -370,7 +368,7 @@ func (ec *EncounterCollector) ReadLogLine(l *LogLineData) {
 					}
 					break
 				}
-			case LogColorEcho:
+			case LogMsgIDEcho:
 				{
 					re, err := regexp.Compile("00:0038:end")
 					if err != nil {
@@ -384,7 +382,7 @@ func (ec *EncounterCollector) ReadLogLine(l *LogLineData) {
 					}
 					break
 				}
-			case LogColorCountdownStart:
+			case LogMsgIDCountdownStart:
 				{
 					re, err := regexp.Compile("00:00b9:Battle commencing in .* seconds!")
 					if err != nil {
@@ -407,7 +405,7 @@ func (ec *EncounterCollector) ReadLogLine(l *LogLineData) {
 }
 
 // IsNewEncounter - Check if log data is for new encounter
-func (ec *EncounterCollector) IsNewEncounter(l *LogLineData) bool {
+func (ec *EncounterCollector) IsNewEncounter(l *ParsedLogLine) bool {
 	// already active, not a new encounter
 	if ec.Encounter.Active {
 		return false

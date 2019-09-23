@@ -202,6 +202,7 @@ class Combatant
     constructor()
     {
         this.data = null;
+        this.snapshots = [];
         this.ids = [];
         this.names = [];
     }
@@ -212,13 +213,8 @@ class Combatant
      */
     update(data)
     {
-        if (!this.data || !this.data.Job) {
-            this.data = data;
-        } else if (this.data) {
-            for (var i in data.Snapshots) {
-                this.data.Snapshots.push(data.Snapshots[i]);
-            }
-        }
+        this.data = data;
+        this.snapshots.push(data);
         if (this.ids.indexOf(data.ID) == -1) {
             this.ids.push(data.ID);
         }
@@ -237,8 +233,8 @@ class Combatant
         var bestIndex = 0;
         var bestDiff = 99999;
         if (time) {
-            for (var i in this.data.Snapshots) {
-                var diff = time.getTime() - this.data.Snapshots[i].Time.getTime();
+            for (var i in this.snapshots) {
+                var diff = time.getTime() - this.snapshots[i].Time.getTime();
                 if (diff < 0) {
                     continue;
                 }
@@ -249,8 +245,7 @@ class Combatant
             }
         }
         var data = {};
-        Object.assign(data, this.data, this.data.Snapshots[bestIndex]);
-        delete data.Snapshots;
+        Object.assign(data, this.data, this.snapshots[bestIndex]);
         return data;
     }
 
@@ -264,8 +259,7 @@ class Combatant
             return null;
         }
         var data = {};
-        Object.assign(data, this.data, this.data.Snapshots[this.data.Snapshots.length - 1]);
-        delete data.Snapshots;
+        Object.assign(data, this.data, this.snapshots[this.snapshots.length - 1]);
         return data;
     }
 

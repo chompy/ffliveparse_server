@@ -25,107 +25,35 @@ import (
 
 // Manager - manage object storage
 type Manager struct {
-	handlers []BaseHandler
-	_lock    bool
-	log      app.Logging
+	log  app.Logging
+	File FileHandler
+	DB   SqliteHandler
 }
 
 // NewManager - create new storage manager
-func NewManager() Manager {
+func NewManager() (Manager, error) {
+	file, err := NewFileHandler(app.FileStorePath)
+	if err != nil {
+		return Manager{}, err
+	}
+	db, err := NewSqliteHandler(app.DatabasePath)
+	if err != nil {
+		return Manager{}, err
+	}
 	m := Manager{
-		handlers: make([]BaseHandler, 0),
-		_lock:    false,
-		log:      app.Logging{ModuleName: "STORAGE"},
+		log:  app.Logging{ModuleName: "STORAGE"},
+		File: file,
+		DB:   db,
 	}
-	return m
-}
-
-// AddHandler - add a storage handler
-func (m *Manager) AddHandler(h BaseHandler) error {
-	m.handlers = append(
-		m.handlers,
-		h,
-	)
-	return m.handlers[len(m.handlers)-1].Init()
-}
-
-// lock - lock writing
-func (m *Manager) lock() {
-	m._lock = true
-}
-
-// unlock - unlock writing
-func (m *Manager) unlock() {
-	m._lock = false
-}
-
-// IsLocked - check lock status
-func (m *Manager) IsLocked() bool {
-	return m._lock
-}
-
-// Store - store object
-func (m *Manager) Store(data []interface{}) error {
-	// wait
-	for m.IsLocked() {
-		time.Sleep(time.Millisecond * 5)
-	}
-	// lock
-	m.lock()
-	defer m.unlock()
-	// store
-	for index := range m.handlers {
-		err := m.handlers[index].Store(data)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-// FetchBytes - fetch stored object bytes
-func (m *Manager) FetchBytes(params map[string]interface{}) ([][]byte, int, error) {
-	output := make([][]byte, 0)
-	totalCount := 0
-	for index := range m.handlers {
-		byteData, count, err := m.handlers[index].FetchBytes(params)
-		if err != nil {
-			return nil, 0, err
-		}
-		output = append(
-			output,
-			byteData,
-		)
-		totalCount += count
-	}
-	return output, totalCount, nil
-}
-
-// Fetch - fetch stored object
-func (m *Manager) Fetch(params map[string]interface{}) ([]interface{}, int, error) {
-	output := make([]interface{}, 0)
-	totalCount := 0
-	for index := range m.handlers {
-		res, count, err := m.handlers[index].Fetch(params)
-		if err != nil {
-			return nil, 0, err
-		}
-		output = append(
-			output,
-			res...,
-		)
-		totalCount += count
-	}
-	return output, totalCount, nil
+	return m, nil
 }
 
 // StartCleanUp - start clean up process
 func (m *Manager) StartCleanUp() {
 	doClean := func() {
 		m.log.Start("Begin clean up.")
-		for index := range m.handlers {
-			m.handlers[index].CleanUp()
-		}
+		m.File.CleanUp()
+		m.DB.CleanUp()
 		m.log.Finish("Finish clean up.")
 	}
 	doClean()

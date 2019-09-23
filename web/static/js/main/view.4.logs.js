@@ -15,6 +15,34 @@ You should have received a copy of the GNU General Public License
 along with FFLiveParse.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+var MESSAGE_ID_SUFFIX_COLORS = {
+
+    // 0xXXX9 = damage taken
+    "9": "#ff7878",
+
+    // 0xXXXA = missed
+    "a": "#c9c9c9",
+    
+    // 0xXXXb = action
+    "b": "#ffffac",
+
+    // 0xXXXF = enfeeble
+    "f": "#ff85c1",
+    
+    // 0xXXXD = healing
+    "d": "#d1ff78",
+
+    // 0xXXXE = enhancing
+    "e": "#8fbcff",
+    
+    // 0xXXX0 = lose good effect
+    "0": "#8fbcff",
+
+    // 0xXXX1 = lose bad effect
+    "1": "#ff85c1",
+    
+};
+
 class ViewLogs extends ViewBase
 {
 
@@ -156,9 +184,17 @@ class ViewLogs extends ViewBase
                             );
                         }
                     }
-
+                    // set message
                     logMessageElement.innerHTML = logData.message;
-                    logMessageElement.style.color = "rgb(" + logData.color.join(",") + ")";
+                    // set message color
+                    var colorHex = "#fff";
+                    var msgIdHex = logData.messageId.toString(16)
+                    var msgIdHexSuffix = msgIdHex.substr(-1);
+                    if (msgIdHexSuffix in MESSAGE_ID_SUFFIX_COLORS) {
+                        colorHex = MESSAGE_ID_SUFFIX_COLORS[msgIdHexSuffix];
+                    }
+                    logMessageElement.style.color = colorHex;
+                    // add message to log output
                     logElement.appendChild(logMessageElement);
                     break;
                 }

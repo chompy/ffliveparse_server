@@ -92,7 +92,6 @@ func (m *Manager) ParseDataString(dataStr []byte, addr *net.UDPAddr) (*GameSessi
 				)
 				// start ticks
 				go m.doTick(gameSession.User.ID)
-				go m.doLogTick(gameSession.User.ID)
 				// save user data, update accessed time
 				m.userManager.Save(&user)
 				m.log.Log(fmt.Sprintf("Created session for user '%d' (%s) from '%s.'", user.ID, user.GetWebIDStringNoError(), addr))
@@ -124,31 +123,12 @@ func (m *Manager) ParseDataString(dataStr []byte, addr *net.UDPAddr) (*GameSessi
 			}
 			// parse encounter data
 			encounter := data.Encounter{}
-			err := encounter.FromBytes(dataStr)
+			err := encounter.FromActBytes(dataStr)
 			if err != nil {
 				return nil, err
 			}
 			// update data
 			sessObj.UpdateEncounter(encounter)
-			// log
-			/*dur := encounter.EndTime.Sub(encounter.StartTime)
-			log.Println(
-				"Update encounter",
-				encounter.UID,
-				"for user",
-				sessObj.User.ID,
-				"(ZoneName:",
-				encounter.Zone,
-				", Damage: ",
-				encounter.Damage,
-				", Duration:",
-				dur,
-				", Active:",
-				encounter.Active,
-				", SuccessLevel:",
-				encounter.SuccessLevel,
-				")",
-			)*/
 			break
 		}
 	case data.DataTypeCombatant:
@@ -159,33 +139,12 @@ func (m *Manager) ParseDataString(dataStr []byte, addr *net.UDPAddr) (*GameSessi
 			}
 			// parse combatant data
 			combatant := data.Combatant{}
-			pos := 0
-			err := data.CombatantFromActBytes(dataStr, &pos, &combatant)
+			err := combatant.FromActBytes(dataStr)
 			if err != nil {
 				return nil, err
 			}
 			// update user data
 			sessObj.UpdateCombatant(combatant)
-			// log
-			/*log.Println(
-				"Update combatant",
-				combatant.Name,
-				"for encounter",
-				combatant.UID,
-				"(UserID:",
-				sessObj.User.ID,
-				", Job:",
-				combatant.Job,
-				", Damage:",
-				combatant.Damage,
-				", Healing:",
-				combatant.DamageHealed,
-				", DamageTaken:",
-				combatant.DamageTaken,
-				", Deaths:",
-				combatant.Deaths,
-				")",
-			)*/
 		}
 	case data.DataTypeLogLine:
 		{
@@ -216,104 +175,77 @@ func (m *Manager) ParseDataString(dataStr []byte, addr *net.UDPAddr) (*GameSessi
 // doTick - ticks every app.TickRate milliseconds
 func (m *Manager) doTick(userID int64) {
 	for range time.Tick(app.TickRate * time.Millisecond) {
-		dataObj := m.GetSessionWithUserID(userID)
-		if dataObj == nil {
+		sessObj := m.GetSessionWithUserID(userID)
+		if sessObj == nil {
 			m.log.Log(fmt.Sprintf("Tick with no session data for user '%d.' Killing thread.", userID))
 			return
 		}
 		// clear session if no longer active
-		if !dataObj.IsActive() {
-			m.log.Log(fmt.Sprintf("Session inactive for user '%d' (%s).", dataObj.User.ID, dataObj.User.GetWebIDStringNoError()))
-			m.ClearSession(dataObj)
+		if !sessObj.IsActive() {
+			m.log.Log(fmt.Sprintf("Session inactive for user '%d' (%s).", sessObj.User.ID, sessObj.User.GetWebIDStringNoError()))
+			m.ClearSession(sessObj)
 			return
 		}
-		if dataObj.EncounterCollector.Encounter.UID == "" {
+		if sessObj.EncounterCollector.Encounter.UID == "" {
 			continue
 		}
+		var dumpData []data.ByteEncodable
+		var err error
 		// check if encounter should be made inactive
-		if dataObj.EncounterCollector.Encounter.Active {
-			dataObj.EncounterCollector.CheckInactive()
-			if !dataObj.EncounterCollector.Encounter.Active {
-				dataObj.SaveEncounter()
-				dataObj.NewTickData = true
+		if sessObj.EncounterCollector.Encounter.Active {
+			sessObj.EncounterCollector.CheckInactive()
+			if !sessObj.EncounterCollector.Encounter.Active {
+				// dump buffer before saving encounter
+				dumpData, err = sessObj.Buffer.Dump()
+				if err != nil {
+					m.log.Error(err)
+				}
+				// save encounter
+				err = sessObj.SaveEncounter()
+				if err != nil {
+					m.log.Error(err)
+				}
+				sessObj.NewTickData = true
 			}
 		}
 		// ensure there is new data to send
-		if !dataObj.NewTickData {
+		if !sessObj.NewTickData {
 			continue
 		}
-		dataObj.NewTickData = false
-		//log.Println("Tick for user", data.User.ID, "send data for encounter", data.EncounterCollector.Encounter.UID)
-		// gz compress encounter data and emit event
-		compressData, err := data.CompressBytes(dataObj.EncounterCollector.Encounter.ToBytes())
+		sessObj.NewTickData = false
+		// build data to send
+		sendData := make([]byte, 0)
+		// encounter
+		sendData = append(sendData, sessObj.EncounterCollector.Encounter.ToBytes()...)
+		// combatants
+		for _, combatant := range sessObj.CombatantCollector.GetLatestSnapshots() {
+			combatant.UserID = sessObj.User.ID
+			combatant.EncounterUID = sessObj.EncounterCollector.Encounter.UID
+			sendData = append(sendData, combatant.ToBytes()...)
+		}
+		// dump buffer
+		if len(dumpData) == 0 {
+			dumpData, err = sessObj.Buffer.Dump()
+			if err != nil {
+				m.log.Error(err)
+				continue
+			}
+		}
+		for index := range dumpData {
+			sendData = append(sendData, dumpData[index].ToBytes()...)
+		}
+		// compress
+		sendData, err = data.CompressBytes(sendData)
 		if err != nil {
 			m.log.Error(err)
 			continue
 		}
+		// send
 		go m.events.Emit(
-			"act:encounter",
-			dataObj.User.ID,
-			compressData,
+			"act:tick",
+			sessObj.User.ID,
+			sendData,
 		)
-		// emit combatant events
-		sendBytes := make([]byte, 0)
-		for _, combatantSnapshots := range dataObj.CombatantCollector.GetCombatants() {
-			combatants := make([]data.Combatant, 1)
-			combatants[0] = combatantSnapshots[len(combatantSnapshots)-1]
-			combatants[0].EncounterUID = dataObj.EncounterCollector.Encounter.UID
-			sendBytes = append(sendBytes, data.CombatantsToBytes(&combatants)...)
-		}
-		if len(sendBytes) > 0 {
-			compressData, err := data.CompressBytes(sendBytes)
-			if err != nil {
-				m.log.Error(err)
-				continue
-			}
-			go m.events.Emit(
-				"act:combatant",
-				dataObj.User.ID,
-				compressData,
-			)
-		}
-	}
-}
-
-// doLogTick - ticks every app.LogTickRate milliseconds
-func (m *Manager) doLogTick(userID int64) {
-	for range time.Tick(app.LogTickRate * time.Millisecond) {
-		dataObj := m.GetSessionWithUserID(userID)
-		if dataObj == nil {
-			m.log.Log(fmt.Sprintf("Log tick with no session data for user '%d.' Killing thread.", userID))
-			return
-		}
-		if len(dataObj.LogLineBuffer) == 0 {
-			continue
-		}
-		// emit log line events
-		sendBytes := make([]byte, 0)
-		for _, logLine := range dataObj.LogLineBuffer {
-			sendBytes = append(sendBytes, logLine.ToBytes()...)
-		}
-		if len(sendBytes) > 0 {
-			// dump log buffer
-			err := dataObj.DumpLogLineBuffer()
-			if err != nil {
-				m.log.Error(err)
-				continue
-			}
-			// compress log lines and send
-			compressData, err := data.CompressBytes(sendBytes)
-			if err != nil {
-				m.log.Error(err)
-				continue
-			}
-			go m.events.Emit(
-				"act:logLine",
-				dataObj.User.ID,
-				compressData,
-			)
-		}
-
 	}
 }
 
@@ -390,7 +322,10 @@ func (m *Manager) ClearSession(s *GameSession) {
 		if ittSess.User.ID == s.User.ID {
 			m.sessions = append(m.sessions[:index], m.sessions[index+1:]...)
 			if s.EncounterCollector.Encounter.Active {
-				s.SaveEncounter()
+				err := s.SaveEncounter()
+				if err != nil {
+					m.log.Error(err)
+				}
 				s.ClearEncounter()
 			}
 			m.log.Log(fmt.Sprintf("End ACT session for user '%d' (%s).", s.User.ID, s.User.GetWebIDStringNoError()))

@@ -40,11 +40,8 @@ const FileStorePath = "./data/store"
 // GlobalStatBanPath - path to global stat ban file
 const GlobalStatBanPath = "./data/conf/global_stat_bans.txt"
 
-// TickRate - how often combatant and encounter data should be sent to web user in ms
-const TickRate = 3000
-
-// LogTickRate - how often log line data should be sent to web user in ms
-const LogTickRate = 1000
+// TickRate - how often act data should be sent to web user in ms
+const TickRate = 1000
 
 // LastUpdateInactiveTime - Time in ms between last data update before data is considered inactive
 const LastUpdateInactiveTime = 1800000 // 30 minutes

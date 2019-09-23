@@ -21,9 +21,10 @@ import (
 	"bufio"
 	"compress/gzip"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"os"
 	"path/filepath"
+	"sync"
 	"time"
 
 	"../app"
@@ -33,8 +34,13 @@ import (
 
 // FileHandler - handles file storage
 type FileHandler struct {
+	lock *sync.Mutex
 	path string
 	log  app.Logging
+	file *os.File
+	gf   *gzip.Writer
+	fw   *bufio.Writer
+	mode int
 }
 
 // NewFileHandler - create new file handler
@@ -42,172 +48,139 @@ func NewFileHandler(path string) (FileHandler, error) {
 	return FileHandler{
 		path: path,
 		log:  app.Logging{ModuleName: "STORAGE/FILE"},
+		file: nil,
+		gf:   nil,
+		fw:   nil,
+		lock: &sync.Mutex{},
 	}, nil
 }
 
 // getFilePath - get path to data file
-func (f *FileHandler) getFilePath(objType string, encounterUID string) string {
+func (f *FileHandler) getFilePath(encounterUID string) string {
 	return filepath.Join(
 		f.path,
-		encounterUID+"_"+objType+".dat",
+		encounterUID+".dat",
 	)
 }
 
-// getWriteFile - open file for writing
-func (f *FileHandler) getWriteFile(objType string, encounterUID string) (*os.File, error) {
-	return os.OpenFile(
-		f.getFilePath(objType, encounterUID),
-		os.O_CREATE|os.O_APPEND|os.O_WRONLY,
+// OpenWrite - open file for writting
+func (f *FileHandler) OpenWrite(encounterUID string) error {
+	f.lock.Lock()
+	var err error
+	f.file, err = os.OpenFile(
+		f.getFilePath(encounterUID),
+		os.O_CREATE|os.O_WRONLY,
 		0644,
 	)
-}
-
-// Init - init file handler
-func (f *FileHandler) Init() error {
+	if err != nil {
+		return err
+	}
+	f.log.Log(fmt.Sprintf("Write to encounter '%s.'", encounterUID))
+	f.gf = gzip.NewWriter(f.file)
+	f.fw = bufio.NewWriter(f.gf)
+	f.mode = os.O_WRONLY
 	return nil
 }
 
-// Store - store data objects to file system
-func (f *FileHandler) Store(objs []interface{}) error {
-	uid := ""
-	dType := ""
-	var dFile *os.File
-	var gzWriter *gzip.Writer
-	var gzFw *bufio.Writer
-	// itterate data to store
-	for index := range objs {
-		var byteData []byte
-		switch objs[index].(type) {
-		case *data.LogLine:
-			{
-				// log line
-				logLine := objs[index].(*data.LogLine)
-				if logLine.EncounterUID == "" {
-					break
-				}
-				if index == 0 {
-					f.log.Log(fmt.Sprintf("Store %d log line objects for encounter '%s'.", len(objs), logLine.EncounterUID))
-				}
-				// must be of same uid/type as last item
-				if (uid != "" && logLine.EncounterUID != uid) || (dType != "" && dType != StoreTypeLogLine) {
-					return fmt.Errorf("cannot store multiple items of different uid or types")
-				}
-				byteData = logLine.ToBytes()
-				uid = logLine.EncounterUID
-				dType = StoreTypeLogLine
-				break
-			}
-		case *data.Combatant:
-			{
-				// combatant
-				combatant := objs[index].(*data.Combatant)
-				if combatant.EncounterUID == "" {
-					break
-				}
-				if index == 0 {
-					f.log.Log(fmt.Sprintf("Store %d combatant objects for encounter '%s'.", len(objs), combatant.EncounterUID))
-				}
-				// must be of same uid/type as last item
-				if (uid != "" && combatant.EncounterUID != uid) || (dType != "" && dType != StoreTypeCombatant) {
-					return fmt.Errorf("cannot store multiple items of different uid or types")
-				}
-				byteData = combatant.ToBytes()
-				uid = combatant.EncounterUID
-				dType = StoreTypeCombatant
-				break
-			}
+// OpenRead - open file for read, get gzip reader
+func (f *FileHandler) OpenRead(encounterUID string) (*gzip.Reader, error) {
+	f.lock.Lock()
+	var err error
+	f.file, err = os.OpenFile(
+		f.getFilePath(encounterUID),
+		os.O_RDONLY,
+		0644,
+	)
+	if err != nil {
+		return nil, err
+	}
+	f.log.Log(fmt.Sprintf("Read encounter '%s.'", encounterUID))
+	f.mode = os.O_RDONLY
+	return gzip.NewReader(f.file)
+}
+
+// Close - close file
+func (f *FileHandler) Close() error {
+	if f.file == nil {
+		return fmt.Errorf("no file was open")
+	}
+	defer f.lock.Unlock()
+	defer f.file.Close()
+	if f.mode == os.O_WRONLY {
+		err := f.fw.Flush()
+		if err != nil {
+			return err
 		}
-		// data to write
-		if len(byteData) > 0 && uid != "" && dType != "" {
-			if dFile == nil {
-				var err error
-				dFile, err = f.getWriteFile(dType, uid)
+		err = f.gf.Close()
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// Write - write to file
+func (f *FileHandler) Write(store interface{}) error {
+	if f.file == nil || f.mode == os.O_RDONLY {
+		return fmt.Errorf("file not open or in read mode")
+	}
+	switch store.(type) {
+	case []byte:
+		{
+			data := store.([]byte)
+			_, err := f.fw.Write(data)
+			return err
+		}
+	case *os.File:
+		{
+			file := store.(*os.File)
+			buf := make([]byte, 4096)
+			for {
+				n, err := file.Read(buf)
+				if n > 0 {
+					_, err = f.fw.Write(buf)
+					if err != nil {
+						return err
+					}
+				}
+				if err == io.EOF {
+					break
+				}
 				if err != nil {
 					return err
 				}
-				gzWriter = gzip.NewWriter(dFile)
-				gzFw = bufio.NewWriter(gzWriter)
-				defer gzWriter.Close()
-				defer dFile.Close()
 			}
-			gzFw.Write(byteData)
+			break
 		}
-	}
-	if gzFw != nil {
-		gzFw.Flush()
-		gzWriter.Flush()
-		gzWriter.Close()
-		dFile.Close()
+	case data.ByteEncodable:
+		{
+			byteEncodable := store.(data.ByteEncodable)
+			data := byteEncodable.ToBytes()
+			_, err := f.fw.Write(data)
+			return err
+		}
 	}
 	return nil
 }
 
-// FetchBytes - retrieve data bytes from file system (gzip compressed)
-func (f *FileHandler) FetchBytes(params map[string]interface{}) ([]byte, int, error) {
-	dType := ParamsGetType(params)
-	if dType == "" {
-		return nil, 0, nil
-	}
-	uid := ParamGetUID(params)
-	if uid == "" {
-		return nil, 0, nil
-	}
-	res, _ := ioutil.ReadFile(f.getFilePath(dType, uid))
-	if len(res) > 0 {
-		return res, 1, nil
-	}
-	return nil, 0, nil
-}
-
-// Fetch - retrieve data from file system
-func (f *FileHandler) Fetch(params map[string]interface{}) ([]interface{}, int, error) {
-	byteData, count, err := f.FetchBytes(params)
-	if err != nil {
-		return nil, 0, err
-	}
-	if count == 0 {
-		return nil, 0, nil
-	}
-	dType := ParamsGetType(params)
-	switch dType {
-	case StoreTypeCombatant:
-		{
-			combatants, _, err := data.DecodeCombatantBytesFile(byteData)
-			if err != nil {
-				return nil, 0, err
-			}
-			output := make([]interface{}, len(combatants))
-			for index, combatant := range combatants {
-				output[index] = combatant
-			}
-			return output, len(combatants), nil
-		}
-	}
-	return nil, 0, nil
-}
-
 // Remove - remove data from file system
-func (f *FileHandler) Remove(params map[string]interface{}) (int, error) {
-	dType := ParamsGetType(params)
-	if dType == "" {
-		return 0, nil
-	}
-	uid := ParamGetUID(params)
-	if uid == "" {
-		return 0, nil
-	}
-	err := os.Remove(f.getFilePath(dType, uid))
+func (f *FileHandler) Remove(encounterUID string) error {
+	f.lock.Lock()
+	defer f.lock.Unlock()
+	err := os.Remove(f.getFilePath(encounterUID))
 	if err != nil {
 		if err == os.ErrNotExist {
-			return 0, nil
+			return nil
 		}
-		return 0, err
+		return err
 	}
-	return 1, nil
+	return nil
 }
 
 // CleanUp - perform clean up operations
 func (f *FileHandler) CleanUp() error {
+	f.lock.Lock()
+	defer f.lock.Unlock()
 	cleanCount := 0
 	noBirthTimeCount := 0
 	cleanUpDate := time.Now().Add(time.Duration(-app.EncounterLogDeleteDays*24) * time.Hour)

@@ -34,13 +34,3 @@ const StoreTypeUser = "User"
 
 // StoreTypePlayerStat - denotes player stat storage type
 const StoreTypePlayerStat = "PlayerStat"
-
-// BaseHandler - base storage handler
-type BaseHandler interface {
-	Init() error
-	Store(data []interface{}) error
-	FetchBytes(params map[string]interface{}) ([]byte, int, error)
-	Fetch(params map[string]interface{}) ([]interface{}, int, error)
-	Remove(params map[string]interface{}) (int, error)
-	CleanUp() error
-}

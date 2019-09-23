@@ -55,13 +55,29 @@ func (e *Encounter) ToBytes() []byte {
 	return data
 }
 
+// FromActBytes - Convert act bytes to encounter
+func (e *Encounter) FromActBytes(data []byte) error {
+	if data[0] != DataTypeEncounter {
+		return errors.New("invalid data type for Encounter")
+	}
+	pos := 1
+	e.ActID = readUint32(data, &pos)
+	e.StartTime = readTime(data, &pos)
+	e.EndTime = readTime(data, &pos)
+	e.Zone = readString(data, &pos)
+	e.Damage = readInt32(data, &pos)
+	e.Active = (readByte(data, &pos) != 0)
+	e.SuccessLevel = readByte(data, &pos)
+	return nil
+}
+
 // FromBytes - Convert bytes to encounter
 func (e *Encounter) FromBytes(data []byte) error {
 	if data[0] != DataTypeEncounter {
 		return errors.New("invalid data type for Encounter")
 	}
 	pos := 1
-	e.ActID = readUint32(data, &pos)
+	e.UID = readString(data, &pos)
 	e.StartTime = readTime(data, &pos)
 	e.EndTime = readTime(data, &pos)
 	e.Zone = readString(data, &pos)

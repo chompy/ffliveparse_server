@@ -56,7 +56,7 @@ const LogTypeGainEffect = 0x1A
 const LogTypeLoseEffect = 0x1E
 
 // LogTypeHPPercent - Log type identifier, HP percent of combatant
-const LogTypeHPPercent = 0x1D
+const LogTypeHPPercent = 0x0D
 
 // LogTypeFFLPCombatant - Log type identifier, custom combatant data
 const LogTypeFFLPCombatant = 0x99
@@ -124,34 +124,37 @@ const LogFlagParry = 7
 // LogFlagInstantDeath - Log flag, instant death
 const LogFlagInstantDeath = 8
 
-// LogColorCharacterWorldName - Log message color for message with character world name
-const LogColorCharacterWorldName = 0x102b
+// LogMsgIDCharacterWorldName - Log message ID for message with character world name
+const LogMsgIDCharacterWorldName = 0x102b
 
-// LogColorObtainItem - Log message color for message about obtaining item
-const LogColorObtainItem = 0x083e
+// LogMsgIDObtainItem - Log message ID for message about obtaining item
+const LogMsgIDObtainItem = 0x083e
 
-// LogColorCompletionTime - Log message color for message about encounter completion
-const LogColorCompletionTime = 0x0840
+// LogMsgIDCompletionTime - Log message ID for message about encounter completion
+const LogMsgIDCompletionTime = 0x0840
 
-// LogColorCastLot - Log message color for message about casting lot on loot
-const LogColorCastLot = 0x0839
+// LogMsgIDCastLot - Log message ID for message about casting lot on loot
+const LogMsgIDCastLot = 0x0839
 
-// LogColorEcho - Log message color for echo messages
-const LogColorEcho = 0x0038
+// LogMsgIDEcho - Log message ID for echo messages
+const LogMsgIDEcho = 0x0038
 
-// LogColorCountdown - Log message color for countdown messages
-const LogColorCountdown = 0x0039
+// LogMsgIDCountdown - Log message ID for countdown messages
+const LogMsgIDCountdown = 0x0039
 
-// LogColorCountdownStart - Log message color for start countdown messages
-const LogColorCountdownStart = 0x00b9
+// LogMsgIDCountdownStart - Log message ID for start countdown messages
+const LogMsgIDCountdownStart = 0x00b9
+
+// LogMsgChatID - Log message IDs less then this value are considered chat messages and can be ignored
+const LogMsgChatID = 0x00FF
 
 // logShiftValues
 var logShiftValues = [...]int{0x3E, 0x113, 0x213, 0x313}
 
-// LogLineData - Data retrieved by parsing a log line
-type LogLineData struct {
+// ParsedLogLine - Data retrieved by parsing a log line
+type ParsedLogLine struct {
 	Type              int
-	Color             int
+	GameLogType       int
 	Raw               string
 	AttackerID        int
 	AttackerName      string
@@ -169,7 +172,7 @@ type LogLineData struct {
 }
 
 // HasFlag - Check if log line data has given flag
-func (l *LogLineData) HasFlag(flag int) bool {
+func (l *ParsedLogLine) HasFlag(flag int) bool {
 	for _, lFlag := range l.Flags {
 		if lFlag == flag {
 			return true
@@ -188,10 +191,10 @@ func hexToInt(hexString string) (int, error) {
 }
 
 // ParseLogLine - Parse log line in to data structure
-func ParseLogLine(logLine data.LogLine) (LogLineData, error) {
+func ParseLogLine(logLine data.LogLine) (ParsedLogLine, error) {
 	logLineString := logLine.LogLine
 	if len(logLineString) <= 15 {
-		return LogLineData{}, fmt.Errorf("tried to parse log line with too few characters")
+		return ParsedLogLine{}, fmt.Errorf("tried to parse log line with too few characters")
 	}
 	// hack, fix SAM "Hissatsu:" move as it breaks ":" delimiter
 	logLineString = strings.Replace(logLineString, "Hissatsu:", "Hissatsu--", -1)
@@ -202,10 +205,10 @@ func ParseLogLine(logLine data.LogLine) (LogLineData, error) {
 	logLineType, err := hexToInt(fields[0])
 	if err != nil {
 		log.Print(logLineString)
-		return LogLineData{}, err
+		return ParsedLogLine{}, err
 	}
 	// create data object
-	data := LogLineData{
+	data := ParsedLogLine{
 		Type: int(logLineType),
 		Raw:  logLineString,
 		Time: logLine.Time,
@@ -216,7 +219,7 @@ func ParseLogLine(logLine data.LogLine) (LogLineData, error) {
 		{
 			// ensure there are enough fields
 			if len(fields) < 24 {
-				return LogLineData{}, fmt.Errorf("not enough fields when parsing ability")
+				return ParsedLogLine{}, fmt.Errorf("not enough fields when parsing ability")
 			}
 			// Shift damage and flags forward for mysterious spurious :3E:0:.
 			// Plenary Indulgence also appears to prepend confession stacks.
@@ -381,15 +384,20 @@ func ParseLogLine(logLine data.LogLine) (LogLineData, error) {
 			if len(fields) <= 2 {
 				break
 			}
-			// get log message color
-			logMessageColor, err := strconv.ParseInt(fields[1], 16, 16)
+			// get Log message ID
+			gameLogType, err := strconv.ParseInt(fields[1], 16, 16)
 			if err != nil {
 				return data, err
 			}
-			data.Color = int(logMessageColor)
-			switch data.Color {
+			data.GameLogType = int(gameLogType)
+			// player chat message, ignore
+			if data.GameLogType <= LogMsgChatID && data.GameLogType != LogMsgIDEcho {
+				data.Raw = ""
+				break
+			}
+			switch data.GameLogType {
 			// try to strip out world name from message
-			case LogColorCharacterWorldName:
+			case LogMsgIDCharacterWorldName:
 				{
 					re, err := regexp.Compile("102b:([a-zA-Z'\\-]*) ([A-Z'])([a-z'\\-]*)([A-Z])([a-z]*)")
 					if err != nil {

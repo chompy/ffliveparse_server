@@ -79,8 +79,8 @@ func combatantSub(c1 data.Combatant, c2 data.Combatant) data.Combatant {
 	return c1
 }
 
-// UpdateCombatantTracker - Sync ACT combatant data
-func (c *CombatantCollector) UpdateCombatantTracker(combatant data.Combatant) {
+// Update - Sync ACT combatant data
+func (c *CombatantCollector) Update(combatant data.Combatant) {
 	// ignore non player combatants
 	if combatant.Player.ID > 1000000000 {
 		return
@@ -142,7 +142,7 @@ func (c *CombatantCollector) UpdateCombatantTracker(combatant data.Combatant) {
 }
 
 // ReadLogLine - Parse log line and update combatant(s)
-func (c *CombatantCollector) ReadLogLine(l *LogLineData) {
+func (c *CombatantCollector) ReadLogLine(l *ParsedLogLine) {
 	switch l.Type {
 	case LogTypeSingleTarget, LogTypeAoe:
 		{
@@ -158,8 +158,8 @@ func (c *CombatantCollector) ReadLogLine(l *LogLineData) {
 		}
 	case LogTypeGameLog:
 		{
-			switch l.Color {
-			case LogColorCharacterWorldName:
+			switch l.GameLogType {
+			case LogMsgIDCharacterWorldName:
 				{
 					if l.TargetName != "" && l.AttackerName != "" {
 						// sync world
@@ -180,8 +180,8 @@ func (c *CombatantCollector) ReadLogLine(l *LogLineData) {
 	}
 }
 
-// GetCombatants - Compile all combatants
-func (c *CombatantCollector) GetCombatants() [][]data.Combatant {
+// GetSnapshots - Get all combatant snapshots
+func (c *CombatantCollector) GetSnapshots() [][]data.Combatant {
 	combatants := make([][]data.Combatant, 0)
 	for _, ct := range c.CombatantTrackers {
 		snapshots := make([]data.Combatant, 0)
@@ -199,6 +199,20 @@ func (c *CombatantCollector) GetCombatants() [][]data.Combatant {
 		combatants = append(
 			combatants,
 			snapshots,
+		)
+	}
+	return combatants
+}
+
+// GetLatestSnapshots - Get the latest snapshot for each combatant
+func (c *CombatantCollector) GetLatestSnapshots() []data.Combatant {
+	combatants := make([]data.Combatant, 0)
+	for _, ct := range c.CombatantTrackers {
+		combatant := ct.Snapshots[len(ct.Snapshots)-1]
+		combatant.Player = ct.Player
+		combatants = append(
+			combatants,
+			combatant,
 		)
 	}
 	return combatants

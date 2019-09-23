@@ -21,6 +21,7 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"sync"
 	"time"
 
 	"../app"
@@ -29,6 +30,7 @@ import (
 
 // SqliteHandler - handles sqlite storage
 type SqliteHandler struct {
+	lock *sync.Mutex
 	path string
 	db   *sql.DB
 	log  app.Logging
@@ -36,11 +38,14 @@ type SqliteHandler struct {
 
 // NewSqliteHandler - create new sqlite handler
 func NewSqliteHandler(path string) (SqliteHandler, error) {
-	return SqliteHandler{
+	s := SqliteHandler{
 		db:   nil,
 		path: path,
 		log:  app.Logging{ModuleName: "STORAGE/SQLITE"},
-	}, nil
+		lock: &sync.Mutex{},
+	}
+	err := s.Init()
+	return s, err
 }
 
 // Init - init sqlite handler

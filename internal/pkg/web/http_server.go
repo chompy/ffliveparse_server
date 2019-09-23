@@ -23,6 +23,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"html/template"
+	"io"
 	"io/ioutil"
 	"math"
 	"net/http"
@@ -455,11 +456,13 @@ func HTTPStartServer(
 		job := r.URL.Query().Get("job")
 		// fetch zones
 		zones := make([][]*data.PlayerStat, 0)
-		for _, zoneName := range act.StatTrackerZones {
-			zones = append(
-				zones,
-				playerStatTracker.GetZoneStats(zoneName, job, statSort),
-			)
+		if playerStatTracker != nil {
+			for _, zoneName := range act.StatTrackerZones {
+				zones = append(
+					zones,
+					playerStatTracker.GetZoneStats(zoneName, job, statSort),
+				)
+			}
 		}
 		jsonBytes, err := json.Marshal(zones)
 		if err != nil {
@@ -661,7 +664,6 @@ func globalWsWriter(websocketConnections *[]websocketConnection, events *emitter
 				if websocketConnection.connection == nil || event.Args[0] != websocketConnection.userData.ID {
 					continue
 				}
-				//log.Println("ACT event", event.OriginalTopic, ", send data for user", websocketConnection.userData.ID, "to", websocketConnection.connection.RemoteAddr())
 				websocket.Message.Send(
 					websocketConnection.connection,
 					event.Args[1],
@@ -727,72 +729,80 @@ func getWebKeyCookie(user data.User, r *http.Request) http.Cookie {
 // sendInitData - Send initial data to web user to sync their session
 func sendInitData(ws *websocket.Conn, gameSession *act.GameSession) {
 	appLog := app.Logging{ModuleName: "WEB"}
-	// prepare data
-	dataBytes := make([]byte, 0)
-	// send encounter
-	if gameSession != nil && gameSession.EncounterCollector.Encounter.UID != "" {
-		encounterUID := gameSession.EncounterCollector.Encounter.UID
-		combatants := gameSession.CombatantCollector.GetCombatants()
-		appLog.Log(fmt.Sprintf("Send encounter data for '%s.'", encounterUID))
-		// add encounter
-		dataBytes = append(dataBytes, gameSession.EncounterCollector.Encounter.ToBytes()...)
-		// add combatants
-		for _, combatantSnapshots := range combatants {
-			if len(combatantSnapshots) > 0 {
-				combatantSnapshots[0].EncounterUID = encounterUID
-				dataBytes = append(dataBytes, data.CombatantsToBytes(&combatantSnapshots)...)
-			}
-		}
-	}
 	// add flag indicating if ACT is active
 	isActiveFlag := data.Flag{
 		Name:  "active",
 		Value: gameSession != nil && gameSession.IsActive(),
 	}
-	dataBytes = append(dataBytes, isActiveFlag.ToBytes()...)
-	// compress
-	compressData, err := data.CompressBytes(dataBytes)
+	activeCompress, err := data.CompressBytes(isActiveFlag.ToBytes())
 	if err != nil {
 		appLog.Error(err)
 		return
 	}
-	appLog.Log(fmt.Sprintf("Send %d bytes (encounter/combatants) of data to '%s.'", len(compressData), ws.Request().RemoteAddr))
-	websocket.Message.Send(ws, compressData)
-	// send logs
-	if gameSession != nil && gameSession.Storage != nil && gameSession.EncounterCollector.Encounter.UID != "" {
-
-		var logBytes []byte
-
-		// active encounter
-		if gameSession.EncounterCollector.Encounter.Active {
-			// read from temp log lines
-			var err error
-			logBytes, err = ioutil.ReadFile(gameSession.GetLogTempPath())
-			if err != nil && err != os.ErrNotExist {
-				appLog.Error(err)
-				return
-			}
-			logBytes, err = data.CompressBytes(logBytes)
-			if err != nil {
-				appLog.Error(err)
-				return
-			}
-		} else {
-			logFetchBytes, _, err := gameSession.Storage.FetchBytes(map[string]interface{}{
-				"type": storage.StoreTypeLogLine,
-				"uid":  gameSession.EncounterCollector.Encounter.UID,
-			})
-			if err != nil {
-				appLog.Error(err)
-				return
-			}
-			if len(logFetchBytes) == 0 || len(logFetchBytes[0]) == 0 {
-				return
-			}
-			logBytes = logFetchBytes[0]
-		}
-		appLog.Log(fmt.Sprintf("Send %d bytes (log) of data to '%s.'", len(logBytes), ws.Request().RemoteAddr))
-		websocket.Message.Send(ws, logBytes)
+	websocket.Message.Send(ws, activeCompress)
+	appLog.Log(fmt.Sprintf("Send %d bytes (flags) of data to '%s.'", len(activeCompress), ws.Request().RemoteAddr))
+	// must have active encounter for the rest
+	if gameSession == nil || gameSession.EncounterCollector.Encounter.UID == "" {
+		return
 	}
-
+	// prepare data
+	dataBytes := make([]byte, 0)
+	// send encounter
+	dataBytes = append(dataBytes, gameSession.EncounterCollector.Encounter.ToBytes()...)
+	if err != nil {
+		appLog.Error(err)
+		return
+	}
+	// add combatants
+	for _, snapshots := range gameSession.CombatantCollector.GetSnapshots() {
+		for _, combatant := range snapshots {
+			combatant.EncounterUID = gameSession.EncounterCollector.Encounter.UID
+			combatant.UserID = gameSession.User.ID
+			dataBytes = append(dataBytes, combatant.ToBytes()...)
+		}
+	}
+	// compress + send
+	dataBytes, err = data.CompressBytes(dataBytes)
+	appLog.Log(fmt.Sprintf("Send %d bytes (encounter/combatants) of data to '%s.'", len(dataBytes), ws.Request().RemoteAddr))
+	err = websocket.Message.Send(ws, dataBytes)
+	if err != nil {
+		appLog.Error(err)
+		return
+	}
+	// send encounter
+	// TODO buffer reads for memory usage
+	var reader io.ReadCloser
+	if gameSession.EncounterCollector.Encounter.Active {
+		// send from temp buffer (for active encounter)
+		reader, err = gameSession.Buffer.GetReadFile()
+		if err != nil {
+			appLog.Error(err)
+			return
+		}
+		defer reader.Close()
+	} else {
+		// send from permanent storage
+		reader, err = gameSession.Storage.File.OpenRead(gameSession.EncounterCollector.Encounter.UID)
+		if err == os.ErrNotExist {
+			return
+		}
+		if err != nil {
+			appLog.Error(err)
+			return
+		}
+		defer reader.Close()
+		defer gameSession.Storage.File.Close()
+	}
+	dataBytes, err = ioutil.ReadAll(reader)
+	if err != nil {
+		appLog.Error(err)
+		return
+	}
+	dataBytes, err = data.CompressBytes(dataBytes)
+	if err != nil {
+		appLog.Error(err)
+		return
+	}
+	appLog.Log(fmt.Sprintf("Send %d bytes (buffer) of data to '%s.'", len(dataBytes), ws.Request().RemoteAddr))
+	websocket.Message.Send(ws, dataBytes)
 }

@@ -47,7 +47,7 @@ func (m *Manager) New() data.User {
 
 // LoadFromID - load user from id
 func (m *Manager) LoadFromID(ID int64) (data.User, error) {
-	res, count, err := m.storage.Fetch(map[string]interface{}{
+	res, count, err := m.storage.DB.Fetch(map[string]interface{}{
 		"type": storage.StoreTypeUser,
 		"id":   int(ID),
 	})
@@ -62,7 +62,7 @@ func (m *Manager) LoadFromID(ID int64) (data.User, error) {
 
 // LoadFromUploadKey - load user from upload key
 func (m *Manager) LoadFromUploadKey(uploadKey string) (data.User, error) {
-	res, count, err := m.storage.Fetch(map[string]interface{}{
+	res, count, err := m.storage.DB.Fetch(map[string]interface{}{
 		"type":       storage.StoreTypeUser,
 		"upload_key": uploadKey,
 	})
@@ -77,7 +77,7 @@ func (m *Manager) LoadFromUploadKey(uploadKey string) (data.User, error) {
 
 // LoadFromWebKey - load user from web key
 func (m *Manager) LoadFromWebKey(webKey string) (data.User, error) {
-	res, count, err := m.storage.Fetch(map[string]interface{}{
+	res, count, err := m.storage.DB.Fetch(map[string]interface{}{
 		"type":    storage.StoreTypeUser,
 		"web_key": webKey,
 	})
@@ -103,6 +103,6 @@ func (m *Manager) LoadFromWebIDString(webIDString string) (data.User, error) {
 func (m *Manager) Save(ud *data.User) {
 	store := make([]interface{}, 1)
 	store[0] = ud
-	m.storage.Store(store)
+	m.storage.DB.Store(store)
 	// TODO no error return?
 }

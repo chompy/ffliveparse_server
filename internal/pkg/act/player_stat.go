@@ -65,7 +65,7 @@ func NewStatsTracker(sm *storage.Manager) StatsTracker {
 func (st *StatsTracker) collect() {
 	st.log.Start("Start player stat collection.")
 	// collect all player stats
-	playerStats, _, err := st.storage.Fetch(map[string]interface{}{
+	playerStats, _, err := st.storage.DB.Fetch(map[string]interface{}{
 		"type": storage.StoreTypePlayerStat,
 	})
 	if err != nil {

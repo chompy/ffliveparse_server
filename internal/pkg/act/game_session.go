@@ -21,9 +21,6 @@ import (
 	"crypto/md5"
 	"fmt"
 	"io"
-	"io/ioutil"
-	"os"
-	"path"
 	"sort"
 	"strconv"
 	"time"
@@ -40,29 +37,32 @@ const logLineRetainCount = 1000
 
 // GameSession - data about an ACT session
 type GameSession struct {
-	Session            data.Session
-	User               data.User
-	EncounterCollector EncounterCollector
-	CombatantCollector CombatantCollector
-	LogLineBuffer      []data.LogLine
-	LastUpdate         time.Time
-	NewTickData        bool
-	HasValidSession    bool
-	LogLineCounter     int
-	Storage            *storage.Manager
+	Buffer              data.Buffer
+	Session             data.Session
+	User                data.User
+	EncounterCollector  EncounterCollector
+	CombatantCollector  CombatantCollector
+	LastUpdate          time.Time
+	NewTickData         bool
+	HasValidSession     bool
+	LogLineCounter      int
+	Storage             *storage.Manager
+	lastCombatantBuffer time.Time
 }
 
 // NewGameSession - create new ACT session data
 func NewGameSession(session data.Session, user data.User, storage *storage.Manager) (GameSession, error) {
 	return GameSession{
-		Session:            session,
-		User:               user,
-		EncounterCollector: NewEncounterCollector(&user),
-		CombatantCollector: NewCombatantCollector(&user),
-		LastUpdate:         time.Now(),
-		HasValidSession:    false,
-		LogLineCounter:     0,
-		Storage:            storage,
+		Buffer:              data.NewBuffer(&user),
+		Session:             session,
+		User:                user,
+		EncounterCollector:  NewEncounterCollector(&user),
+		CombatantCollector:  NewCombatantCollector(&user),
+		LastUpdate:          time.Now(),
+		HasValidSession:     false,
+		LogLineCounter:      0,
+		Storage:             storage,
+		lastCombatantBuffer: time.Now(),
 	}, nil
 }
 
@@ -73,7 +73,7 @@ func (s *GameSession) UpdateEncounter(encounter data.Encounter) {
 	}
 	s.LastUpdate = time.Now()
 	s.NewTickData = true
-	s.EncounterCollector.UpdateEncounter(encounter)
+	s.EncounterCollector.Update(encounter)
 }
 
 // UpdateCombatant - Add or update combatant data
@@ -85,7 +85,7 @@ func (s *GameSession) UpdateCombatant(combatant data.Combatant) {
 	s.LastUpdate = time.Now()
 	s.NewTickData = true
 	// update combatant collector
-	s.CombatantCollector.UpdateCombatantTracker(combatant)
+	s.CombatantCollector.Update(combatant)
 }
 
 // UpdateLogLine - Add log line to buffer
@@ -93,7 +93,6 @@ func (s *GameSession) UpdateLogLine(logLine data.LogLine) error {
 	if time.Now().Sub(logLine.Time) > time.Hour {
 		return nil
 	}
-	s.LogLineCounter++
 	// update log last update flag
 	s.LastUpdate = time.Now()
 	// parse out log line details
@@ -101,10 +100,17 @@ func (s *GameSession) UpdateLogLine(logLine data.LogLine) error {
 	if err != nil {
 		return err
 	}
+	// if empty log line then no need to proceed
+	if logLineParse.Raw == "" {
+		return nil
+	}
+	// set encounter UID
+	logLine.EncounterUID = s.EncounterCollector.Encounter.UID
 	// reset encounter
 	if s.EncounterCollector.IsNewEncounter(&logLineParse) {
 		s.EncounterCollector.Reset()
 		s.CombatantCollector.Reset()
+		s.Buffer.Reset()
 	}
 	// update encounter collector
 	wasActiveEncounter := s.EncounterCollector.Encounter.Active
@@ -117,42 +123,8 @@ func (s *GameSession) UpdateLogLine(logLine data.LogLine) error {
 		}
 		return nil
 	}
-	// set encounter UID
-	logLine.EncounterUID = s.EncounterCollector.Encounter.UID
-	// add to log line list
-	s.LogLineBuffer = append(s.LogLineBuffer, logLine)
-	return nil
-}
-
-// ClearLogLines - Clear log lines from current session
-func (s *GameSession) ClearLogLines() {
-	s.LogLineBuffer = make([]data.LogLine, 0)
-}
-
-// GetLogTempPath - Get path to temp log lines file
-func (s *GameSession) GetLogTempPath() string {
-	return path.Join(os.TempDir(), fmt.Sprintf("fflp_LogLine_%s.dat", s.EncounterCollector.Encounter.UID))
-}
-
-// DumpLogLineBuffer - Dump log line buffer to file storage
-func (s *GameSession) DumpLogLineBuffer() error {
-	logBytes := make([]byte, 0)
-	for _, logLine := range s.LogLineBuffer {
-		logBytes = append(logBytes, logLine.ToBytes()...)
-	}
-	if len(logBytes) > 0 {
-		f, err := os.OpenFile(s.GetLogTempPath(), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
-		if err != nil {
-			return err
-		}
-		defer f.Close()
-		_, err = f.Write(logBytes)
-		if err != nil {
-			return err
-		}
-	}
-	// clear buffer
-	s.LogLineBuffer = make([]data.LogLine, 0)
+	// add to buffer
+	s.Buffer.Add(&logLine)
 	return nil
 }
 
@@ -168,9 +140,9 @@ func (s *GameSession) SaveEncounter() error {
 		return nil
 	}
 	// get sorted combatants
-	combatants := s.CombatantCollector.GetCombatants()
+	combatants := s.CombatantCollector.GetLatestSnapshots()
 	sort.Slice(combatants, func(i, j int) bool {
-		return combatants[i][0].Player.ID < combatants[j][0].Player.ID
+		return combatants[i].Player.ID < combatants[j].Player.ID
 	})
 	// build encounter compare hash
 	// this is used to determine if two different user's encounters
@@ -178,65 +150,69 @@ func (s *GameSession) SaveEncounter() error {
 	h := md5.New()
 	io.WriteString(h, s.EncounterCollector.Encounter.StartTime.UTC().String())
 	for _, combatant := range combatants {
-		io.WriteString(h, strconv.Itoa(int(combatant[0].Player.ID)))
+		io.WriteString(h, strconv.Itoa(int(combatant.Player.ID)))
 	}
 	s.EncounterCollector.Encounter.CompareHash = fmt.Sprintf("%x", h.Sum(nil))
-	// insert in to encounter table
+	// save encounter to database
 	s.EncounterCollector.Encounter.UserID = s.User.ID
-	store := make([]interface{}, 1)
-	store[0] = &s.EncounterCollector.Encounter
-	s.Storage.Store(store)
-	// insert in to combatant+player tables
-	combatantStore := make([]interface{}, 0)
-	for cIndex := range combatants {
-		// insert combatant
-		for sIndex := range combatants[cIndex] {
-			combatant := &combatants[cIndex][sIndex]
+	dbStore := make([]interface{}, 1)
+	dbStore[0] = &s.EncounterCollector.Encounter
+	for index := range combatants {
+		dbStore = append(dbStore, &combatants[index])
+	}
+	err := s.Storage.DB.Store(dbStore)
+	if err != nil {
+		return err
+	}
+	// dump buffer
+	_, err = s.Buffer.Dump()
+	if err != nil {
+		return err
+	}
+	// read buffer
+	bufFile, err := s.Buffer.GetReadFile()
+	if err != nil {
+		return err
+	}
+	defer bufFile.Close()
+	defer s.Buffer.Reset()
+	// save encounter to file
+	err = s.Storage.File.OpenWrite(s.EncounterCollector.Encounter.UID)
+	if err != nil {
+		return err
+	}
+	defer s.Storage.File.Close()
+	// - save encounter
+	s.Storage.File.Write(&s.EncounterCollector.Encounter)
+	// - save combatant snapshots
+	for _, snapshots := range s.CombatantCollector.GetSnapshots() {
+		for _, combatant := range snapshots {
 			combatant.EncounterUID = s.EncounterCollector.Encounter.UID
 			combatant.UserID = s.User.ID
-			combatant.Player = combatants[cIndex][0].Player
-			combatantStore = append(combatantStore, combatant)
+			err = s.Storage.File.Write(&combatant)
+			if err != nil {
+				return err
+			}
 		}
 	}
-	s.Storage.Store(combatantStore)
-	// dump log lines
-	err := s.DumpLogLineBuffer()
+	// - save buffer (log lines)
+	err = s.Storage.File.Write(bufFile)
 	if err != nil {
 		return err
 	}
-	// save log lines
-	logBytes, err := ioutil.ReadFile(s.GetLogTempPath())
-	if err != nil {
-		if err == os.ErrNotExist {
-			return nil
-		}
-		return err
-	}
-	logLines, _, err := data.DecodeLogLineBytesFile(logBytes)
-	if err != nil {
-		return err
-	}
-	logStore := make([]interface{}, len(logBytes))
-	for index := range logLines {
-		logStore[index] = &logLines[index]
-	}
-	err = s.Storage.Store(logStore)
-	if err != nil {
-		return err
-	}
-	return os.Remove(s.GetLogTempPath())
+	return nil
 }
 
 // ClearEncounter - delete all data for current encounter from memory
 func (s *GameSession) ClearEncounter() {
-	s.ClearLogLines()
+	s.Buffer.Reset()
 	s.EncounterCollector.Reset()
 	s.CombatantCollector.Reset()
 }
 
 // getEncounterCombatants - fetch all combatants in an encounter
 func getEncounterCombatants(sm *storage.Manager, user data.User, encounterUID string) (CombatantCollector, error) {
-	combatants, _, err := sm.Fetch(map[string]interface{}{
+	combatants, _, err := sm.DB.Fetch(map[string]interface{}{
 		"type":          storage.StoreTypeCombatant,
 		"user_id":       int(user.ID),
 		"encounter_uid": encounterUID,
@@ -246,7 +222,7 @@ func getEncounterCombatants(sm *storage.Manager, user data.User, encounterUID st
 	}
 	combatantCollector := NewCombatantCollector(&user)
 	for _, combatant := range combatants {
-		combatantCollector.UpdateCombatantTracker(combatant.(data.Combatant))
+		combatantCollector.Update(combatant.(data.Combatant))
 	}
 	for index := range combatantCollector.CombatantTrackers {
 		combatantCollector.CombatantTrackers[index].Offset = data.Combatant{}
@@ -257,7 +233,7 @@ func getEncounterCombatants(sm *storage.Manager, user data.User, encounterUID st
 // GetPreviousEncounter - retrieve previous encounter data from database
 func GetPreviousEncounter(sm *storage.Manager, user data.User, encounterUID string) (GameSession, error) {
 	// fetch encounter
-	encounters, count, err := sm.Fetch(map[string]interface{}{
+	encounters, count, err := sm.DB.Fetch(map[string]interface{}{
 		"type":    storage.StoreTypeEncounter,
 		"user_id": int(user.ID),
 		"uid":     encounterUID,
@@ -300,7 +276,7 @@ func GetPreviousEncounters(
 	end *time.Time,
 	totalCount *int,
 ) ([]GameSession, error) {
-	encounters, count, err := sm.Fetch(map[string]interface{}{
+	encounters, count, err := sm.DB.Fetch(map[string]interface{}{
 		"type":    storage.StoreTypeEncounter,
 		"user_id": int(user.ID),
 		"query":   query,

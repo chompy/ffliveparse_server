@@ -106,21 +106,15 @@ function decodeCombatantBytes(data)
     output["Name"]          = readString(data, pos); pos += readUint16(data, pos) + SIZE_INT16;
     output["World"]         = readString(data, pos); pos += readUint16(data, pos) + SIZE_INT16;
     output["Job"]           = readString(data, pos); pos += readUint16(data, pos) + SIZE_INT16;
-    var numberOfSnaphots    = readInt32(data, pos); pos += SIZE_INT32;
-    output["Snapshots"]     = [];
-    for (var i = 0; i < numberOfSnaphots; i++) {
-        var snapshot = {};
-        snapshot["Damage"]        = readInt32(data, pos); pos += SIZE_INT32;
-        snapshot["DamageTaken"]   = readInt32(data, pos); pos += SIZE_INT32;
-        snapshot["DamageHealed"]  = readInt32(data, pos); pos += SIZE_INT32;
-        snapshot["Deaths"]        = readInt32(data, pos); pos += SIZE_INT32;
-        snapshot["Hits"]          = readInt32(data, pos); pos += SIZE_INT32;
-        snapshot["Heals"]         = readInt32(data, pos); pos += SIZE_INT32;
-        snapshot["Kills" ]        = readInt32(data, pos); pos += SIZE_INT32;
-        snapshot["Time"]          = readString(data, pos); pos += readUint16(data, pos) + SIZE_INT16;
-        snapshot["Time"]          = new Date(snapshot["Time"]);
-        output["Snapshots"].push(snapshot);
-    }
+    output["Damage"]        = readInt32(data, pos); pos += SIZE_INT32;
+    output["DamageTaken"]   = readInt32(data, pos); pos += SIZE_INT32;
+    output["DamageHealed"]  = readInt32(data, pos); pos += SIZE_INT32;
+    output["Deaths"]        = readInt32(data, pos); pos += SIZE_INT32;
+    output["Hits"]          = readInt32(data, pos); pos += SIZE_INT32;
+    output["Heals"]         = readInt32(data, pos); pos += SIZE_INT32;
+    output["Kills" ]        = readInt32(data, pos); pos += SIZE_INT32;
+    output["Time"]          = readString(data, pos); pos += readUint16(data, pos) + SIZE_INT16;
+    output["Time"]          = new Date(output["Time"]);
     if (!encounterUid || output["EncounterUID"] == encounterUid) {
         postMessage({
             "type"      : "act:combatant",

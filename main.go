@@ -42,17 +42,7 @@ func main() {
 	go usageStatCollector.Start()
 
 	// create storage handler
-	sqliteStorageHandler, err := storage.NewSqliteHandler(app.DatabasePath)
-	if err != nil {
-		panic(err)
-	}
-	fileStorageHandler, err := storage.NewFileHandler(app.FileStorePath)
-	storageManager := storage.NewManager()
-	err = storageManager.AddHandler(&fileStorageHandler)
-	if err != nil {
-		panic(err)
-	}
-	err = storageManager.AddHandler(&sqliteStorageHandler)
+	storageManager, err := storage.NewManager()
 	if err != nil {
 		panic(err)
 	}
@@ -66,8 +56,8 @@ func main() {
 	defer actManager.ClearAllSessions()
 
 	// player stat tracker on seperate threads
-	playerStatTracker := act.NewStatsTracker(&storageManager)
-	go playerStatTracker.Start()
+	//playerStatTracker := act.NewStatsTracker(&storageManager)
+	//go playerStatTracker.Start()
 
 	// clean up old data
 	go storageManager.StartCleanUp()
@@ -80,7 +70,7 @@ func main() {
 		&events,
 		&storageManager,
 		&usageStatCollector,
-		&playerStatTracker,
+		nil,
 		*devModePtr,
 	)
 

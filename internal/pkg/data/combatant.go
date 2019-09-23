@@ -25,9 +25,6 @@ import (
 // DataTypeCombatant - Data type, combatant data
 const DataTypeCombatant byte = 3
 
-// DataTypeCombatantSnapshots - Data type, snapshots of combatant data throughout fight
-const DataTypeCombatantSnapshots byte = 6
-
 // Combatant - Data about a combatant
 type Combatant struct {
 	ByteEncodable
@@ -66,103 +63,51 @@ func (c *Combatant) ToBytes() []byte {
 	return data
 }
 
-// CombatantsToBytes - Convert multiple combatants (assumed same player) to bytes
-func CombatantsToBytes(value *[]Combatant) []byte {
-	data := make([]byte, 1)
-	data[0] = DataTypeCombatant
-	cb := *value
-	writeString(&data, cb[0].EncounterUID)
-	writeInt32(&data, cb[0].Player.ID)
-	writeString(&data, cb[0].Player.Name)
-	writeString(&data, cb[0].Player.World)
-	writeString(&data, cb[0].Job)
-	writeInt32(&data, int32(len(cb)))
-	for index := range cb {
-		writeInt32(&data, cb[index].Damage)
-		writeInt32(&data, cb[index].DamageTaken)
-		writeInt32(&data, cb[index].DamageHealed)
-		writeInt32(&data, cb[index].Deaths)
-		writeInt32(&data, cb[index].Hits)
-		writeInt32(&data, cb[index].Heals)
-		writeInt32(&data, cb[index].Kills)
-		writeTime(&data, cb[index].Time)
-	}
-	return data
-}
-
-// FromBytes - Convert bytes to combatant
-func (c *Combatant) FromBytes(data []byte) error {
-	pos := 0
-	return CombatantFromBytes(data, &pos, c)
-}
-
-// CombatantFromActBytes - read combatant from bytes recieved from ACT
-func CombatantFromActBytes(data []byte, pos *int, c *Combatant) error {
+// FromActBytes - Convert act bytes to combatant
+func (c *Combatant) FromActBytes(data []byte) error {
 	if data[0] != DataTypeCombatant {
 		return errors.New("invalid data type for Combatant")
 	}
-	*pos++
-	actEncounterID := readUint32(data, pos)
+	pos := 1
+	actEncounterID := readUint32(data, &pos)
 	c.Player = Player{
-		ID:   readInt32(data, pos),
-		Name: readString(data, pos),
+		ID:   readInt32(data, &pos),
+		Name: readString(data, &pos),
 	}
 	c.Player.ActName = c.Player.Name
 	c.ActEncounterID = actEncounterID
-	c.Job = readString(data, pos)
-	c.Damage = readInt32(data, pos)
-	c.DamageTaken = readInt32(data, pos)
-	c.DamageHealed = readInt32(data, pos)
-	c.Deaths = readInt32(data, pos)
-	c.Hits = readInt32(data, pos)
-	c.Heals = readInt32(data, pos)
-	c.Kills = readInt32(data, pos)
+	c.Job = readString(data, &pos)
+	c.Damage = readInt32(data, &pos)
+	c.DamageTaken = readInt32(data, &pos)
+	c.DamageHealed = readInt32(data, &pos)
+	c.Deaths = readInt32(data, &pos)
+	c.Hits = readInt32(data, &pos)
+	c.Heals = readInt32(data, &pos)
+	c.Kills = readInt32(data, &pos)
 	c.Time = time.Now()
 	return nil
 }
 
-// CombatantFromBytes - read combatant from bytes
-func CombatantFromBytes(data []byte, pos *int, c *Combatant) error {
+// FromBytes - Convert bytes to combatant
+func (c *Combatant) FromBytes(data []byte) error {
 	if data[0] != DataTypeCombatant {
 		return errors.New("invalid data type for Combatant")
 	}
-	*pos++
-	c.EncounterUID = readString(data, pos)
+	pos := 1
+	c.EncounterUID = readString(data, &pos)
 	c.Player = Player{
-		ID:    readInt32(data, pos),
-		Name:  readString(data, pos),
-		World: readString(data, pos),
+		ID:    readInt32(data, &pos),
+		Name:  readString(data, &pos),
+		World: readString(data, &pos),
 	}
-	c.Player.ActName = c.Player.Name
-	c.Job = readString(data, pos)
-	c.Damage = readInt32(data, pos)
-	c.DamageTaken = readInt32(data, pos)
-	c.DamageHealed = readInt32(data, pos)
-	c.Deaths = readInt32(data, pos)
-	c.Hits = readInt32(data, pos)
-	c.Heals = readInt32(data, pos)
-	c.Kills = readInt32(data, pos)
-	c.Time = readTime(data, pos)
+	c.Job = readString(data, &pos)
+	c.Damage = readInt32(data, &pos)
+	c.DamageTaken = readInt32(data, &pos)
+	c.DamageHealed = readInt32(data, &pos)
+	c.Deaths = readInt32(data, &pos)
+	c.Hits = readInt32(data, &pos)
+	c.Heals = readInt32(data, &pos)
+	c.Kills = readInt32(data, &pos)
+	c.Time = readTime(data, &pos)
 	return nil
-}
-
-// DecodeCombatantBytesFile - Create combatant struct from data stored in combatant file
-func DecodeCombatantBytesFile(data []byte) ([]Combatant, int, error) {
-	// should be compressed
-	combatantBytes, err := DecompressBytes(data)
-	if err != nil {
-		return nil, 0, err
-	}
-	// itterate log bytes and convert to log line
-	pos := 0
-	combatants := make([]Combatant, 0)
-	for pos < len(combatantBytes) {
-		combatant := Combatant{}
-		err := CombatantFromBytes(combatantBytes, &pos, &combatant)
-		if err != nil {
-			return combatants, pos, err
-		}
-		combatants = append(combatants, combatant)
-	}
-	return combatants, pos, nil
 }

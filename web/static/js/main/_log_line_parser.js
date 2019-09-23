@@ -89,11 +89,7 @@ function parseLogLine(message)
     {
         case MESSAGE_TYPE_GAME_LOG:
         {
-            var color = parseInt(fields[1], 16);
-            var colorR = (color & 0xF800) >> 8;
-            var colorG = (color & 0x07E0) >> 3;
-            var colorB = (color & 0x1F) << 3;
-            data["color"] = [colorR, colorG, colorB];
+            data["messageId"] = parseInt(fields[1], 16);
             data["message"] = fields.slice(2).join(":");
             break;
         }
