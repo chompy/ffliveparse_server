@@ -286,11 +286,9 @@ class Application
             console.log(">> An error has occured,", event);
         };    
         // log incoming data
-        var lastEncounterUid = null;
         window.addEventListener("act:encounter", function(e) {
             if (!t.encounter || e.detail.UID != t.encounter.data.UID) {
                 console.log(">> Encounter active, ", e.detail);
-                lastEncounterUid = e.detail.UID;
                 t.combatantCollector.reset();
                 t.actionCollector.reset();
                 t.encounter = new Encounter();

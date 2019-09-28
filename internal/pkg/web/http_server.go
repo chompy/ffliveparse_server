@@ -793,6 +793,7 @@ func sendInitData(ws *websocket.Conn, gameSession *act.GameSession) {
 		defer reader.Close()
 		defer gameSession.Storage.File.Close()
 	}
+	// WARNING this reads everything in to memory!!
 	dataBytes, err = ioutil.ReadAll(reader)
 	if err != nil {
 		appLog.Error(err)

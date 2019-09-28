@@ -20,6 +20,8 @@ package data
 import (
 	"errors"
 	"time"
+
+	"github.com/jinzhu/gorm"
 )
 
 // DataTypeCombatant - Data type, combatant data
@@ -28,12 +30,13 @@ const DataTypeCombatant byte = 3
 // Combatant - Data about a combatant
 type Combatant struct {
 	ByteEncodable
+	gorm.Model
 	UserID         int64     `json:"user_id"`
 	Player         Player    `json:"player"`
-	EncounterUID   string    `json:"encounter_uid"`
+	EncounterUID   string    `json:"encounter_uid" gorm:"type:varchar(32)"`
 	ActEncounterID uint32    `json:"act_encounter_id"`
 	Time           time.Time `json:"time"`
-	Job            string    `json:"job"`
+	Job            string    `json:"job" gorm:"type:varchar(3)"`
 	Damage         int32     `json:"damage"`
 	DamageTaken    int32     `json:"damage_taken"`
 	DamageHealed   int32     `json:"damage_healed"`
@@ -95,10 +98,13 @@ func (c *Combatant) FromBytes(data []byte) error {
 	}
 	pos := 1
 	c.EncounterUID = readString(data, &pos)
+	playerID := readInt32(data, &pos)
+	playerName := readString(data, &pos)
+	playerWorld := readString(data, &pos)
 	c.Player = Player{
-		ID:    readInt32(data, &pos),
-		Name:  readString(data, &pos),
-		World: readString(data, &pos),
+		ID:    playerID,
+		Name:  playerName,
+		World: playerWorld,
 	}
 	c.Job = readString(data, &pos)
 	c.Damage = readInt32(data, &pos)

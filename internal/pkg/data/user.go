@@ -21,6 +21,7 @@ import (
 	"errors"
 	"time"
 
+	"github.com/jinzhu/gorm"
 	"github.com/rs/xid"
 	hashids "github.com/speps/go-hashids"
 )
@@ -29,12 +30,14 @@ const webIDSalt = "aedb2d139b653ee8aeeed9010ed053e94cb01$#!756"
 
 // User - data about an user
 type User struct {
-	ID        int64
+	gorm.Model
+	ID        int64 `gorm:"AUTO_INCREMENT"`
 	Created   time.Time
 	Accessed  time.Time
-	UploadKey string // key used to push data from ACT
-	WebKey    string // key used to access creds via homepage (stored in cookie)
-	webIDHash string
+	UploadKey string `gorm:"unique;not null;type:varchar(32)"` // key used to push data from ACT
+	WebKey    string `gorm:"unique;not null;type:varchar(32)"` // key used to access creds via homepage (stored in cookie)
+	Username  string `gorm:"unique;type:varchar(64)"`
+	webIDHash string `gorm:"-"`
 }
 
 // NewUser - create new user data

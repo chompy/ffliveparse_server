@@ -27,16 +27,16 @@ import (
 type Manager struct {
 	log  app.Logging
 	File FileHandler
-	DB   SqliteHandler
+	DB   DatabaseHandler
 }
 
 // NewManager - create new storage manager
 func NewManager() (Manager, error) {
-	file, err := NewFileHandler(app.FileStorePath)
+	file, err := NewFileHandler()
 	if err != nil {
 		return Manager{}, err
 	}
-	db, err := NewSqliteHandler(app.DatabasePath)
+	db, err := NewDatabaseHandler()
 	if err != nil {
 		return Manager{}, err
 	}

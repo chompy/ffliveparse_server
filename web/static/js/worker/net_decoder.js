@@ -24,9 +24,10 @@ var SIZE_BYTE = 1;
 var SIZE_INT16 = 2;
 var SIZE_INT32 = 4;
 
-var totalBytesRecieved= 0;
+var totalBytesRecieved = 0;
 var hasEncounter = false;
 var reportStatus = false;
+var partialBuffer = {};
 
 function readInt32(data, pos)
 {
@@ -58,6 +59,14 @@ function readString(data, pos)
 function buf2hex(buffer)
 {
     return Array.prototype.map.call(new Uint8Array(buffer), x => ('00' + x.toString(16)).slice(-2)).join('');
+}
+
+// @see https://stackoverflow.com/questions/33702838/how-to-append-bytes-multi-bytes-and-buffer-to-arraybuffer-in-javascript
+function concatTypedArrays(a, b) {
+    var c = new (a.constructor)(a.length + b.length);
+    c.set(a, 0);
+    c.set(b, a.length);
+    return c;
 }
 
 function decodeEncounterBytes(data)
@@ -203,7 +212,6 @@ function parseNextMessage(buffer, pos, count)
     // every ~200 send status update and use setTimeout to prevent recursion error
     if (count > 200) {
         if (reportStatus) {
-
             var loadingProgress = ((pos / buffer.byteLength) * 100).toFixed(1);
             postMessage({
                 "type"      : "status_in_progress",

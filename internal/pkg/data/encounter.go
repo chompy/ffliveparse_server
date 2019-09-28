@@ -20,6 +20,8 @@ package data
 import (
 	"errors"
 	"time"
+
+	"github.com/jinzhu/gorm"
 )
 
 // DataTypeEncounter - Data type, encounter data
@@ -28,17 +30,17 @@ const DataTypeEncounter byte = 2
 // Encounter - Data about an encounter
 type Encounter struct {
 	ByteEncodable
+	gorm.Model
 	UserID       int64     `json:"user_id"`
-	UID          string    `json:"uid"`
+	UID          string    `json:"uid" gorm:"unique;not null;type:varchar(32)"`
 	ActID        uint32    `json:"act_id"`
-	CompareHash  string    `json:"compare_hash"`
+	CompareHash  string    `json:"compare_hash" gorm:"not null;type:varchar(32)"`
 	StartTime    time.Time `json:"start_time"`
 	EndTime      time.Time `json:"end_time"`
-	Zone         string    `json:"zone"`
+	Zone         string    `json:"zone" gorm:"type:varchar(256)"`
 	Damage       int32     `json:"damage"`
 	Active       bool      `json:"active"`
 	SuccessLevel uint8     `json:"success_level"`
-	HasLogs      bool      `json:"has_logs"`
 }
 
 // ToBytes - Convert to bytes
