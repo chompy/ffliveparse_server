@@ -58,17 +58,19 @@ type EncounterManager struct {
 	teamWipeTime     time.Time
 	log              app.Logging
 	database         *DatabaseHandler
+	user             data.User
 	CombatantManager CombatantManager
 	LogLineManager   LogLineManager
 }
 
 // NewEncounterManager - create new encounter manager
-func NewEncounterManager(database *DatabaseHandler) EncounterManager {
+func NewEncounterManager(database *DatabaseHandler, user data.User) EncounterManager {
 	e := EncounterManager{
 		log:              app.Logging{ModuleName: "ENCOUNTER"},
 		CombatantManager: NewCombatantManager(),
 		LogLineManager:   NewLogLineManager(),
 		database:         database,
+		user:             user,
 	}
 	e.Reset()
 	return e
@@ -85,6 +87,7 @@ func (e *EncounterManager) Reset() {
 		Zone:         "",
 		SuccessLevel: 2,
 		Damage:       0,
+		UserID:       e.user.ID,
 	}
 	e.playerTeam = 0
 	e.teamWipeTime = time.Time{}
@@ -145,6 +148,9 @@ func (e *EncounterManager) End(successLevel uint8) {
 // getCombatantTracker - get combatant tracker for combatant with given name
 func (e *EncounterManager) getCombatantTracker(name string) *combatantTracker {
 	name = strings.TrimSpace(strings.ToUpper(name))
+	if name == "" {
+		return nil
+	}
 	for index := range e.combatantTracker {
 		if e.combatantTracker[index].Name == name {
 			return e.combatantTracker[index]
@@ -193,7 +199,7 @@ func (e *EncounterManager) checkTeamStatus() {
 	// set 'time wipe time'
 	if e.teamWipeTime.Before(e.encounter.StartTime) {
 		e.teamWipeTime = time.Now().Add(time.Millisecond * teamDeadTimeout)
-		e.log.Log(fmt.Sprintf("Team %d has no remaining comabatants.", deadTeam))
+		e.log.Log(fmt.Sprintf("Team %d has no remaining combatants.", deadTeam))
 	}
 	// 'team wipe time' has passed
 	if time.Now().After(e.teamWipeTime) {
@@ -277,6 +283,10 @@ func (e *EncounterManager) ReadLogLine(l *ParsedLogLine) {
 				}
 				e.log.Log(fmt.Sprintf("Combatant '%s' is on team %d.", ctTarget.Name, ctTarget.Team))
 			}
+			// update team wipe time if action was just performed
+			if e.teamWipeTime.After(e.encounter.StartTime) {
+				e.teamWipeTime = l.Time.Add(time.Millisecond * teamDeadTimeout)
+			}
 			break
 		}
 	case LogTypeDefeat, LogTypeRemoveCombatant:
@@ -286,6 +296,9 @@ func (e *EncounterManager) ReadLogLine(l *ParsedLogLine) {
 				break
 			}
 			ctTarget := e.getCombatantTracker(l.TargetName)
+			if ctTarget == nil {
+				break
+			}
 			ctTarget.IsAlive = false
 			e.log.Log(fmt.Sprintf("Combatant '%s' was defeated.", ctTarget.Name))
 			e.checkTeamStatus()
@@ -317,6 +330,9 @@ func (e *EncounterManager) ReadLogLine(l *ParsedLogLine) {
 					}
 					if l.TargetName != "" && l.AttackerName != "" {
 						ct := e.getCombatantTracker(l.AttackerName)
+						if ct == nil {
+							break
+						}
 						if ct.Team != 0 {
 							e.playerTeam = ct.Team
 							e.log.Log(fmt.Sprintf("Player team is %d.", ct.Team))
@@ -436,6 +452,7 @@ func (e *EncounterManager) Save() error {
 	combatants := e.CombatantManager.GetCombatants()
 	storeCombatants := make([]*data.Combatant, 0)
 	for index := range combatants {
+		combatants[index].UserID = e.user.ID
 		storeCombatants = append(storeCombatants, &combatants[index])
 	}
 	err = e.database.StoreCombatants(storeCombatants)
@@ -443,7 +460,12 @@ func (e *EncounterManager) Save() error {
 		return err
 	}
 	// store players
-	err = e.database.StorePlayers(e.CombatantManager.GetPlayers())
+	players := e.CombatantManager.GetPlayers()
+	storePlayers := make([]*data.Player, 0)
+	for index := range players {
+		storePlayers = append(storePlayers, &players[index])
+	}
+	err = e.database.StorePlayers(storePlayers)
 	if err != nil {
 		return err
 	}

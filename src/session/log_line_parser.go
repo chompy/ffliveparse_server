@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"log"
 	"regexp"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -187,6 +188,10 @@ func hexToInt(hexString string) (int, error) {
 		return 0, nil
 	}
 	output, err := strconv.ParseInt(hexString, 16, 64)
+	if err != nil {
+		_, fn, line, _ := runtime.Caller(1)
+		log.Println(hexString, fn, line)
+	}
 	return int(output), err
 }
 
@@ -196,9 +201,9 @@ func ParseLogLine(logLine data.LogLine) (ParsedLogLine, error) {
 	if len(logLineString) <= 15 {
 		return ParsedLogLine{}, fmt.Errorf("tried to parse log line with too few characters")
 	}
-	// hack, fix SAM "Hissatsu:" move as it breaks ":" delimiter
-	logLineString = strings.Replace(logLineString, "Hissatsu:", "Hissatsu--", -1)
-	//logLineString = strings.Replace(logLineString, )
+	// semi colon with space afterwards is ability name instead of delimiter
+	// probably........... examples... Kaeshi: Higanbana, Hissatsu: Guren
+	logLineString = strings.Replace(logLineString, ": ", "####", -1)
 	// split fields
 	fields := strings.Split(logLineString[15:], ":")
 	// get field type
@@ -272,8 +277,8 @@ func ParseLogLine(logLine data.LogLine) (ParsedLogLine, error) {
 			data.AbilityID = int(abilityID)
 			// ability name
 			data.AbilityName = fields[LogFieldAbilityName]
-			// hack, restore 'Hissatsu:'
-			data.AbilityName = strings.Replace(data.AbilityName, "Hissatsu--", "Hissatsu:", -1)
+			// restore ability name with semicolon
+			data.AbilityName = strings.Replace(data.AbilityName, "####", ": ", -1)
 			// target id
 			targetID, err := hexToInt(fields[LogFieldTargetID])
 			if err != nil {
@@ -284,7 +289,7 @@ func ParseLogLine(logLine data.LogLine) (ParsedLogLine, error) {
 			data.TargetName = fields[LogFieldTargetName]
 			// target current hp
 			if len(fields)-1 >= LogFieldTargetCurrentHP && fields[LogFieldTargetCurrentHP] != "" {
-				targetCurrentHP, err := strconv.ParseInt(fields[LogFieldTargetCurrentHP], 10, 64)
+				targetCurrentHP, err := hexToInt(fields[LogFieldTargetCurrentHP])
 				if err != nil {
 					return data, err
 				}
@@ -292,7 +297,7 @@ func ParseLogLine(logLine data.LogLine) (ParsedLogLine, error) {
 			}
 			// target max hp
 			if len(fields)-1 >= LogFieldTargetMaxHP && fields[LogFieldTargetMaxHP] != "" {
-				targetMaxHP, err := strconv.ParseInt(fields[LogFieldTargetMaxHP], 10, 64)
+				targetMaxHP, err := hexToInt(fields[LogFieldTargetMaxHP])
 				if err != nil {
 					return data, err
 				}
@@ -300,7 +305,7 @@ func ParseLogLine(logLine data.LogLine) (ParsedLogLine, error) {
 			}
 			// attacker current hp
 			if len(fields)-1 >= LogFieldAttackerCurrentHP && fields[LogFieldAttackerCurrentHP] != "" {
-				attackerCurrentHP, err := strconv.ParseInt(fields[LogFieldAttackerCurrentHP], 10, 64)
+				attackerCurrentHP, err := hexToInt(fields[LogFieldAttackerCurrentHP])
 				if err != nil {
 					return data, err
 				}
@@ -308,7 +313,7 @@ func ParseLogLine(logLine data.LogLine) (ParsedLogLine, error) {
 			}
 			// target max hp
 			if len(fields)-1 >= LogFieldAttackerMaxHP && fields[LogFieldAttackerMaxHP] != "" {
-				attackerMaxHP, err := strconv.ParseInt(fields[LogFieldAttackerMaxHP], 10, 64)
+				attackerMaxHP, err := hexToInt(fields[LogFieldAttackerMaxHP])
 				if err != nil {
 					return data, err
 				}
@@ -355,7 +360,7 @@ func ParseLogLine(logLine data.LogLine) (ParsedLogLine, error) {
 				break
 			}
 			data.TargetName = match[1]
-			maxHP, err := strconv.ParseInt(match[2], 10, 64)
+			maxHP, err := hexToInt(match[2])
 			if err != nil {
 				return data, err
 			}
@@ -371,7 +376,7 @@ func ParseLogLine(logLine data.LogLine) (ParsedLogLine, error) {
 			match := re.FindStringSubmatch(logLineString)
 			if len(match) > 2 {
 				data.TargetName = match[1]
-				damage, err := strconv.ParseInt(match[2], 10, 64)
+				damage, err := hexToInt(match[2])
 				if err != nil {
 					return data, err
 				}
@@ -385,7 +390,7 @@ func ParseLogLine(logLine data.LogLine) (ParsedLogLine, error) {
 				break
 			}
 			// get Log message ID
-			gameLogType, err := strconv.ParseInt(fields[1], 16, 16)
+			gameLogType, err := hexToInt(fields[1])
 			if err != nil {
 				return data, err
 			}

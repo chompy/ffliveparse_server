@@ -116,7 +116,7 @@ func (m *Manager) Update(dataStr []byte, addr *net.UDPAddr) {
 				session := &UserSession{
 					User:             user,
 					Session:          actSessionData,
-					EncounterManager: NewEncounterManager(&m.database),
+					EncounterManager: NewEncounterManager(&m.database, user),
 				}
 				m.sessions = append(
 					m.sessions,
@@ -212,41 +212,49 @@ func (m *Manager) handdleSession(session *UserSession) {
 	logger := app.Logging{ModuleName: fmt.Sprintf("SESSION/%d", session.User.ID)}
 	logger.Log("Start session.")
 	lastActivity := time.Now()
+	encounterActive := false
+	lastCombatantUpdate := time.Time{}
 	for range time.Tick(time.Millisecond * app.TickRate) {
+		var err error
 		// tick encounter
 		session.EncounterManager.Tick()
 		// send encounter
 		encounter := session.EncounterManager.GetEncounter()
 		encounter.UserID = session.User.ID
-		encounterBytes := encounter.ToBytes()
-		var err error
-		encounterBytes, err = data.CompressBytes(encounterBytes)
-		if err != nil {
-			continue
-		}
-		go m.events.Emit(
-			"act:encounter",
-			session.User.ID,
-			encounterBytes,
-		)
-		// send combatants
-		combatantBytes := make([]byte, 0)
-		combatants := session.EncounterManager.CombatantManager.GetLastCombatants()
-		for index := range combatants {
-			combatants[index].UserID = session.User.ID
-			combatantBytes = append(combatantBytes, combatants[index].ToBytes()...)
-		}
-		if len(combatantBytes) > 0 {
-			lastActivity = time.Now()
-			combatantBytes, err = data.CompressBytes(combatantBytes)
+		if encounter.Active != encounterActive {
+			encounterBytes := encounter.ToBytes()
+			encounterBytes, err = data.CompressBytes(encounterBytes)
 			if err != nil {
 				continue
 			}
 			go m.events.Emit(
-				"act:combatant",
+				"act:encounter",
 				session.User.ID,
-				combatantBytes,
+				encounterBytes,
 			)
+		}
+		encounterActive = encounter.Active
+		// send combatants
+		if session.EncounterManager.CombatantManager.GetLastUpdate().After(lastCombatantUpdate) {
+			combatantBytes := make([]byte, 0)
+			combatants := session.EncounterManager.CombatantManager.GetLastCombatantsSince(lastCombatantUpdate)
+			for index := range combatants {
+				combatants[index].UserID = session.User.ID
+				combatantBytes = append(combatantBytes, combatants[index].ToBytes()...)
+			}
+			if len(combatantBytes) > 0 {
+				lastActivity = time.Now()
+				combatantBytes, err = data.CompressBytes(combatantBytes)
+				if err != nil {
+					continue
+				}
+				go m.events.Emit(
+					"act:combatant",
+					session.User.ID,
+					combatantBytes,
+				)
+			}
+			lastCombatantUpdate = session.EncounterManager.CombatantManager.GetLastUpdate()
 		}
 		// dump+send log lines
 		logLineBytes := make([]byte, 0)

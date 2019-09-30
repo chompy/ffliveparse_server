@@ -26,13 +26,14 @@ import (
 )
 
 // combatantManagerUpdateInterval - rate at which combatant manager will accept new combatants
-const combatantManagerUpdateInterval = 3000
+const combatantManagerUpdateInterval = 2500
 
 // CombatantManager - handles combatant data for an encounter
 type CombatantManager struct {
 	combatants   []*data.Combatant
 	log          app.Logging
 	encounterUID string
+	lastUpdate   time.Time
 }
 
 // NewCombatantManager - create new combatant manager
@@ -47,6 +48,8 @@ func NewCombatantManager() CombatantManager {
 // Reset - reset combatant manager
 func (c *CombatantManager) Reset() {
 	c.combatants = make([]*data.Combatant, 0)
+	c.lastUpdate = time.Time{}
+	c.encounterUID = ""
 }
 
 // SetEncounterUID - set encounter uid for logging
@@ -57,6 +60,27 @@ func (c *CombatantManager) SetEncounterUID(encounterUID string) {
 
 // Update - add a combatant update
 func (c *CombatantManager) Update(combatant data.Combatant) {
+	// ignore non player combatants
+	if combatant.Player.ID > 1000000000 {
+		return
+	}
+	// fix limit break combatant data
+	if combatant.Job == "" {
+		for index := range c.combatants {
+			if c.combatants[index].Player.ID == combatant.Player.ID {
+				combatant.Job = "LB"
+				combatant.Player = data.Player{
+					ID:      -99,
+					ActName: "Limit Break",
+					Name:    "Limit Break",
+				}
+				break
+			}
+		}
+		if combatant.Job == "" {
+			return
+		}
+	}
 	// find last update for this player
 	var lastCombatant *data.Combatant
 	for index := range c.combatants {
@@ -71,6 +95,9 @@ func (c *CombatantManager) Update(combatant data.Combatant) {
 	// grab player name from last combatant
 	if lastCombatant != nil {
 		combatant.Player.Name = lastCombatant.Player.Name
+		if lastCombatant.Player.World != "" {
+			combatant.Player.World = lastCombatant.Player.World
+		}
 	}
 	// not enough time passed, update the last combatant with this new data
 	if lastCombatant != nil && combatant.Time.Sub(lastCombatant.Time) < time.Millisecond*combatantManagerUpdateInterval {
@@ -79,6 +106,9 @@ func (c *CombatantManager) Update(combatant data.Combatant) {
 	}
 	// add a new combatant
 	c.combatants = append(c.combatants, &combatant)
+	if combatant.Time.After(c.lastUpdate) {
+		c.lastUpdate = combatant.Time
+	}
 }
 
 // ReadLogLine - parse log line and update combatant(s)
@@ -91,7 +121,7 @@ func (c *CombatantManager) ReadLogLine(l *ParsedLogLine) {
 				player := &c.combatants[index].Player
 				if player.ID == int32(l.AttackerID) && player.Name != l.AttackerName {
 					player.Name = l.AttackerName
-					c.log.Log(fmt.Sprintf("Set combatant '%d' name to '%s.'", player.ID, l.AttackerName))
+					//c.log.Log(fmt.Sprintf("Set combatant '%d' name to '%s.'", player.ID, l.AttackerName))
 				}
 			}
 			break
@@ -104,11 +134,10 @@ func (c *CombatantManager) ReadLogLine(l *ParsedLogLine) {
 					if l.TargetName != "" && l.AttackerName != "" {
 						// sync world
 						for index := range c.combatants {
-							player := &c.combatants[index].Player
+							player := c.combatants[index].Player
 							if player.Name == l.AttackerName && player.World != l.TargetName {
-								player.World = l.TargetName
-								c.log.Log(fmt.Sprintf("Set combatant '%d' world to '%s.'", player.ID, l.TargetName))
-								break
+								c.combatants[index].Player.World = l.TargetName
+								//c.log.Log(fmt.Sprintf("Set combatant '%d' world to '%s.'", player.ID, l.TargetName))
 							}
 						}
 					}
@@ -121,27 +150,25 @@ func (c *CombatantManager) ReadLogLine(l *ParsedLogLine) {
 }
 
 // GetPlayers - get list of players in encounter
-func (c *CombatantManager) GetPlayers() []*data.Player {
-	output := make([]*data.Player, 0)
+func (c *CombatantManager) GetPlayers() []data.Player {
+	output := make([]data.Player, 0)
 	for index := range c.combatants {
-		combatant := c.combatants[index]
-		hasCombatant := false
-		for oIndex := range output {
-			if combatant.Player.ID == output[oIndex].ID {
-				if combatant.Player.Name == "" && output[oIndex].Name != "" {
-					output[oIndex].Name = combatant.Player.Name
+		hasPlayer := false
+		for pIndex := range output {
+			if output[pIndex].ID == c.combatants[index].Player.ID {
+				if c.combatants[index].Player.Name != output[pIndex].ActName {
+					output[pIndex].Name = c.combatants[index].Player.Name
 				}
-				if combatant.Player.World == "" && output[oIndex].World != "" {
-					output[oIndex].World = combatant.Player.World
+				if c.combatants[index].Player.World != "" && output[pIndex].World == "" {
+					output[pIndex].World = c.combatants[index].Player.World
 				}
-				hasCombatant = true
-				break
+				hasPlayer = true
 			}
 		}
-		if hasCombatant {
+		if hasPlayer {
 			continue
 		}
-		output = append(output, &combatant.Player)
+		output = append(output, c.combatants[index].Player)
 	}
 	return output
 }
@@ -221,4 +248,21 @@ func (c *CombatantManager) GetLastCombatants() []data.Combatant {
 		output = append(output, combatants[index])
 	}
 	return output
+}
+
+// GetLastCombatantsSince - get last combatants updates since given time
+func (c *CombatantManager) GetLastCombatantsSince(since time.Time) []data.Combatant {
+	combatants := c.GetCombatants()
+	output := make([]data.Combatant, 0)
+	for index := range combatants {
+		if combatants[index].Time.After(since) {
+			output = append(output, combatants[index])
+		}
+	}
+	return output
+}
+
+// GetLastUpdate - get last combatant update time
+func (c *CombatantManager) GetLastUpdate() time.Time {
+	return c.lastUpdate
 }
