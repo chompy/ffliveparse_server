@@ -21,7 +21,6 @@ import (
 	"errors"
 	"time"
 
-	"github.com/jinzhu/gorm"
 	"github.com/rs/xid"
 	hashids "github.com/speps/go-hashids"
 )
@@ -30,7 +29,6 @@ const webIDSalt = "aedb2d139b653ee8aeeed9010ed053e94cb01$#!756"
 
 // User - data about an user
 type User struct {
-	gorm.Model
 	ID        int64 `gorm:"AUTO_INCREMENT"`
 	Created   time.Time
 	Accessed  time.Time

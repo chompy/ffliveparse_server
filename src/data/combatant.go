@@ -20,8 +20,6 @@ package data
 import (
 	"errors"
 	"time"
-
-	"github.com/jinzhu/gorm"
 )
 
 // DataTypeCombatant - Data type, combatant data
@@ -30,7 +28,6 @@ const DataTypeCombatant byte = 3
 // Combatant - Data about a combatant
 type Combatant struct {
 	ByteEncodable
-	gorm.Model
 	UserID         int64     `json:"user_id"`
 	Player         Player    `json:"player"`
 	EncounterUID   string    `json:"encounter_uid" gorm:"type:varchar(32)"`

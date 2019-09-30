@@ -53,17 +53,22 @@ type combatantTracker struct {
 // EncounterManager - handles encounter and related objects
 type EncounterManager struct {
 	encounter        data.Encounter
-	combatantManager CombatantManager
-	combatantTracker []combatantTracker
+	combatantTracker []*combatantTracker
 	playerTeam       uint8
+	teamWipeTime     time.Time
 	log              app.Logging
+	database         *DatabaseHandler
+	CombatantManager CombatantManager
+	LogLineManager   LogLineManager
 }
 
 // NewEncounterManager - create new encounter manager
-func NewEncounterManager() EncounterManager {
+func NewEncounterManager(database *DatabaseHandler) EncounterManager {
 	e := EncounterManager{
-		combatantManager: NewCombatantManager(),
 		log:              app.Logging{ModuleName: "ENCOUNTER"},
+		CombatantManager: NewCombatantManager(),
+		LogLineManager:   NewLogLineManager(),
+		database:         database,
 	}
 	e.Reset()
 	return e
@@ -71,7 +76,6 @@ func NewEncounterManager() EncounterManager {
 
 // Reset - reset encounter manager
 func (e *EncounterManager) Reset() {
-	e.combatantManager.Reset()
 	encounterUIDGenerator := xid.New()
 	e.encounter = data.Encounter{
 		Active:       false,
@@ -82,34 +86,29 @@ func (e *EncounterManager) Reset() {
 		SuccessLevel: 2,
 		Damage:       0,
 	}
-	e.combatantTracker = make([]combatantTracker, 0)
-	e.log.ModuleName = "ENCOUNTER/" + e.encounter.UID
+	e.playerTeam = 0
+	e.teamWipeTime = time.Time{}
+	e.combatantTracker = make([]*combatantTracker, 0)
+	e.CombatantManager.Reset()
+	e.LogLineManager.Reset()
+	e.log.ModuleName = fmt.Sprintf("ENCOUNTER/%s", e.encounter.UID)
+	e.CombatantManager.SetEncounterUID(e.encounter.UID)
+	e.LogLineManager.SetEncounterUID(e.encounter.UID)
+	e.log.Log("Reset.")
 }
 
 // Update - update the encounter
-func (e *EncounterManager) Update(encounter data.Encounter) error {
-	// reset encounter if new data is active while old data is not
-	if !e.encounter.Active && encounter.Active {
-		e.Reset()
-		e.encounter.Active = true
+func (e *EncounterManager) Update(encounter data.Encounter) {
+	// ignore updates if current encounter is inactive
+	if !e.encounter.Active {
+		return
 	}
-	// if both old+new data are inactive do nothing
-	if !e.encounter.Active && !encounter.Active {
-		return nil
+	// update zone
+	if e.encounter.Zone == "" && encounter.Zone != "" {
+		e.encounter.Zone = encounter.Zone
 	}
-	// end if zone isn't the same
-	if encounter.Active && encounter.Zone != "" && e.encounter.Zone != encounter.Zone {
-		e.Reset()
-		e.encounter.Active = true
-	}
-	// update
-	if encounter.StartTime.Before(e.encounter.StartTime) {
-		e.encounter.StartTime = encounter.StartTime
-	}
-	e.encounter.Damage = encounter.Damage
-	e.encounter.Zone = encounter.Zone
+	// set current act id (could change throughout encounter depending on ACT settings)
 	e.encounter.ActID = encounter.ActID
-	return nil
 }
 
 // End - flag encounter as inactive
@@ -121,18 +120,24 @@ func (e *EncounterManager) End(successLevel uint8) {
 	// flag end
 	e.encounter.Active = false
 	e.encounter.SuccessLevel = successLevel
+	// save
+	err := e.Save()
+	if err != nil {
+		e.log.Error(err)
+	}
+	// log status
 	switch successLevel {
 	case EncounterSuccessClear:
 		{
-			e.log.Finish(fmt.Sprintf("Encounter '%s' CLEAR.", e.encounter.UID))
+			e.log.Log(fmt.Sprintf("Encounter '%s' CLEAR. (%s)", e.encounter.UID, e.encounter.EndTime.Sub(e.encounter.StartTime)))
 		}
 	case EncounterSuccessWipe, 3:
 		{
-			e.log.Finish(fmt.Sprintf("Encounter '%s' WIPE.", e.encounter.UID))
+			e.log.Log(fmt.Sprintf("Encounter '%s' WIPE. (%s)", e.encounter.UID, e.encounter.EndTime.Sub(e.encounter.StartTime)))
 		}
 	default:
 		{
-			e.log.Finish(fmt.Sprintf("Encounter '%s' ENDED.", e.encounter.UID))
+			e.log.Log(fmt.Sprintf("Encounter '%s' ENDED. (%s)", e.encounter.UID, e.encounter.EndTime.Sub(e.encounter.StartTime)))
 		}
 	}
 }
@@ -142,16 +147,73 @@ func (e *EncounterManager) getCombatantTracker(name string) *combatantTracker {
 	name = strings.TrimSpace(strings.ToUpper(name))
 	for index := range e.combatantTracker {
 		if e.combatantTracker[index].Name == name {
-			return &e.combatantTracker[index]
+			return e.combatantTracker[index]
 		}
 	}
-	ct := combatantTracker{
-		Name:    name,
-		Team:    0,
-		IsAlive: true,
+	ct := &combatantTracker{
+		Name:        name,
+		Team:        0,
+		IsAlive:     true,
+		WasAttacked: false,
 	}
 	e.combatantTracker = append(e.combatantTracker, ct)
-	return &e.combatantTracker[len(e.combatantTracker)-1]
+	return ct
+}
+
+// checkTeamStatus - check status of combatant tracker teams to determine encounter status
+func (e *EncounterManager) checkTeamStatus() {
+	// must have active encounter
+	if !e.encounter.Active {
+		return
+	}
+	// map alive counts on each team
+	ctMap := make(map[uint8]int)
+	ctMap[1] = 0
+	ctMap[2] = 0
+	for index := range e.combatantTracker {
+		if e.combatantTracker[index].Team == 0 {
+			continue
+		}
+		if e.combatantTracker[index].IsAlive && e.combatantTracker[index].WasAttacked {
+			ctMap[e.combatantTracker[index].Team]++
+		}
+	}
+	// if all teams alive then reset team wipe time
+	deadTeam := uint8(0)
+	for team := range ctMap {
+		if ctMap[team] == 0 {
+			deadTeam = team
+			break
+		}
+	}
+	if deadTeam == 0 {
+		e.teamWipeTime = time.Time{}
+		return
+	}
+	// set 'time wipe time'
+	if e.teamWipeTime.Before(e.encounter.StartTime) {
+		e.teamWipeTime = time.Now().Add(time.Millisecond * teamDeadTimeout)
+		e.log.Log(fmt.Sprintf("Team %d has no remaining comabatants.", deadTeam))
+	}
+	// 'team wipe time' has passed
+	if time.Now().After(e.teamWipeTime) {
+		for team := range ctMap {
+			if ctMap[team] == 0 {
+				if e.playerTeam == 0 {
+					// player team unknown, end encounter with unknown success
+					e.End(EncounterSuccessEnd)
+					return
+				} else if team == e.playerTeam {
+					// player team wipe, end encounter with fail
+					e.End(EncounterSuccessWipe)
+					return
+				}
+				// player team still alive, end encounter with clear
+				e.End(EncounterSuccessClear)
+				return
+			}
+		}
+	}
 }
 
 // ReadLogLine - parse log line and determine encounter status
@@ -160,6 +222,10 @@ func (e *EncounterManager) ReadLogLine(l *ParsedLogLine) {
 	if l.Time.Before(e.encounter.EndTime) {
 		return
 	}
+	// send log line to combatant manager
+	// log line manager will recieve log line from session manager
+	e.CombatantManager.ReadLogLine(l)
+	// perform actions
 	switch l.Type {
 	case LogTypeSingleTarget, LogTypeAoe:
 		{
@@ -170,8 +236,8 @@ func (e *EncounterManager) ReadLogLine(l *ParsedLogLine) {
 			// start/reset encounter
 			if !e.encounter.Active {
 				e.Reset()
-				e.log.Start(fmt.Sprintf("Encounter '%s' started.", e.encounter.UID))
 				e.encounter.Active = true
+				e.encounter.StartTime = l.Time
 			}
 			// update encounter end time
 			e.encounter.EndTime = l.Time
@@ -213,7 +279,7 @@ func (e *EncounterManager) ReadLogLine(l *ParsedLogLine) {
 			}
 			break
 		}
-	case LogTypeDefeat:
+	case LogTypeDefeat, LogTypeRemoveCombatant:
 		{
 			// must be active
 			if !e.encounter.Active {
@@ -222,19 +288,27 @@ func (e *EncounterManager) ReadLogLine(l *ParsedLogLine) {
 			ctTarget := e.getCombatantTracker(l.TargetName)
 			ctTarget.IsAlive = false
 			e.log.Log(fmt.Sprintf("Combatant '%s' was defeated.", ctTarget.Name))
+			e.checkTeamStatus()
 			break
 		}
 	case LogTypeZoneChange:
 		{
 			e.log.Log(fmt.Sprintf("Zone changed to '%s.'", l.TargetName))
 			if e.encounter.Zone != l.TargetName {
+				// if zone change while waiting for team wipe to be determined
+				// then force team wipe check now
+				if e.IsWaitForTeamWipe() {
+					e.teamWipeTime = time.Now().Add(-time.Millisecond)
+					e.checkTeamStatus()
+					break
+				}
+				// otherwise flag unknown end
 				e.End(EncounterSuccessEnd)
 			}
 			break
 		}
 	case LogTypeGameLog:
 		{
-
 			switch l.GameLogType {
 			case LogMsgIDCharacterWorldName:
 				{
@@ -299,7 +373,7 @@ func (e *EncounterManager) ReadLogLine(l *ParsedLogLine) {
 					// end encounter if match
 					if re.MatchString(l.Raw) && e.encounter.Active {
 						e.End(EncounterSuccessEnd)
-						e.log.Log(fmt.Sprintf("Encounter '%s' clear flag (end echo) detected.", e.encounter.UID))
+						e.log.Log("Clear flag (end echo) detected.")
 					}
 					break
 				}
@@ -310,12 +384,69 @@ func (e *EncounterManager) ReadLogLine(l *ParsedLogLine) {
 						break
 					}
 					if re.MatchString(l.Raw) && e.encounter.Active {
+						e.log.Log("Clear flag (countdown) detected.")
+						// if countdown while waiting for team wipe to be determined
+						// then force team wipe check now
+						if e.IsWaitForTeamWipe() {
+							e.teamWipeTime = time.Now().Add(-time.Millisecond)
+							e.checkTeamStatus()
+							break
+						}
 						e.End(EncounterSuccessEnd)
-						e.log.Log(fmt.Sprintf("Encounter '%s' clear flag (countdown) detected.", e.encounter.UID))
 					}
 					break
 				}
 			}
 		}
 	}
+}
+
+// Tick - perform status checks
+func (e *EncounterManager) Tick() {
+	e.checkTeamStatus()
+}
+
+// GetEncounter - get the current encounter
+func (e *EncounterManager) GetEncounter() data.Encounter {
+	return e.encounter
+}
+
+// IsWaitForTeamWipe - determine if waiting for team wipe time out to end encounter
+func (e *EncounterManager) IsWaitForTeamWipe() bool {
+	return !e.teamWipeTime.Before(e.encounter.StartTime) && e.teamWipeTime.After(time.Now())
+}
+
+// Save - save encounter
+func (e *EncounterManager) Save() error {
+	// no database
+	if e.database == nil {
+		return nil
+	}
+	// ensure encounter meets min+max encounter length
+	duration := e.encounter.EndTime.Sub(e.encounter.StartTime)
+	if duration < app.MinEncounterSaveLength*time.Millisecond || duration > app.MaxEncounterSaveLength*time.Millisecond {
+		return nil
+	}
+	// store encounter to database
+	err := e.database.StoreEncounter(&e.encounter)
+	if err != nil {
+		return err
+	}
+	// store combatants
+	combatants := e.CombatantManager.GetCombatants()
+	storeCombatants := make([]*data.Combatant, 0)
+	for index := range combatants {
+		storeCombatants = append(storeCombatants, &combatants[index])
+	}
+	err = e.database.StoreCombatants(storeCombatants)
+	if err != nil {
+		return err
+	}
+	// store players
+	err = e.database.StorePlayers(e.CombatantManager.GetPlayers())
+	if err != nil {
+		return err
+	}
+	// store log lines
+	return e.LogLineManager.Save()
 }

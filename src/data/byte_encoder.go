@@ -49,9 +49,6 @@ func writeBool(data *[]byte, value bool) {
 }
 
 func writeString(data *[]byte, value string) {
-	if len(value) > 255 {
-		value = value[0:255]
-	}
 	writeUint16(data, uint16(len(value)))
 	*data = append(*data, []byte(value)...)
 }

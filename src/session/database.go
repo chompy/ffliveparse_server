@@ -15,7 +15,7 @@ You should have received a copy of the GNU General Public License
 along with FFLiveParse.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-package storage
+package session
 
 import (
 	"fmt"
@@ -24,6 +24,7 @@ import (
 	"../app"
 	"../data"
 	"github.com/jinzhu/gorm"
+	_ "github.com/jinzhu/gorm/dialects/sqlite" // import sqlite3 driver
 )
 
 // DatabaseHandler - handles database access

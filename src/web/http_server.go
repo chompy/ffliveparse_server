@@ -23,8 +23,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"html/template"
-	"io"
 	"io/ioutil"
+	"log"
 	"math"
 	"net/http"
 	"os"
@@ -42,11 +42,9 @@ import (
 
 	"golang.org/x/net/websocket"
 
-	"../act"
 	"../app"
 	"../data"
-	"../storage"
-	"../user"
+	"../session"
 )
 
 // webKeyCookieName - name of cookie to store web key in
@@ -68,7 +66,7 @@ type templateData struct {
 	StatActConnections      int
 	StatActiveWebUsers      int
 	StatPageLoads           int
-	Encounters              []act.GameSession
+	Encounters              []session.EncounterManager
 	EncounterCurrentPage    int
 	EncounterTotalPage      int
 	EncounterNextPageOffset int
@@ -91,12 +89,9 @@ type websocketConnection struct {
 // HTTPStartServer - Start HTTP server
 func HTTPStartServer(
 	port uint16,
-	userManager *user.Manager,
-	actManager *act.Manager,
+	sessionManager *session.Manager,
 	events *emitter.Emitter,
-	storageManager *storage.Manager,
 	usageStatCollector *app.StatCollector,
-	playerStatTracker *act.StatsTracker,
 	devMode bool,
 ) {
 	// init logger
@@ -179,35 +174,29 @@ func HTTPStartServer(
 		}
 		appLog.Log(fmt.Sprintf("Start web socket connection for user '%s' from '%s.'", userID, ws.Request().RemoteAddr))
 		// fetch user data
-		userData, err := userManager.LoadFromWebIDString(userID)
+		userData, err := sessionManager.UserManager.LoadFromWebIDString(userID)
 		if err != nil {
 			appLog.Error(err)
 			return
 		}
 		// get act data from web ID
-		actSession, err := actManager.GetSessionWithWebID(userID)
+		userSession := sessionManager.GetSessionWithUser(userData)
 		if err != nil {
 			appLog.Error(err)
 			return
 		}
 		// relay previous encounter data if encounter id was provided
-		if encounterUID != "" && (actSession == nil || encounterUID != actSession.EncounterCollector.Encounter.UID) {
-			appLog.Log(fmt.Sprintf("Load previous encounter '%s' for user '%s.'", encounterUID, userID))
+		if encounterUID != "" && (userSession == nil || encounterUID != userSession.EncounterManager.GetEncounter().UID) {
+			/*appLog.Log(fmt.Sprintf("Load previous encounter '%s' for user '%s.'", encounterUID, userID))
 			previousEncounter, err := act.GetPreviousEncounter(storageManager, userData, encounterUID)
 			if err != nil {
 				appLog.Error(err)
 				return
 			}
-			sendInitData(ws, &previousEncounter)
+			sendInitData(ws, &previousEncounter)*/
 		} else {
-			// get act data from web ID
-			actSession, err := actManager.GetSessionWithWebID(userID)
-			if err != nil {
-				appLog.Error(err)
-				return
-			}
 			// send init data
-			sendInitData(ws, actSession)
+			sendInitData(ws, userSession)
 		}
 		// add websocket connection to global list
 		websocketConnections = append(
@@ -227,16 +216,15 @@ func HTTPStartServer(
 			}
 			ws.Close()
 		}()
-
 		// listen/wait for incomming messages
-		wsReader(ws, actManager)
+		wsReader(ws, sessionManager)
 	}))
 	http.HandleFunc("/new", func(w http.ResponseWriter, r *http.Request) {
 		// inc page load count
 		pageLoads++
 		// create a new user
 		appLog.Log("Create new user.")
-		userData := userManager.New()
+		userData := sessionManager.UserManager.New()
 		if err != nil {
 			appLog.Error(err)
 			displayError(
@@ -259,7 +247,7 @@ func HTTPStartServer(
 		// build template data
 		td := getBaseTemplateData()
 		// collect stats
-		td.StatActConnections = actManager.SessionCount()
+		td.StatActConnections = sessionManager.SessionCount()
 		td.StatActiveWebUsers = len(websocketConnections)
 		td.StatPageLoads = pageLoads
 		// render stats template
@@ -305,7 +293,7 @@ func HTTPStartServer(
 			return
 		}
 		// get user data
-		userData, err := userManager.LoadFromWebIDString(webUID)
+		userData, err := sessionManager.UserManager.LoadFromWebIDString(webUID)
 		if err != nil {
 			appLog.Error(err)
 			displayError(
@@ -397,7 +385,8 @@ func HTTPStartServer(
 			}
 		}
 		totalEncounterCount := 0
-		td.Encounters, err = act.GetPreviousEncounters(
+		log.Println(startTime, endTime)
+		/*td.Encounters, err = act.GetPreviousEncounters(
 			storageManager,
 			userData,
 			int(offset),
@@ -405,7 +394,7 @@ func HTTPStartServer(
 			startTime,
 			endTime,
 			&totalEncounterCount,
-		)
+		)*/
 		if err == nil {
 			td.EncounterTotalPage = int(math.Floor(float64(totalEncounterCount)/float64(app.PastEncounterFetchLimit))) + 1
 			if offset > totalEncounterCount-app.PastEncounterFetchLimit {
@@ -443,40 +432,6 @@ func HTTPStartServer(
 		// render stats template
 		htmlTemplates["player_stats.tmpl"].ExecuteTemplate(w, "base.tmpl", td)
 	})
-
-	// display player stats JSON
-	http.HandleFunc("/stats_json", func(w http.ResponseWriter, r *http.Request) {
-		// set resposne headers
-		w.Header().Set("Content-Type", "application/json; charset=utf-8")
-		// sort
-		statSort := r.URL.Query().Get("sort")
-		if statSort == "" {
-			statSort = ""
-		}
-		job := r.URL.Query().Get("job")
-		// fetch zones
-		zones := make([][]*data.PlayerStat, 0)
-		if playerStatTracker != nil {
-			for _, zoneName := range act.StatTrackerZones {
-				zones = append(
-					zones,
-					playerStatTracker.GetZoneStats(zoneName, job, statSort),
-				)
-			}
-		}
-		jsonBytes, err := json.Marshal(zones)
-		if err != nil {
-			appLog.Error(err)
-			displayError(
-				w,
-				"An error occured while displaying player stats",
-				http.StatusInternalServerError,
-			)
-			return
-		}
-		w.Write(jsonBytes)
-	})
-
 	// ping
 	http.HandleFunc("/ping", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
@@ -501,7 +456,7 @@ func HTTPStartServer(
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		// if web ID provided in URL attempt to serve up main app
 		if webID != "" {
-			userData, err := userManager.LoadFromWebIDString(webID)
+			userData, err := sessionManager.UserManager.LoadFromWebIDString(webID)
 			if err != nil {
 				appLog.Error(err)
 				displayError(
@@ -518,7 +473,7 @@ func HTTPStartServer(
 		// get cookie, use it to fetch user data
 		cookie, err := r.Cookie(webKeyCookieName)
 		if err == nil {
-			userData, err := userManager.LoadFromWebKey(cookie.Value)
+			userData, err := sessionManager.UserManager.LoadFromWebKey(cookie.Value)
 			if err == nil {
 				addUserToTemplateData(&td, userData)
 			} else {
@@ -641,9 +596,9 @@ func compileGCSS() (map[string]string, error) {
 	return output, nil
 }
 
-func wsReader(ws *websocket.Conn, actManager *act.Manager) {
+func wsReader(ws *websocket.Conn, sessionManager *session.Manager) {
 	for {
-		if ws == nil || actManager == nil {
+		if ws == nil || sessionManager == nil {
 			break
 		}
 		var data []byte
@@ -655,6 +610,7 @@ func wsReader(ws *websocket.Conn, actManager *act.Manager) {
 }
 
 func globalWsWriter(websocketConnections *[]websocketConnection, events *emitter.Emitter) {
+	appLog := app.Logging{ModuleName: "WEB/SEND"}
 	for {
 		if websocketConnections == nil {
 			break
@@ -664,10 +620,13 @@ func globalWsWriter(websocketConnections *[]websocketConnection, events *emitter
 				if websocketConnection.connection == nil || event.Args[0] != websocketConnection.userData.ID {
 					continue
 				}
-				websocket.Message.Send(
+				err := websocket.Message.Send(
 					websocketConnection.connection,
 					event.Args[1],
 				)
+				if err != nil {
+					appLog.Error(err)
+				}
 			}
 		}
 	}
@@ -727,12 +686,12 @@ func getWebKeyCookie(user data.User, r *http.Request) http.Cookie {
 }
 
 // sendInitData - Send initial data to web user to sync their session
-func sendInitData(ws *websocket.Conn, gameSession *act.GameSession) {
+func sendInitData(ws *websocket.Conn, userSession *session.UserSession) {
 	appLog := app.Logging{ModuleName: "WEB"}
-	// add flag indicating if ACT is active
+	// add flag indicating if session is active
 	isActiveFlag := data.Flag{
 		Name:  "active",
-		Value: gameSession != nil && gameSession.IsActive(),
+		Value: userSession != nil,
 	}
 	activeCompress, err := data.CompressBytes(isActiveFlag.ToBytes())
 	if err != nil {
@@ -741,25 +700,23 @@ func sendInitData(ws *websocket.Conn, gameSession *act.GameSession) {
 	}
 	websocket.Message.Send(ws, activeCompress)
 	appLog.Log(fmt.Sprintf("Send %d bytes (flags) of data to '%s.'", len(activeCompress), ws.Request().RemoteAddr))
-	// must have active encounter for the rest
-	if gameSession == nil || gameSession.EncounterCollector.Encounter.UID == "" {
+	// must have active session for the rest
+	if userSession == nil {
 		return
 	}
 	// prepare data
 	dataBytes := make([]byte, 0)
 	// send encounter
-	dataBytes = append(dataBytes, gameSession.EncounterCollector.Encounter.ToBytes()...)
+	encounter := userSession.EncounterManager.GetEncounter()
+	dataBytes = append(dataBytes, encounter.ToBytes()...)
 	if err != nil {
 		appLog.Error(err)
 		return
 	}
 	// add combatants
-	for _, snapshots := range gameSession.CombatantCollector.GetSnapshots() {
-		for _, combatant := range snapshots {
-			combatant.EncounterUID = gameSession.EncounterCollector.Encounter.UID
-			combatant.UserID = gameSession.User.ID
-			dataBytes = append(dataBytes, combatant.ToBytes()...)
-		}
+	for _, combatant := range userSession.EncounterManager.CombatantManager.GetCombatants() {
+		combatant.UserID = userSession.User.ID
+		dataBytes = append(dataBytes, combatant.ToBytes()...)
 	}
 	// compress + send
 	dataBytes, err = data.CompressBytes(dataBytes)
@@ -769,41 +726,6 @@ func sendInitData(ws *websocket.Conn, gameSession *act.GameSession) {
 		appLog.Error(err)
 		return
 	}
-	// send encounter
-	// TODO buffer reads for memory usage
-	var reader io.ReadCloser
-	if gameSession.EncounterCollector.Encounter.Active {
-		// send from temp buffer (for active encounter)
-		reader, err = gameSession.Buffer.GetReadFile()
-		if err != nil {
-			appLog.Error(err)
-			return
-		}
-		defer reader.Close()
-	} else {
-		// send from permanent storage
-		reader, err = gameSession.Storage.File.OpenRead(gameSession.EncounterCollector.Encounter.UID)
-		if err == os.ErrNotExist {
-			return
-		}
-		if err != nil {
-			appLog.Error(err)
-			return
-		}
-		defer reader.Close()
-		defer gameSession.Storage.File.Close()
-	}
-	// WARNING this reads everything in to memory!!
-	dataBytes, err = ioutil.ReadAll(reader)
-	if err != nil {
-		appLog.Error(err)
-		return
-	}
-	dataBytes, err = data.CompressBytes(dataBytes)
-	if err != nil {
-		appLog.Error(err)
-		return
-	}
-	appLog.Log(fmt.Sprintf("Send %d bytes (buffer) of data to '%s.'", len(dataBytes), ws.Request().RemoteAddr))
-	websocket.Message.Send(ws, dataBytes)
+	// send log lines
+	// TODO
 }

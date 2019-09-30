@@ -56,7 +56,7 @@ func (l *Logging) Error(err error) {
 		return
 	}
 	_, fn, line, _ := runtime.Caller(1)
-	msg := fmt.Sprintf("%s (%s at line %d)", err.Error(), fn, line)
+	msg := fmt.Sprintf("%s (%s:%d)", err.Error(), fn, line)
 	l.LogLevel(msg, LogLevelError)
 }
 
@@ -66,7 +66,7 @@ func (l *Logging) Panic(err error) {
 		return
 	}
 	_, fn, line, _ := runtime.Caller(1)
-	msg := fmt.Sprintf("%s (%s at line %d)", err.Error(), fn, line)
+	msg := fmt.Sprintf("%s (%s:%d)", err.Error(), fn, line)
 	l.LogLevel(msg, LogLevelError)
 	panic(err)
 }

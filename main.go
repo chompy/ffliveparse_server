@@ -6,11 +6,9 @@ import (
 
 	"github.com/olebedev/emitter"
 
-	"./internal/pkg/act"
-	"./internal/pkg/app"
-	"./internal/pkg/storage"
-	"./internal/pkg/user"
-	"./internal/pkg/web"
+	"./src/app"
+	"./src/session"
+	"./src/web"
 )
 
 // ActListenUDPPort - Port act server will listen on
@@ -41,39 +39,22 @@ func main() {
 	usageStatCollector.TakeSnapshot()
 	go usageStatCollector.Start()
 
-	// create storage handler
-	storageManager, err := storage.NewManager()
+	// create session manager
+	sessionManager, err := session.NewSessionManager(&events)
 	if err != nil {
 		panic(err)
 	}
 
-	// create user manager
-	userManager := user.NewManager(&storageManager)
-
-	// create act manager
-	actManager := act.NewManager(&events, &storageManager, &userManager, *devModePtr)
-	go actManager.SnapshotListener()
-	defer actManager.ClearAllSessions()
-
-	// player stat tracker on seperate threads
-	//playerStatTracker := act.NewStatsTracker(&storageManager)
-	//go playerStatTracker.Start()
-
-	// clean up old data
-	go storageManager.StartCleanUp()
-
 	// start http server
 	go web.HTTPStartServer(
 		uint16(*httpPort),
-		&userManager,
-		&actManager,
+		&sessionManager,
 		&events,
-		&storageManager,
 		&usageStatCollector,
-		nil,
 		*devModePtr,
 	)
 
 	// start act listen server
-	act.Listen(uint16(*actPort), &actManager)
+	session.Listen(uint16(*actPort), &sessionManager)
+
 }

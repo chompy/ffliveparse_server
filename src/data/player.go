@@ -17,11 +17,8 @@ along with FFLiveParse.  If not, see <https://www.gnu.org/licenses/>.
 
 package data
 
-import "github.com/jinzhu/gorm"
-
 // Player - Data about a player
 type Player struct {
-	gorm.Model
 	ID      int32  `json:"id" gorm:"unique;not null"`
 	Name    string `json:"name" gorm:"type:varchar(128)"`
 	ActName string `json:"act_name" gorm:"type:varchar(128)"`

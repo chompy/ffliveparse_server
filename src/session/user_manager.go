@@ -21,18 +21,17 @@ import (
 	"time"
 
 	"../data"
-	"../storage"
 )
 
 // UserManager - manages users data
 type UserManager struct {
-	storage *storage.Manager
+	database *DatabaseHandler
 }
 
 // NewUserManager - create new user manager
-func NewUserManager(sm *storage.Manager) UserManager {
+func NewUserManager(db *DatabaseHandler) UserManager {
 	return UserManager{
-		storage: sm,
+		database: db,
 	}
 }
 
@@ -45,7 +44,7 @@ func (m *UserManager) New() data.User {
 
 // LoadFromID - load user from id
 func (m *UserManager) LoadFromID(ID int64) (data.User, error) {
-	u, err := m.storage.DB.FetchUserFromID(ID)
+	u, err := m.database.FetchUserFromID(ID)
 	if err != nil {
 		return u, err
 	}
@@ -55,7 +54,7 @@ func (m *UserManager) LoadFromID(ID int64) (data.User, error) {
 
 // LoadFromUploadKey - load user from upload key
 func (m *UserManager) LoadFromUploadKey(uploadKey string) (data.User, error) {
-	u, err := m.storage.DB.FetchUserFromUploadKey(uploadKey)
+	u, err := m.database.FetchUserFromUploadKey(uploadKey)
 	if err != nil {
 		return u, err
 	}
@@ -65,7 +64,7 @@ func (m *UserManager) LoadFromUploadKey(uploadKey string) (data.User, error) {
 
 // LoadFromWebKey - load user from web key
 func (m *UserManager) LoadFromWebKey(webKey string) (data.User, error) {
-	u, err := m.storage.DB.FetchUserFromWebKey(webKey)
+	u, err := m.database.FetchUserFromWebKey(webKey)
 	if err != nil {
 		return u, err
 	}
@@ -84,5 +83,5 @@ func (m *UserManager) LoadFromWebIDString(webIDString string) (data.User, error)
 
 // Save - save user data
 func (m *UserManager) Save(u *data.User) error {
-	return m.storage.DB.StoreUser(u)
+	return m.database.StoreUser(u)
 }

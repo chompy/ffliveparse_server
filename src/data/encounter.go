@@ -20,8 +20,6 @@ package data
 import (
 	"errors"
 	"time"
-
-	"github.com/jinzhu/gorm"
 )
 
 // DataTypeEncounter - Data type, encounter data
@@ -30,7 +28,6 @@ const DataTypeEncounter byte = 2
 // Encounter - Data about an encounter
 type Encounter struct {
 	ByteEncodable
-	gorm.Model
 	UserID       int64     `json:"user_id"`
 	UID          string    `json:"uid" gorm:"unique;not null;type:varchar(32)"`
 	ActID        uint32    `json:"act_id"`
