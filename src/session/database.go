@@ -73,21 +73,21 @@ func (d *DatabaseHandler) StoreUser(user *data.User) error {
 // FetchUserFromID - fetch user with ID from database
 func (d *DatabaseHandler) FetchUserFromID(userID int64) (data.User, error) {
 	u := data.User{}
-	res := d.conn.First(&u, 1)
+	res := d.conn.First(&u)
 	return u, res.Error
 }
 
 // FetchUserFromUploadKey - fetch user with upload key from database
 func (d *DatabaseHandler) FetchUserFromUploadKey(uploadKey string) (data.User, error) {
 	u := data.User{}
-	res := d.conn.Where("upload_key = ?", uploadKey).First(&u, 1)
+	res := d.conn.Where("upload_key = ?", uploadKey).First(&u)
 	return u, res.Error
 }
 
 // FetchUserFromWebKey - fetch user with web key from database
 func (d *DatabaseHandler) FetchUserFromWebKey(webKey string) (data.User, error) {
 	u := data.User{}
-	res := d.conn.Where("web_key = ?", webKey).First(&u, 1)
+	res := d.conn.Where("web_key = ?", webKey).First(&u)
 	return u, res.Error
 }
 
@@ -95,6 +95,43 @@ func (d *DatabaseHandler) FetchUserFromWebKey(webKey string) (data.User, error) 
 func (d *DatabaseHandler) StoreEncounter(encounter *data.Encounter) error {
 	res := d.conn.Save(encounter)
 	return res.Error
+}
+
+// FetchEncounter - fetch encounter by UID
+func (d *DatabaseHandler) FetchEncounter(encounterUID string) (data.Encounter, error) {
+	e := data.Encounter{}
+	res := d.conn.Where(&data.Encounter{UID: encounterUID}).First(&e)
+	return e, res.Error
+}
+
+// buildUserEncountersQuery - build query for user encounters
+func (d *DatabaseHandler) buildUserEncountersQuery(userID int64, start *time.Time, end *time.Time) *gorm.DB {
+	res := d.conn.Model(&data.Encounter{}).Where("user_id = ?", userID).Limit(app.PastEncounterFetchLimit)
+	if start != nil {
+		res = res.Where("start_time >= ?", start)
+	}
+	if end != nil {
+		res = res.Where("end_time <= ?", end)
+	}
+	res = res.Order("start_time DESC")
+	return res
+}
+
+// FetchUserEncounters - fetch encounters for user
+func (d *DatabaseHandler) FetchUserEncounters(userID int64, offset int, start *time.Time, end *time.Time) ([]data.Encounter, error) {
+	e := make([]data.Encounter, 0)
+	res := d.buildUserEncountersQuery(userID, start, end)
+	res = res.Offset(offset)
+	res = res.Find(&e)
+	return e, res.Error
+}
+
+// CountUserEncounters - get number of user encounters
+func (d *DatabaseHandler) CountUserEncounters(userID int64, start *time.Time, end *time.Time) (int, error) {
+	count := 0
+	res := d.buildUserEncountersQuery(userID, start, end)
+	res = res.Count(&count)
+	return count, res.Error
 }
 
 // StoreCombatants - store combatants to database
@@ -106,6 +143,41 @@ func (d *DatabaseHandler) StoreCombatants(combatants []*data.Combatant) error {
 		}
 	}
 	return nil
+}
+
+// FetchCombatantsForEncounter - fetch all combatants for an encounter
+func (d *DatabaseHandler) FetchCombatantsForEncounter(encounterUID string) ([]data.Combatant, error) {
+	c := make([]data.Combatant, 0)
+	res := d.conn.Where("encounter_uid = ?", encounterUID).Find(&c)
+	if res.Error != nil {
+		return c, res.Error
+	}
+	// add player entry
+	players := make([]data.Player, 0)
+	playerIDs := make([]int32, 0)
+	for index := range c {
+		hasPlayer := false
+		for pIndex := range playerIDs {
+			if c[index].PlayerID == playerIDs[pIndex] {
+				hasPlayer = true
+			}
+		}
+		if hasPlayer {
+			continue
+		}
+		playerIDs = append(playerIDs, c[index].PlayerID)
+	}
+	if len(playerIDs) > 0 {
+		res = d.conn.Where(playerIDs).Find(&players)
+	}
+	for index := range players {
+		for cIndex := range c {
+			if players[index].ID == c[cIndex].PlayerID {
+				c[cIndex].Player = players[index]
+			}
+		}
+	}
+	return c, res.Error
 }
 
 // StorePlayers - store players to database

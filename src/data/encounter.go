@@ -29,7 +29,7 @@ const DataTypeEncounter byte = 2
 type Encounter struct {
 	ByteEncodable
 	UserID       int64     `json:"user_id"`
-	UID          string    `json:"uid" gorm:"unique;not null;type:varchar(32)"`
+	UID          string    `json:"uid" gorm:"primary key;unique;not null;type:varchar(32)"`
 	ActID        uint32    `json:"act_id"`
 	CompareHash  string    `json:"compare_hash" gorm:"not null;type:varchar(32)"`
 	StartTime    time.Time `json:"start_time"`

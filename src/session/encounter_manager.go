@@ -58,7 +58,7 @@ type EncounterManager struct {
 	teamWipeTime     time.Time
 	log              app.Logging
 	database         *DatabaseHandler
-	user             data.User
+	User             data.User
 	CombatantManager CombatantManager
 	LogLineManager   LogLineManager
 }
@@ -70,7 +70,7 @@ func NewEncounterManager(database *DatabaseHandler, user data.User) EncounterMan
 		CombatantManager: NewCombatantManager(),
 		LogLineManager:   NewLogLineManager(),
 		database:         database,
-		user:             user,
+		User:             user,
 	}
 	e.Reset()
 	return e
@@ -87,7 +87,7 @@ func (e *EncounterManager) Reset() {
 		Zone:         "",
 		SuccessLevel: 2,
 		Damage:       0,
-		UserID:       e.user.ID,
+		UserID:       e.User.ID,
 	}
 	e.playerTeam = 0
 	e.teamWipeTime = time.Time{}
@@ -97,7 +97,6 @@ func (e *EncounterManager) Reset() {
 	e.log.ModuleName = fmt.Sprintf("ENCOUNTER/%s", e.encounter.UID)
 	e.CombatantManager.SetEncounterUID(e.encounter.UID)
 	e.LogLineManager.SetEncounterUID(e.encounter.UID)
-	e.log.Log("Reset.")
 }
 
 // Update - update the encounter
@@ -448,17 +447,6 @@ func (e *EncounterManager) Save() error {
 	if err != nil {
 		return err
 	}
-	// store combatants
-	combatants := e.CombatantManager.GetCombatants()
-	storeCombatants := make([]*data.Combatant, 0)
-	for index := range combatants {
-		combatants[index].UserID = e.user.ID
-		storeCombatants = append(storeCombatants, &combatants[index])
-	}
-	err = e.database.StoreCombatants(storeCombatants)
-	if err != nil {
-		return err
-	}
 	// store players
 	players := e.CombatantManager.GetPlayers()
 	storePlayers := make([]*data.Player, 0)
@@ -469,6 +457,39 @@ func (e *EncounterManager) Save() error {
 	if err != nil {
 		return err
 	}
+	// store combatants
+	combatants := e.CombatantManager.GetCombatants()
+	storeCombatants := make([]*data.Combatant, 0)
+	for index := range combatants {
+		combatants[index].UserID = e.User.ID
+		storeCombatants = append(storeCombatants, &combatants[index])
+	}
+	err = e.database.StoreCombatants(storeCombatants)
+	if err != nil {
+		return err
+	}
 	// store log lines
 	return e.LogLineManager.Save()
+}
+
+// Load - load previous encounter
+func (e *EncounterManager) Load(encounterUID string) error {
+	// no database
+	if e.database == nil {
+		return fmt.Errorf("no database loaded")
+	}
+	e.LogLineManager.SetEncounterUID(encounterUID)
+	// fetch encounter
+	var err error
+	e.encounter, err = e.database.FetchEncounter(encounterUID)
+	if err != nil {
+		return err
+	}
+	// fetch combatants
+	combatants, err := e.database.FetchCombatantsForEncounter(encounterUID)
+	if err != nil {
+		return err
+	}
+	e.CombatantManager.SetCombatants(combatants)
+	return nil
 }

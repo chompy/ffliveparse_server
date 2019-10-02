@@ -18,7 +18,7 @@ along with FFLiveParse.  If not, see <https://www.gnu.org/licenses/>.
 /**
  * Number of workers to spawn.
  */
-var WORKER_COUNT = 10;
+var WORKER_COUNT = 1;
 
 /**
  * Main application class.
@@ -288,6 +288,7 @@ class Application
         // log incoming data
         window.addEventListener("act:encounter", function(e) {
             if (!t.encounter || e.detail.UID != t.encounter.data.UID) {
+                console.log(t.encounter);
                 console.log(">> Encounter active, ", e.detail);
                 t.combatantCollector.reset();
                 t.actionCollector.reset();
@@ -299,9 +300,9 @@ class Application
                 }
                 return;
             }
-            t.encounter.update(e.detail);
             if (t.encounter && !e.detail.Active) {
                 console.log(">> Encounter inactive, ", e.detail);
+                t.encounter.update(e.detail);
                 for (var i in t.views) {
                     t.views[i].onEncounterInactive(t.encounter);
                 } 
@@ -311,7 +312,7 @@ class Application
         // add/update combatant
         window.addEventListener("act:combatant", function(e) {
             var combatant = t.combatantCollector.update(e.detail);
-            if (combatant) {
+            if (combatant && e.detail.Time >= combatant.getLastUpdateTime()) {
                 window.dispatchEvent(
                     new CustomEvent("app:combatant", {"detail" : combatant})
                 );

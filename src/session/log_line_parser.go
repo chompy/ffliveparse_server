@@ -271,7 +271,6 @@ func ParseLogLine(logLine data.LogLine) (ParsedLogLine, error) {
 			// ability id
 			abilityID, err := hexToInt(fields[LogFieldAbilityID])
 			if err != nil {
-
 				return data, err
 			}
 			data.AbilityID = int(abilityID)

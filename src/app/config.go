@@ -53,13 +53,13 @@ const MinEncounterSaveLength = 20000 // 20 seconds
 const MaxEncounterSaveLength = 1500000 // 25 minutes
 
 // PastEncounterFetchLimit - Max number of past encounters to fetch in one request
-const PastEncounterFetchLimit = 20
+const PastEncounterFetchLimit = 30
 
 // EncounterLogDeleteDays - Number of days that should pass before deleting encounter logs
-const EncounterLogDeleteDays = 90
+const EncounterLogDeleteDays = 14
 
 // EncounterDeleteDays - Number of days that should pass before deleting entire encounter
-const EncounterDeleteDays = 180
+const EncounterDeleteDays = 14
 
 // EncounterCleanUpRate - Rate at which encounter clean up should be ran
 const EncounterCleanUpRate = 1800000 // 30 minutes

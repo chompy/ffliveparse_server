@@ -36,13 +36,13 @@
         </div>
 
         {{ range $val := .Encounters }}
-        <div class="encounter-item{{ if eq $val.EncounterCollector.Encounter.SuccessLevel 1 }} encounter-success{{ end }}">
+        <div class="encounter-item{{ if eq $val.GetEncounter.SuccessLevel 1 }} encounter-success{{ end }}">
             <div class="encounter-flags">
-                {{ if eq $val.EncounterCollector.Encounter.SuccessLevel 1 }}<span class="encounter-flag encounter-flag-success" title="Cleared">C</span>{{ end }}
+                {{ if eq $val.GetEncounter.SuccessLevel 1 }}<span class="encounter-flag encounter-flag-success" title="Cleared">C</span>{{ end }}
             </div>
-            <div class="encounter-time" data-timestamp="{{ $val.EncounterCollector.Encounter.StartTime.Unix }}"><a href="/{{ $val.User.GetWebIDString }}/{{ $val.EncounterCollector.Encounter.UID }}">?</a></div>
-            <div class="encounter-zone" title="{{ $val.EncounterCollector.Encounter.Zone }}">{{ $val.EncounterCollector.Encounter.Zone }}</div>
-            <div class="encounter-length" title="{{ $val.EncounterCollector.Encounter.EndTime.Sub $val.EncounterCollector.Encounter.StartTime }}">{{ $val.EncounterCollector.Encounter.EndTime.Sub $val.EncounterCollector.Encounter.StartTime }}</div>
+            <div class="encounter-time" data-timestamp="{{ $val.GetEncounter.StartTime.Unix }}"><a href="/{{ $val.User.GetWebIDString }}/{{ $val.GetEncounter.UID }}">?</a></div>
+            <div class="encounter-zone" title="{{ $val.GetEncounter.Zone }}">{{ $val.GetEncounter.Zone }}</div>
+            <div class="encounter-length" title="{{ $val.GetEncounter.EndTime.Sub $val.GetEncounter.StartTime }}">{{ $val.GetEncounter.EndTime.Sub $val.GetEncounter.StartTime }}</div>
         </div>
         {{ end }}
 

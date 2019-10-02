@@ -48,6 +48,7 @@ class ViewOverview extends ViewBase
         this.cooldownQueue = [];
         this.bossTracker = [];
         this.playerListElement.innerHTML = "";
+        this.lastLogUpdate = null;
         this.onResize();
     }
 
@@ -322,7 +323,7 @@ class ViewOverview extends ViewBase
                 this.ttcElement.innerText = timeStr;
             }
         }
-        // update daeths
+        // update deaths
         if (this.deathsElement.innerText != deaths) {
             this.deathsElement.innerText = deaths;
         }
@@ -360,6 +361,9 @@ class ViewOverview extends ViewBase
 
     _updateCooldowns()
     {
+        if (!this.encounter || !this.encounter.data.Active) {
+            return;
+        }
         var currentTime = new Date().getTime();
         for (var i in this.playerElements) {
             var elementsGet = this.playerElements[i].getElementsByClassName("cooldown");
@@ -415,6 +419,10 @@ class ViewOverview extends ViewBase
 
     onLogLine(logLineData)
     {
+        if (logLineData.Time < this.lastLogUpdate) {
+            return;
+        }
+        this.lastLogUpdate = logLineData.Time;
         // parse log line
         var pLogLine = parseLogLine(logLineData.LogLine);  
         // track boss hp

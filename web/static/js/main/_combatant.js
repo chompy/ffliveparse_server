@@ -205,6 +205,7 @@ class Combatant
         this.snapshots = [];
         this.ids = [];
         this.names = [];
+        this.lastUpdate = null;
     }
 
     /**
@@ -214,6 +215,9 @@ class Combatant
     update(data)
     {
         this.data = data;
+        if (this.lastUpdate < this.data.Time) {
+            this.lastUpdate = this.data.Time;
+        }
         this.snapshots.push(data);
         if (this.ids.indexOf(data.ID) == -1) {
             this.ids.push(data.ID);
@@ -388,6 +392,14 @@ class Combatant
             }
         }
         return combatantDefaultRoleClass;
+    }
+
+    /**
+     * Get last time this combatant was updated.
+     * @return Date
+     */
+    getLastUpdateTime() {
+        return this.lastUpdate;
     }
 
 }

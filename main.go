@@ -39,8 +39,14 @@ func main() {
 	usageStatCollector.TakeSnapshot()
 	go usageStatCollector.Start()
 
+	// create database handler
+	dbHandler, err := session.NewDatabaseHandler()
+	if err != nil {
+		panic(err)
+	}
+
 	// create session manager
-	sessionManager, err := session.NewSessionManager(&events)
+	sessionManager, err := session.NewSessionManager(&dbHandler, &events)
 	if err != nil {
 		panic(err)
 	}

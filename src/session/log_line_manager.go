@@ -38,7 +38,7 @@ import (
 const LogLineByteSize = 512
 
 // LogLineReadLimit - limit of log lines per read
-const LogLineReadLimit = 16
+const LogLineReadLimit = 50
 
 // LogLineManager - handles log line data for session
 type LogLineManager struct {
@@ -99,6 +99,7 @@ func (l *LogLineManager) Update(logLine data.LogLine) {
 	if pLogLine.Raw == "" {
 		return
 	}
+	logLine.EncounterUID = l.encounterUID
 	l.logLines = append(l.logLines, &logLine)
 }
 

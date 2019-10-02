@@ -26,7 +26,7 @@ import (
 )
 
 // combatantManagerUpdateInterval - rate at which combatant manager will accept new combatants
-const combatantManagerUpdateInterval = 2500
+const combatantManagerUpdateInterval = 5000
 
 // CombatantManager - handles combatant data for an encounter
 type CombatantManager struct {
@@ -74,6 +74,7 @@ func (c *CombatantManager) Update(combatant data.Combatant) {
 					ActName: "Limit Break",
 					Name:    "Limit Break",
 				}
+				combatant.PlayerID = -99
 				break
 			}
 		}
@@ -190,6 +191,7 @@ func (c *CombatantManager) GetCombatants() []data.Combatant {
 		for index := range playerMap[playerID] {
 			if index == 0 {
 				combatant = *playerMap[playerID][index]
+				combatant.EncounterUID = c.encounterUID
 				output = append(output, combatant)
 				continue
 			}
@@ -218,6 +220,7 @@ func (c *CombatantManager) GetCombatants() []data.Combatant {
 			combatant.EncounterUID = c.encounterUID
 			combatant.Time = nextCombatant.Time
 			combatant.Player = nextCombatant.Player
+			combatant.PlayerID = nextCombatant.Player.ID
 			combatant.Job = nextCombatant.Job
 			// add
 			output = append(output, combatant)
@@ -265,4 +268,13 @@ func (c *CombatantManager) GetLastCombatantsSince(since time.Time) []data.Combat
 // GetLastUpdate - get last combatant update time
 func (c *CombatantManager) GetLastUpdate() time.Time {
 	return c.lastUpdate
+}
+
+// SetCombatants - set combatants
+func (c *CombatantManager) SetCombatants(combatants []data.Combatant) {
+	c.Reset()
+	for index := range combatants {
+		c.encounterUID = combatants[index].EncounterUID
+		c.combatants = append(c.combatants, &combatants[index])
+	}
 }

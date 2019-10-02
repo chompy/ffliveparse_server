@@ -29,7 +29,8 @@ const DataTypeCombatant byte = 3
 type Combatant struct {
 	ByteEncodable
 	UserID         int64     `json:"user_id"`
-	Player         Player    `json:"player"`
+	PlayerID       int32     `json:"player_id"`
+	Player         Player    `json:"player" gorm:"foreignkey:ID"`
 	EncounterUID   string    `json:"encounter_uid" gorm:"type:varchar(32)"`
 	ActEncounterID uint32    `json:"act_encounter_id"`
 	Time           time.Time `json:"time"`
@@ -74,6 +75,7 @@ func (c *Combatant) FromActBytes(data []byte) error {
 		ID:   readInt32(data, &pos),
 		Name: readString(data, &pos),
 	}
+	c.PlayerID = c.Player.ID
 	c.Player.ActName = c.Player.Name
 	c.ActEncounterID = actEncounterID
 	c.Job = readString(data, &pos)
@@ -103,6 +105,7 @@ func (c *Combatant) FromBytes(data []byte) error {
 		Name:  playerName,
 		World: playerWorld,
 	}
+	c.PlayerID = playerID
 	c.Job = readString(data, &pos)
 	c.Damage = readInt32(data, &pos)
 	c.DamageTaken = readInt32(data, &pos)

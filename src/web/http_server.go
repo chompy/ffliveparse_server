@@ -20,11 +20,12 @@ package web
 import (
 	"bufio"
 	"bytes"
+	"compress/gzip"
 	"encoding/json"
 	"fmt"
 	"html/template"
+	"io"
 	"io/ioutil"
-	"log"
 	"math"
 	"net/http"
 	"os"
@@ -187,13 +188,14 @@ func HTTPStartServer(
 		}
 		// relay previous encounter data if encounter id was provided
 		if encounterUID != "" && (userSession == nil || encounterUID != userSession.EncounterManager.GetEncounter().UID) {
-			/*appLog.Log(fmt.Sprintf("Load previous encounter '%s' for user '%s.'", encounterUID, userID))
-			previousEncounter, err := act.GetPreviousEncounter(storageManager, userData, encounterUID)
+			appLog.Log(fmt.Sprintf("Load previous encounter '%s' for user '%s.'", encounterUID, userID))
+			previousEncounter := sessionManager.GetEmptyUserSession(userData)
+			err := previousEncounter.EncounterManager.Load(encounterUID)
 			if err != nil {
 				appLog.Error(err)
 				return
 			}
-			sendInitData(ws, &previousEncounter)*/
+			sendInitData(ws, &previousEncounter)
 		} else {
 			// send init data
 			sendInitData(ws, userSession)
@@ -324,7 +326,6 @@ func HTTPStartServer(
 			offset = 0
 		}
 		// get encounters
-		td.HistorySearchQuery = r.URL.Query().Get("search")
 		td.HistoryStartDate = r.URL.Query().Get("start")
 		td.HistoryEndDate = r.URL.Query().Get("end")
 		tzOffsetStr := r.URL.Query().Get("tz")
@@ -384,26 +385,9 @@ func HTTPStartServer(
 				return
 			}
 		}
-		totalEncounterCount := 0
-		log.Println(startTime, endTime)
-		/*td.Encounters, err = act.GetPreviousEncounters(
-			storageManager,
-			userData,
-			int(offset),
-			td.HistorySearchQuery,
-			startTime,
-			endTime,
-			&totalEncounterCount,
-		)*/
-		if err == nil {
-			td.EncounterTotalPage = int(math.Floor(float64(totalEncounterCount)/float64(app.PastEncounterFetchLimit))) + 1
-			if offset > totalEncounterCount-app.PastEncounterFetchLimit {
-				offset = (td.EncounterTotalPage - 1) * app.PastEncounterFetchLimit
-			}
-			td.EncounterCurrentPage = 1 + int(math.Floor(float64(offset)/float64(app.PastEncounterFetchLimit)))
-			td.EncounterNextPageOffset = int(offset) + app.PastEncounterFetchLimit
-			td.EncounterPrevPageOffset = int(offset) - app.PastEncounterFetchLimit
-		}
+		appLog.Log(fmt.Sprintf("Fetch past encounters for user '%d' from %s. (OFFSET=%d START_TIME=%s END_TIME=%s)", userData.ID, r.RemoteAddr, offset, startTime, endTime))
+		// fetch encounter count
+		totalEncounterCount, err := sessionManager.Database.CountUserEncounters(userData.ID, startTime, endTime)
 		if err != nil {
 			appLog.Error(err)
 			displayError(
@@ -411,7 +395,45 @@ func HTTPStartServer(
 				"Unable to fetch past encounters.",
 				http.StatusInternalServerError,
 			)
-			return
+		}
+		// fetch encounters
+		if totalEncounterCount > 0 {
+			encounters, err := sessionManager.Database.FetchUserEncounters(
+				userData.ID,
+				offset,
+				startTime,
+				endTime,
+			)
+			if err != nil {
+				appLog.Error(err)
+				displayError(
+					w,
+					"Unable to fetch past encounters.",
+					http.StatusInternalServerError,
+				)
+				return
+			}
+			td.Encounters = make([]session.EncounterManager, len(encounters))
+			for index := range encounters {
+				emptySes := sessionManager.GetEmptyUserSession(userData)
+				err = emptySes.EncounterManager.Load(encounters[index].UID)
+				if err != nil {
+					appLog.Error(err)
+					displayError(
+						w,
+						"Unable to fetch past encounters.",
+						http.StatusInternalServerError,
+					)
+				}
+				td.Encounters[index] = emptySes.EncounterManager
+			}
+			td.EncounterTotalPage = int(math.Floor(float64(totalEncounterCount)/float64(app.PastEncounterFetchLimit))) + 1
+			if offset > totalEncounterCount-app.PastEncounterFetchLimit {
+				offset = (td.EncounterTotalPage - 1) * app.PastEncounterFetchLimit
+			}
+			td.EncounterCurrentPage = 1 + int(math.Floor(float64(offset)/float64(app.PastEncounterFetchLimit)))
+			td.EncounterNextPageOffset = int(offset) + app.PastEncounterFetchLimit
+			td.EncounterPrevPageOffset = int(offset) - app.PastEncounterFetchLimit
 		}
 		// render encounters template
 		htmlTemplates["history.tmpl"].ExecuteTemplate(w, "base.tmpl", td)
@@ -713,19 +735,101 @@ func sendInitData(ws *websocket.Conn, userSession *session.UserSession) {
 		appLog.Error(err)
 		return
 	}
-	// add combatants
-	for _, combatant := range userSession.EncounterManager.CombatantManager.GetCombatants() {
-		combatant.UserID = userSession.User.ID
-		dataBytes = append(dataBytes, combatant.ToBytes()...)
-	}
 	// compress + send
 	dataBytes, err = data.CompressBytes(dataBytes)
-	appLog.Log(fmt.Sprintf("Send %d bytes (encounter/combatants) of data to '%s.'", len(dataBytes), ws.Request().RemoteAddr))
+	if err != nil {
+		appLog.Error(err)
+		return
+	}
 	err = websocket.Message.Send(ws, dataBytes)
 	if err != nil {
 		appLog.Error(err)
 		return
 	}
+	appLog.Log(fmt.Sprintf("Send %d bytes (encounter) of data to '%s.'", len(dataBytes), ws.Request().RemoteAddr))
+	time.Sleep(time.Second)
+
+	// add combatants
+	dataBytes = make([]byte, 0)
+	combatants := userSession.EncounterManager.CombatantManager.GetLastCombatants()
+	combatants = append(combatants, userSession.EncounterManager.CombatantManager.GetCombatants()...)
+	for _, combatant := range combatants {
+		combatant.UserID = userSession.User.ID
+		dataBytes = append(dataBytes, combatant.ToBytes()...)
+	}
+	// compress + send
+	if len(dataBytes) > 0 {
+		dataBytes, err = data.CompressBytes(dataBytes)
+		if err != nil {
+			appLog.Error(err)
+			return
+		}
+		appLog.Log(fmt.Sprintf("Send %d bytes (combatants) of data to '%s.'", len(dataBytes), ws.Request().RemoteAddr))
+		err = websocket.Message.Send(ws, dataBytes)
+		if err != nil {
+			appLog.Error(err)
+			return
+		}
+	}
 	// send log lines
-	// TODO
+	// attempt to find permanent log line file
+	byteCount := 0
+	logFilePath := userSession.EncounterManager.LogLineManager.GetLogFilePath()
+	logFile, err := os.OpenFile(logFilePath, os.O_RDONLY, 0644)
+	if err != nil && !os.IsNotExist(err) {
+		appLog.Error(err)
+		return
+	}
+	var gz *gzip.Reader
+	if logFile != nil && !os.IsNotExist(err) {
+		defer logFile.Close()
+		gz, err = gzip.NewReader(logFile)
+		if err != nil {
+			appLog.Error(err)
+			return
+		}
+		defer gz.Close()
+	}
+	// attempt to fetch log lines
+	var logLines []data.LogLine
+	offset := 0
+	for {
+		logLines = nil
+		if logFile != nil && gz != nil {
+			logLines, err = session.GetLogLinesFromReader(gz)
+			if err != nil {
+				appLog.Error(err)
+				return
+			}
+		} else {
+			logLines, err = userSession.EncounterManager.LogLineManager.GetLogLines(offset)
+			if err != nil {
+				appLog.Error(err)
+				return
+			}
+		}
+		if len(logLines) == 0 || err == io.EOF {
+			break
+		}
+		offset += session.LogLineReadLimit
+		logLineBytes := make([]byte, 0)
+		for index := range logLines {
+			logLines[index].EncounterUID = encounter.UID
+			logLineBytes = append(logLineBytes, logLines[index].ToBytes()...)
+		}
+		if len(logLineBytes) > 0 {
+			logLineBytes, err = data.CompressBytes(logLineBytes)
+			byteCount += len(logLineBytes)
+			if err != nil {
+				appLog.Error(err)
+				return
+			}
+			err = websocket.Message.Send(ws, logLineBytes)
+			if err != nil {
+				appLog.Error(err)
+				return
+			}
+		}
+	}
+	appLog.Log(fmt.Sprintf("Send %d bytes (log lines) of data to '%s.'", byteCount, ws.Request().RemoteAddr))
 }

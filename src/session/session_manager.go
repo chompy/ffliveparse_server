@@ -40,22 +40,18 @@ type UserSession struct {
 type Manager struct {
 	sessions    []*UserSession
 	log         app.Logging
-	database    DatabaseHandler
 	events      *emitter.Emitter
+	Database    *DatabaseHandler
 	UserManager UserManager
 }
 
 // NewSessionManager - create new session manager
-func NewSessionManager(events *emitter.Emitter) (Manager, error) {
-	dbHandler, err := NewDatabaseHandler()
-	if err != nil {
-		return Manager{}, err
-	}
+func NewSessionManager(dbHandler *DatabaseHandler, events *emitter.Emitter) (Manager, error) {
 	return Manager{
-		database:    dbHandler,
+		Database:    dbHandler,
 		sessions:    make([]*UserSession, 0),
 		log:         app.Logging{ModuleName: "SESSION"},
-		UserManager: NewUserManager(&dbHandler),
+		UserManager: NewUserManager(dbHandler),
 		events:      events,
 	}, nil
 }
@@ -116,7 +112,7 @@ func (m *Manager) Update(dataStr []byte, addr *net.UDPAddr) {
 				session := &UserSession{
 					User:             user,
 					Session:          actSessionData,
-					EncounterManager: NewEncounterManager(&m.database, user),
+					EncounterManager: NewEncounterManager(m.Database, user),
 				}
 				m.sessions = append(
 					m.sessions,
@@ -213,6 +209,7 @@ func (m *Manager) handdleSession(session *UserSession) {
 	logger.Log("Start session.")
 	lastActivity := time.Now()
 	encounterActive := false
+	encounterZone := ""
 	lastCombatantUpdate := time.Time{}
 	for range time.Tick(time.Millisecond * app.TickRate) {
 		var err error
@@ -221,7 +218,9 @@ func (m *Manager) handdleSession(session *UserSession) {
 		// send encounter
 		encounter := session.EncounterManager.GetEncounter()
 		encounter.UserID = session.User.ID
-		if encounter.Active != encounterActive {
+		if encounter.Active != encounterActive || (encounter.Zone != "" && encounterZone == "") {
+			encounterZone = encounter.Zone
+			encounterActive = encounter.Active
 			encounterBytes := encounter.ToBytes()
 			encounterBytes, err = data.CompressBytes(encounterBytes)
 			if err != nil {
@@ -296,4 +295,12 @@ func (m *Manager) handdleSession(session *UserSession) {
 // SessionCount - get number of active sessions
 func (m *Manager) SessionCount() int {
 	return len(m.sessions)
+}
+
+// GetEmptyUserSession - get new empty session, used to load previous encounters
+func (m *Manager) GetEmptyUserSession(user data.User) UserSession {
+	return UserSession{
+		User:             user,
+		EncounterManager: NewEncounterManager(m.Database, user),
+	}
 }
