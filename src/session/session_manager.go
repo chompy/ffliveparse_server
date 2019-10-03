@@ -38,21 +38,23 @@ type UserSession struct {
 
 // Manager - session manager
 type Manager struct {
-	sessions    []*UserSession
-	log         app.Logging
-	events      *emitter.Emitter
-	Database    *DatabaseHandler
-	UserManager UserManager
+	sessions          []*UserSession
+	log               app.Logging
+	events            *emitter.Emitter
+	Database          *DatabaseHandler
+	UserManager       UserManager
+	logLinesProcessed int64
 }
 
 // NewSessionManager - create new session manager
 func NewSessionManager(dbHandler *DatabaseHandler, events *emitter.Emitter) (Manager, error) {
 	return Manager{
-		Database:    dbHandler,
-		sessions:    make([]*UserSession, 0),
-		log:         app.Logging{ModuleName: "SESSION"},
-		UserManager: NewUserManager(dbHandler),
-		events:      events,
+		Database:          dbHandler,
+		sessions:          make([]*UserSession, 0),
+		log:               app.Logging{ModuleName: "SESSION"},
+		UserManager:       NewUserManager(dbHandler),
+		events:            events,
+		logLinesProcessed: 0,
 	}, nil
 }
 
@@ -198,6 +200,7 @@ func (m *Manager) Update(dataStr []byte, addr *net.UDPAddr) {
 			}
 			// add to encounter/combatant managers
 			session.EncounterManager.ReadLogLine(&parsedLogLine)
+			m.logLinesProcessed++
 		}
 	}
 
@@ -302,5 +305,18 @@ func (m *Manager) GetEmptyUserSession(user data.User) UserSession {
 	return UserSession{
 		User:             user,
 		EncounterManager: NewEncounterManager(m.Database, user),
+	}
+}
+
+// SnapshotListener - listen for snapshot event
+func (m *Manager) SnapshotListener() {
+	for {
+		for event := range m.events.On("stat:snapshot") {
+			statSnapshot := event.Args[0].(*app.StatSnapshot)
+			for index := range m.sessions {
+				statSnapshot.Connections.ACT[m.sessions[index].User.ID] = 1
+			}
+			statSnapshot.LogLines = m.logLinesProcessed
+		}
 	}
 }

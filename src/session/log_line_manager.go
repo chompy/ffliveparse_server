@@ -223,32 +223,37 @@ func (l *LogLineManager) Save() error {
 	return nil
 }
 
-// LogLineCleanUp - perform log line clean up operations
-func LogLineCleanUp() error {
-	logger := app.Logging{ModuleName: "LOGLINE-CLEANUP"}
-	cleanCount := 0
-	noBirthTimeCount := 0
-	cleanUpDate := time.Now().Add(time.Duration(-app.EncounterLogDeleteDays*24) * time.Hour)
-	logger.Start(fmt.Sprintf("Start log file clean up. (Clean up log older than %s.)", cleanUpDate))
-	err := filepath.Walk(app.FileStorePath, func(path string, info os.FileInfo, err error) error {
-		if info.IsDir() || filepath.Ext(path) != ".dat" {
+// LogLineCleanUpRoutine - perform log line clean up operations at regular interval
+func LogLineCleanUpRoutine() {
+	cleanUp := func() {
+		logger := app.Logging{ModuleName: "LOGLINE-CLEANUP"}
+		cleanCount := 0
+		noBirthTimeCount := 0
+		cleanUpDate := time.Now().Add(time.Duration(-app.EncounterLogDeleteDays*24) * time.Hour)
+		logger.Start(fmt.Sprintf("Start log file clean up. (Clean up log older than %s.)", cleanUpDate))
+		err := filepath.Walk(app.FileStorePath, func(path string, info os.FileInfo, err error) error {
+			if info.IsDir() || filepath.Ext(path) != ".dat" {
+				return nil
+			}
+			t, err := times.Stat(path)
+			if err == nil && !t.HasBirthTime() {
+				noBirthTimeCount++
+			}
+			if (err == nil && t.HasBirthTime() && t.BirthTime().Before(cleanUpDate)) || info.ModTime().Before(cleanUpDate) {
+				cleanCount++
+				return os.Remove(path)
+			}
 			return nil
-		}
-		t, err := times.Stat(path)
-		if err == nil && !t.HasBirthTime() {
-			noBirthTimeCount++
-		}
-		if (err == nil && t.HasBirthTime() && t.BirthTime().Before(cleanUpDate)) || info.ModTime().Before(cleanUpDate) {
-			cleanCount++
-			return os.Remove(path)
-		}
-		return nil
-	})
-	if err == nil {
-		logger.Finish(fmt.Sprintf("Finish file clean up. (%d files removed.)", cleanCount))
-		if noBirthTimeCount > 0 {
-			logger.Log(fmt.Sprintf("%d files had no creation time.", noBirthTimeCount))
+		})
+		if err == nil {
+			logger.Finish(fmt.Sprintf("Finish file clean up. (%d files removed.)", cleanCount))
+			if noBirthTimeCount > 0 {
+				logger.Log(fmt.Sprintf("%d files had no creation time.", noBirthTimeCount))
+			}
 		}
 	}
-	return err
+	cleanUp()
+	for range time.Tick(time.Millisecond * app.CleanUpRoutineRate) {
+		cleanUp()
+	}
 }

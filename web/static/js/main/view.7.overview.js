@@ -361,7 +361,7 @@ class ViewOverview extends ViewBase
 
     _updateCooldowns()
     {
-        if (!this.encounter || !this.encounter.data.Active) {
+        if (!this.encounter) {
             return;
         }
         var currentTime = new Date().getTime();

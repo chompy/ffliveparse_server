@@ -173,13 +173,13 @@ func HTTPStartServer(
 		if len(urlPathParts) >= 3 {
 			encounterUID = urlPathParts[2]
 		}
-		appLog.Log(fmt.Sprintf("Start web socket connection for user '%s' from '%s.'", userID, ws.Request().RemoteAddr))
 		// fetch user data
 		userData, err := sessionManager.UserManager.LoadFromWebIDString(userID)
 		if err != nil {
 			appLog.Error(err)
 			return
 		}
+		appLog.Log(fmt.Sprintf("Start web socket connection for user '%d' from '%s.'", userData.ID, ws.Request().RemoteAddr))
 		// get act data from web ID
 		userSession := sessionManager.GetSessionWithUser(userData)
 		if err != nil {
@@ -188,7 +188,7 @@ func HTTPStartServer(
 		}
 		// relay previous encounter data if encounter id was provided
 		if encounterUID != "" && (userSession == nil || encounterUID != userSession.EncounterManager.GetEncounter().UID) {
-			appLog.Log(fmt.Sprintf("Load previous encounter '%s' for user '%s.'", encounterUID, userID))
+			appLog.Log(fmt.Sprintf("Load previous encounter '%s' for user '%d.'", encounterUID, userData.ID))
 			previousEncounter := sessionManager.GetEmptyUserSession(userData)
 			err := previousEncounter.EncounterManager.Load(encounterUID)
 			if err != nil {
@@ -300,7 +300,7 @@ func HTTPStartServer(
 			appLog.Error(err)
 			displayError(
 				w,
-				"Unable to find session for user \""+webUID+".\"",
+				fmt.Sprintf("Unable to find session for user '%d.'", userData.ID),
 				http.StatusNotFound,
 			)
 			return
@@ -483,7 +483,7 @@ func HTTPStartServer(
 				appLog.Error(err)
 				displayError(
 					w,
-					"Unable to find session for user \""+webID+".\"",
+					fmt.Sprintf("Unable to find session for user '%d.'", userData.ID),
 					http.StatusNotFound,
 				)
 				return
@@ -666,10 +666,7 @@ func snapshotListener(websocketConnections *[]websocketConnection, events *emitt
 				if websocketConnection.connection == nil {
 					continue
 				}
-				userIDString, err := websocketConnection.userData.GetWebIDString()
-				if err == nil {
-					statSnapshot.Connections.Web[userIDString]++
-				}
+				statSnapshot.Connections.Web[websocketConnection.userData.ID]++
 			}
 		}
 	}

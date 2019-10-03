@@ -43,6 +43,9 @@ const combatantTimeout = 7500
 // teamDeadTimeout - time before an encounter should end upon a team wipe
 const teamDeadTimeout = 10000
 
+// noActionTimeout - time before an encounter should end when no actions/data have been recieved
+const noActionTimeout = 300000
+
 type combatantTracker struct {
 	Name        string
 	Team        uint8
@@ -56,11 +59,13 @@ type EncounterManager struct {
 	combatantTracker []*combatantTracker
 	playerTeam       uint8
 	teamWipeTime     time.Time
+	lastActionTime   time.Time
 	log              app.Logging
 	database         *DatabaseHandler
 	User             data.User
 	CombatantManager CombatantManager
 	LogLineManager   LogLineManager
+	NoSave           bool
 }
 
 // NewEncounterManager - create new encounter manager
@@ -71,6 +76,7 @@ func NewEncounterManager(database *DatabaseHandler, user data.User) EncounterMan
 		LogLineManager:   NewLogLineManager(),
 		database:         database,
 		User:             user,
+		NoSave:           false,
 	}
 	e.Reset()
 	return e
@@ -90,12 +96,12 @@ func (e *EncounterManager) Reset() {
 		UserID:       e.User.ID,
 	}
 	e.playerTeam = 0
+	e.lastActionTime = time.Now()
 	e.teamWipeTime = time.Time{}
 	e.combatantTracker = make([]*combatantTracker, 0)
-	e.CombatantManager.Reset()
+	e.CombatantManager.ResetEncounter(e.encounter)
 	e.LogLineManager.Reset()
 	e.log.ModuleName = fmt.Sprintf("ENCOUNTER/%s", e.encounter.UID)
-	e.CombatantManager.SetEncounterUID(e.encounter.UID)
 	e.LogLineManager.SetEncounterUID(e.encounter.UID)
 }
 
@@ -227,9 +233,6 @@ func (e *EncounterManager) ReadLogLine(l *ParsedLogLine) {
 	if l.Time.Before(e.encounter.EndTime) {
 		return
 	}
-	// send log line to combatant manager
-	// log line manager will recieve log line from session manager
-	e.CombatantManager.ReadLogLine(l)
 	// perform actions
 	switch l.Type {
 	case LogTypeSingleTarget, LogTypeAoe:
@@ -286,6 +289,7 @@ func (e *EncounterManager) ReadLogLine(l *ParsedLogLine) {
 			if e.teamWipeTime.After(e.encounter.StartTime) {
 				e.teamWipeTime = l.Time.Add(time.Millisecond * teamDeadTimeout)
 			}
+			e.lastActionTime = time.Now()
 			break
 		}
 	case LogTypeDefeat, LogTypeRemoveCombatant:
@@ -310,7 +314,7 @@ func (e *EncounterManager) ReadLogLine(l *ParsedLogLine) {
 				// if zone change while waiting for team wipe to be determined
 				// then force team wipe check now
 				if e.IsWaitForTeamWipe() {
-					e.teamWipeTime = time.Now().Add(-time.Millisecond)
+					e.teamWipeTime = time.Now().Add(-time.Second)
 					e.checkTeamStatus()
 					break
 				}
@@ -403,7 +407,7 @@ func (e *EncounterManager) ReadLogLine(l *ParsedLogLine) {
 						// if countdown while waiting for team wipe to be determined
 						// then force team wipe check now
 						if e.IsWaitForTeamWipe() {
-							e.teamWipeTime = time.Now().Add(-time.Millisecond)
+							e.teamWipeTime = time.Now().Add(-time.Second)
 							e.checkTeamStatus()
 							break
 						}
@@ -414,11 +418,17 @@ func (e *EncounterManager) ReadLogLine(l *ParsedLogLine) {
 			}
 		}
 	}
+	// send log line to combatant manager
+	// log line manager will recieve log line from session manager
+	e.CombatantManager.ReadLogLine(l)
 }
 
 // Tick - perform status checks
 func (e *EncounterManager) Tick() {
 	e.checkTeamStatus()
+	if e.encounter.Active && e.lastActionTime.Add(time.Millisecond*noActionTimeout).Before(time.Now()) {
+		e.End(EncounterSuccessEnd)
+	}
 }
 
 // GetEncounter - get the current encounter
@@ -435,6 +445,10 @@ func (e *EncounterManager) IsWaitForTeamWipe() bool {
 func (e *EncounterManager) Save() error {
 	// no database
 	if e.database == nil {
+		return nil
+	}
+	// no save enabled
+	if e.NoSave {
 		return nil
 	}
 	// ensure encounter meets min+max encounter length

@@ -73,7 +73,7 @@ func (d *DatabaseHandler) StoreUser(user *data.User) error {
 // FetchUserFromID - fetch user with ID from database
 func (d *DatabaseHandler) FetchUserFromID(userID int64) (data.User, error) {
 	u := data.User{}
-	res := d.conn.First(&u)
+	res := d.conn.Where("id = ?", userID).First(&u)
 	return u, res.Error
 }
 
@@ -191,30 +191,37 @@ func (d *DatabaseHandler) StorePlayers(players []*data.Player) error {
 	return nil
 }
 
-// CleanUp - perform clean up operations
-func (d *DatabaseHandler) CleanUp() error {
-	count := int64(0)
-	d.log.Start("Begin clean up.")
-	// delete encounters older than EncounterDeleteDays days
-	cleanUpDate := time.Now().Add(time.Duration(-app.EncounterDeleteDays*24) * time.Hour)
-	res := d.conn.Delete(&data.Encounter{}).Where(
-		"start_time < ?",
-		cleanUpDate,
-	)
-	if res.Error != nil {
-		return res.Error
+// CleanUpRoutine - perform clean up operations at regular interval
+func (d *DatabaseHandler) CleanUpRoutine() {
+	cleanUp := func() {
+		count := int64(0)
+		d.log.Start("Begin clean up.")
+		// delete encounters older than EncounterDeleteDays days
+		cleanUpDate := time.Now().Add(time.Duration(-app.EncounterDeleteDays*24) * time.Hour)
+		res := d.conn.Delete(&data.Encounter{}).Where(
+			"start_time < ?",
+			cleanUpDate,
+		)
+		if res.Error != nil {
+			d.log.Error(res.Error)
+			return
+		}
+		count += res.RowsAffected
+		// delete all combatants older than EncounterDeleteDays days
+		res = d.conn.Delete(&data.Combatant{}).Where(
+			"time < ?",
+			cleanUpDate,
+		)
+		if res.Error != nil {
+			d.log.Error(res.Error)
+			return
+		}
+		count += res.RowsAffected
+		// TODO clean up users that have never uploaded
+		d.log.Finish(fmt.Sprintf("Finish clean up. (%d records removed.)", count))
 	}
-	count += res.RowsAffected
-	// delete all combatants older than EncounterDeleteDays days
-	res = d.conn.Delete(&data.Combatant{}).Where(
-		"time < ?",
-		cleanUpDate,
-	)
-	if res.Error != nil {
-		return res.Error
+	cleanUp()
+	for range time.Tick(time.Millisecond * app.CleanUpRoutineRate) {
+		cleanUp()
 	}
-	count += res.RowsAffected
-	// TODO clean up users that have never uploaded
-	d.log.Finish(fmt.Sprintf("Finish clean up. (%d records removed.)", count))
-	return nil
 }

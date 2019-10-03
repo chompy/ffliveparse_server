@@ -91,7 +91,7 @@ function renderLogLinesGraph(data)
         labels.push(
             time.toLocaleDateString() + ' ' + time.toLocaleTimeString()
         );
-        logLines.push(snapshot.log_lines_per_minutes);
+        logLines.push(snapshot.log_lines);
     }
     // configure graph
     var graphConfig = {
@@ -99,7 +99,7 @@ function renderLogLinesGraph(data)
         data: {
             labels: labels,
             datasets: [{
-                label: "Log Lines Per Minute",
+                label: "Log Lines",
                 backgroundColor: "#ff0000",
                 borderColor: "#ff0000",
                 data: logLines,

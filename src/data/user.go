@@ -42,11 +42,13 @@ type User struct {
 func NewUser() User {
 	uploadKeyGen := xid.New()
 	webKeyGen := xid.New()
+	usernameGen := xid.New()
 	return User{
 		Created:   time.Now(),
 		Accessed:  time.Now(),
 		UploadKey: uploadKeyGen.String(),
 		WebKey:    webKeyGen.String(),
+		Username:  usernameGen.String(),
 	}
 }
 

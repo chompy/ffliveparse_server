@@ -31,15 +31,12 @@ const StatSnapshotRate = 1000 * 60
 
 // StatSnapshot - snapshot of stats at a point in time
 type StatSnapshot struct {
-	Time              time.Time `json:"time"`
-	PageLoads         int       `json:"page_loads"`
-	TotalEncounters   int       `json:"total_encounters"`
-	TotalUsers        int       `json:"total_users"`
-	TotalCombatants   int       `json:"total_combatants"`
-	LogLinesPerMinute int       `json:"log_lines_per_minutes"`
-	Connections       struct {
-		Web map[string]int `json:"web"`
-		ACT map[string]int `json:"act"`
+	Time        time.Time `json:"time"`
+	PageLoads   int       `json:"page_loads"`
+	LogLines    int64     `json:"log_lines"`
+	Connections struct {
+		Web map[int64]int `json:"web"`
+		ACT map[int64]int `json:"act"`
 	} `json:"connections"`
 }
 
@@ -77,8 +74,8 @@ func (s *StatCollector) TakeSnapshot() {
 	snapshot := StatSnapshot{
 		Time: time.Now(),
 	}
-	snapshot.Connections.ACT = map[string]int{}
-	snapshot.Connections.Web = map[string]int{}
+	snapshot.Connections.ACT = map[int64]int{}
+	snapshot.Connections.Web = map[int64]int{}
 	s.Snapshots = append(s.Snapshots, snapshot)
 	go s.events.Emit(
 		"stat:snapshot",

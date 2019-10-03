@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"../data"
+	"github.com/rs/xid"
 )
 
 // UserManager - manages users data
@@ -83,5 +84,9 @@ func (m *UserManager) LoadFromWebIDString(webIDString string) (data.User, error)
 
 // Save - save user data
 func (m *UserManager) Save(u *data.User) error {
+	if u.Username == "" {
+		usernameGen := xid.New()
+		u.Username = usernameGen.String()
+	}
 	return m.database.StoreUser(u)
 }

@@ -1,3 +1,8 @@
+1.40
+- Partial rewrite of encounter parsing modules.
+- Removed global player stats.
+- Fixed colors in log view and stripped out chat messages from log view.
+
 1.39
 - Restrict sqlite combatant storage to only store one record per player.
 - Created new logging module and update all code to use it.

@@ -18,7 +18,6 @@ along with FFLiveParse.  If not, see <https://www.gnu.org/licenses/>.
 package session
 
 import (
-	"fmt"
 	"time"
 
 	"../app"
@@ -26,20 +25,23 @@ import (
 )
 
 // combatantManagerUpdateInterval - rate at which combatant manager will accept new combatants
-const combatantManagerUpdateInterval = 5000
+const combatantManagerUpdateInterval = 2500
 
 // CombatantManager - handles combatant data for an encounter
 type CombatantManager struct {
-	combatants   []*data.Combatant
-	log          app.Logging
-	encounterUID string
-	lastUpdate   time.Time
+	combatants         []*data.Combatant
+	lastEncounter      map[int32]*data.Combatant
+	log                app.Logging
+	encounterUID       string
+	encounterStartTime time.Time
+	lastUpdate         time.Time
 }
 
 // NewCombatantManager - create new combatant manager
 func NewCombatantManager() CombatantManager {
 	c := CombatantManager{
-		log: app.Logging{ModuleName: "COMBATANT"},
+		log:                app.Logging{ModuleName: "COMBATANT"},
+		encounterStartTime: time.Now().Add(time.Hour * 999),
 	}
 	c.Reset()
 	return c
@@ -48,20 +50,38 @@ func NewCombatantManager() CombatantManager {
 // Reset - reset combatant manager
 func (c *CombatantManager) Reset() {
 	c.combatants = make([]*data.Combatant, 0)
+	c.lastEncounter = make(map[int32]*data.Combatant, 0)
 	c.lastUpdate = time.Time{}
 	c.encounterUID = ""
 }
 
-// SetEncounterUID - set encounter uid for logging
-func (c *CombatantManager) SetEncounterUID(encounterUID string) {
-	c.encounterUID = encounterUID
-	c.log.ModuleName = fmt.Sprintf("COMBATANT/%s", encounterUID)
+// ResetEncounter - reset with new encounter data
+func (c *CombatantManager) ResetEncounter(encounter data.Encounter) {
+	oldCombatants := c.combatants
+	c.Reset()
+	c.encounterUID = encounter.UID
+	c.encounterStartTime = encounter.StartTime
+	for index := range oldCombatants {
+		playerID := oldCombatants[index].Player.ID
+		if oldCombatants[index].Time.After(c.encounterStartTime) {
+			c.combatants = append(c.combatants, oldCombatants[index])
+		}
+		if c.lastEncounter[playerID] == nil || oldCombatants[index].Time.After(c.lastEncounter[playerID].Time) {
+			if oldCombatants[index].Time.Before(c.encounterStartTime) {
+				c.lastEncounter[playerID] = oldCombatants[index]
+			}
+		}
+	}
 }
 
 // Update - add a combatant update
 func (c *CombatantManager) Update(combatant data.Combatant) {
 	// ignore non player combatants
 	if combatant.Player.ID > 1000000000 {
+		return
+	}
+	// combatant update before encounter start time
+	if combatant.Time.Before(c.encounterStartTime) {
 		return
 	}
 	// fix limit break combatant data
@@ -102,7 +122,8 @@ func (c *CombatantManager) Update(combatant data.Combatant) {
 	}
 	// not enough time passed, update the last combatant with this new data
 	if lastCombatant != nil && combatant.Time.Sub(lastCombatant.Time) < time.Millisecond*combatantManagerUpdateInterval {
-		//lastCombatant = &combatant
+		lastCombatant = &combatant
+		c.lastUpdate = combatant.Time
 		return
 	}
 	// add a new combatant
@@ -187,37 +208,30 @@ func (c *CombatantManager) GetCombatants() []data.Combatant {
 	}
 	// analyze and combine
 	for playerID := range playerMap {
-		combatant := data.Combatant{}
+		offset := data.Combatant{}
 		for index := range playerMap[playerID] {
+			// set offset
 			if index == 0 {
-				combatant = *playerMap[playerID][index]
-				combatant.EncounterUID = c.encounterUID
-				output = append(output, combatant)
-				continue
+				if c.lastEncounter[playerID] != nil && playerMap[playerID][index].ActEncounterID == c.lastEncounter[playerID].ActEncounterID {
+					offset = *c.lastEncounter[playerID]
+				}
 			}
-			lastCombatant := playerMap[playerID][index-1]
+
+			var lastCombatant *data.Combatant
+			if index > 0 {
+				lastCombatant = playerMap[playerID][index-1]
+			}
 			nextCombatant := playerMap[playerID][index]
-			if lastCombatant.ActEncounterID != nextCombatant.ActEncounterID {
-				// if new act encounter then assume reset
-				combatant.Damage += nextCombatant.Damage
-				combatant.DamageTaken += nextCombatant.DamageTaken
-				combatant.DamageHealed += nextCombatant.DamageHealed
-				combatant.Deaths += nextCombatant.Deaths
-				combatant.Hits += nextCombatant.Hits
-				combatant.Heals += nextCombatant.Heals
-				combatant.Kills += nextCombatant.Kills
-			} else {
-				// normal increment
-				combatant.Damage += nextCombatant.Damage - lastCombatant.Damage
-				combatant.DamageTaken += nextCombatant.DamageTaken - lastCombatant.DamageTaken
-				combatant.DamageHealed += nextCombatant.DamageHealed - lastCombatant.DamageHealed
-				combatant.Deaths += nextCombatant.Deaths - lastCombatant.Deaths
-				combatant.Hits += nextCombatant.Hits - lastCombatant.Hits
-				combatant.Heals += nextCombatant.Heals - lastCombatant.Heals
-				combatant.Kills += nextCombatant.Kills - lastCombatant.Kills
+			combatant := data.Combatant{}
+
+			if lastCombatant != nil && lastCombatant.ActEncounterID != nextCombatant.ActEncounterID {
+				offset = combatantSub(data.Combatant{}, *lastCombatant)
 			}
-			// set other values
+
+			// set values
+			combatant = combatantSub(*nextCombatant, offset)
 			combatant.EncounterUID = c.encounterUID
+			combatant.ActEncounterID = nextCombatant.ActEncounterID
 			combatant.Time = nextCombatant.Time
 			combatant.Player = nextCombatant.Player
 			combatant.PlayerID = nextCombatant.Player.ID
@@ -277,4 +291,28 @@ func (c *CombatantManager) SetCombatants(combatants []data.Combatant) {
 		c.encounterUID = combatants[index].EncounterUID
 		c.combatants = append(c.combatants, &combatants[index])
 	}
+}
+
+// combatantAdd - add the values of two combatants together
+func combatantAdd(c1 data.Combatant, c2 data.Combatant) data.Combatant {
+	c1.Damage += c2.Damage
+	c1.DamageHealed += c2.DamageHealed
+	c1.DamageTaken += c2.DamageTaken
+	c1.Deaths += c2.Deaths
+	c1.Heals += c2.Heals
+	c1.Hits += c2.Hits
+	c1.Kills += c2.Kills
+	return c1
+}
+
+// combatantSub - subtract the values of two combatants
+func combatantSub(c1 data.Combatant, c2 data.Combatant) data.Combatant {
+	c1.Damage -= c2.Damage
+	c1.DamageHealed -= c2.DamageHealed
+	c1.DamageTaken -= c2.DamageTaken
+	c1.Deaths -= c2.Deaths
+	c1.Heals -= c2.Heals
+	c1.Hits -= c2.Hits
+	c1.Kills -= c2.Kills
+	return c1
 }

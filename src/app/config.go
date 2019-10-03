@@ -20,7 +20,7 @@ package app
 import "fmt"
 
 // VersionNumber - version number
-const VersionNumber int32 = 139
+const VersionNumber int32 = 140
 
 // ActPluginMinVersionNumber - act plugin min version
 const ActPluginMinVersionNumber int32 = 5
@@ -64,8 +64,8 @@ const EncounterDeleteDays = 14
 // EncounterCleanUpRate - Rate at which encounter clean up should be ran
 const EncounterCleanUpRate = 1800000 // 30 minutes
 
-// StatTrackerRefreshRate - Rate at which stat tracker refreshes
-const StatTrackerRefreshRate = 21600000 // 6 hours
+// CleanUpRoutineRate - Rate at which clean up routines are ran
+const CleanUpRoutineRate = 1800000 // 30 minutes
 
 // GetVersionString - get version as string in format X.XX
 func GetVersionString() string {

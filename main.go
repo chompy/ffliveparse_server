@@ -44,12 +44,17 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+	go dbHandler.CleanUpRoutine()
+
+	// log line clean up
+	go session.LogLineCleanUpRoutine()
 
 	// create session manager
 	sessionManager, err := session.NewSessionManager(&dbHandler, &events)
 	if err != nil {
 		panic(err)
 	}
+	go sessionManager.SnapshotListener()
 
 	// start http server
 	go web.HTTPStartServer(
