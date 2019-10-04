@@ -215,7 +215,7 @@ func ParseLogLine(logLine data.LogLine) (ParsedLogLine, error) {
 	// create data object
 	data := ParsedLogLine{
 		Type: int(logLineType),
-		Raw:  logLineString,
+		Raw:  strings.Replace(logLineString, "####", ": ", -1),
 		Time: logLine.Time,
 	}
 	// parse remaining
@@ -345,7 +345,7 @@ func ParseLogLine(logLine data.LogLine) (ParsedLogLine, error) {
 				break
 			}
 			// special case, target name is zone name
-			data.TargetName = match[1]
+			data.TargetName = strings.Replace(match[1], "####", ": ", -1)
 			break
 		}
 	case LogTypeRemoveCombatant:

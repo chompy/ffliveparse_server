@@ -20,13 +20,13 @@ package app
 import "fmt"
 
 // VersionNumber - version number
-const VersionNumber int32 = 140
+const VersionNumber int32 = 141
 
 // ActPluginMinVersionNumber - act plugin min version
 const ActPluginMinVersionNumber int32 = 5
 
 // ActPluginMaxVersionNumber - act plugin max version
-const ActPluginMaxVersionNumber int32 = 6
+const ActPluginMaxVersionNumber int32 = 7
 
 // Name - app name
 const Name string = "FFLiveParse"

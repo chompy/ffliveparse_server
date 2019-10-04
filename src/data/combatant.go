@@ -28,6 +28,7 @@ const DataTypeCombatant byte = 3
 // Combatant - Data about a combatant
 type Combatant struct {
 	ByteEncodable
+	ID             int64     `gorm:"primary key;unique;AUTO_INCREMENT"`
 	UserID         int64     `json:"user_id"`
 	PlayerID       int32     `json:"player_id"`
 	Player         Player    `json:"player" gorm:"foreignkey:ID"`

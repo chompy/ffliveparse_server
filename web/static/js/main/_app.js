@@ -298,7 +298,6 @@ class Application
                 for (var i in t.views) {
                     t.views[i].onEncounter(t.encounter);
                 }
-                return;
             }
             if (t.encounter && !e.detail.Active) {
                 console.log(">> Encounter inactive, ", e.detail);

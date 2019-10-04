@@ -17,6 +17,8 @@ along with FFLiveParse.  If not, see <https://www.gnu.org/licenses/>.
 
 package data
 
+import "errors"
+
 // DataTypeFlag - Data type, boolean flag
 const DataTypeFlag byte = 99
 
@@ -34,6 +36,17 @@ func (f *Flag) ToBytes() []byte {
 	writeString(&data, f.Name)
 	writeBool(&data, f.Value)
 	return data
+}
+
+// FromActBytes - Convert act bytes to flag
+func (f *Flag) FromActBytes(data []byte) error {
+	if data[0] != DataTypeFlag {
+		return errors.New("invalid data type for Flag")
+	}
+	pos := 1
+	f.Name = readString(data, &pos)
+	f.Value = (readByte(data, &pos) != 0)
+	return nil
 }
 
 // FromBytes - Convert bytes to flag

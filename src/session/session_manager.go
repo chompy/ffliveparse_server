@@ -144,7 +144,7 @@ func (m *Manager) Update(dataStr []byte, addr *net.UDPAddr) {
 	// handle incoming encounter data
 	case data.DataTypeEncounter:
 		{
-			// session required
+			// user session required
 			if session == nil {
 				return
 			}
@@ -162,7 +162,7 @@ func (m *Manager) Update(dataStr []byte, addr *net.UDPAddr) {
 	// handle incoming combatant data
 	case data.DataTypeCombatant:
 		{
-			// session required
+			// user session required
 			if session == nil {
 				return
 			}
@@ -179,7 +179,7 @@ func (m *Manager) Update(dataStr []byte, addr *net.UDPAddr) {
 	// handle incoming log line data
 	case data.DataTypeLogLine:
 		{
-			// data required
+			// user session required
 			if session == nil {
 				return
 			}
@@ -201,6 +201,29 @@ func (m *Manager) Update(dataStr []byte, addr *net.UDPAddr) {
 			// add to encounter/combatant managers
 			session.EncounterManager.ReadLogLine(&parsedLogLine)
 			m.logLinesProcessed++
+		}
+	// handle incoming flag data
+	case data.DataTypeFlag:
+		{
+			// user session required
+			if session == nil {
+				return
+			}
+			flag := data.Flag{}
+			err := flag.FromActBytes(dataStr)
+			if err != nil {
+				m.log.Error(err)
+				return
+			}
+			m.log.Log(fmt.Sprintf("Flag '%s' set to '%t' for user '%d.'", flag.Name, flag.Value, session.User.ID))
+			switch flag.Name {
+			case "NoSave":
+				{
+					session.EncounterManager.NoSave = flag.Value
+					break
+				}
+			}
+			break
 		}
 	}
 

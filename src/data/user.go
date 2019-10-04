@@ -29,7 +29,7 @@ const webIDSalt = "aedb2d139b653ee8aeeed9010ed053e94cb01$#!756"
 
 // User - data about an user
 type User struct {
-	ID        int64 `gorm:"AUTO_INCREMENT"`
+	ID        int64 `gorm:"primary_key;AUTO_INCREMENT"`
 	Created   time.Time
 	Accessed  time.Time
 	UploadKey string `gorm:"unique;not null;type:varchar(32)"` // key used to push data from ACT

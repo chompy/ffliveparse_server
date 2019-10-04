@@ -19,6 +19,7 @@ package session
 
 import (
 	"fmt"
+	"sync"
 	"time"
 
 	"../app"
@@ -31,6 +32,7 @@ import (
 type DatabaseHandler struct {
 	conn *gorm.DB
 	log  app.Logging
+	lock *sync.Mutex
 }
 
 // NewDatabaseHandler - create new database handler + open database connection
@@ -61,11 +63,14 @@ func NewDatabaseHandler() (DatabaseHandler, error) {
 	return DatabaseHandler{
 		conn: db,
 		log:  app.Logging{ModuleName: "STORAGE/DATABASE"},
+		lock: &sync.Mutex{},
 	}, nil
 }
 
 // StoreUser - store user to database
 func (d *DatabaseHandler) StoreUser(user *data.User) error {
+	d.lock.Lock()
+	defer d.lock.Unlock()
 	res := d.conn.Save(user)
 	return res.Error
 }
@@ -93,6 +98,8 @@ func (d *DatabaseHandler) FetchUserFromWebKey(webKey string) (data.User, error) 
 
 // StoreEncounter - store encounter to database
 func (d *DatabaseHandler) StoreEncounter(encounter *data.Encounter) error {
+	d.lock.Lock()
+	defer d.lock.Unlock()
 	res := d.conn.Save(encounter)
 	return res.Error
 }
@@ -136,6 +143,8 @@ func (d *DatabaseHandler) CountUserEncounters(userID int64, start *time.Time, en
 
 // StoreCombatants - store combatants to database
 func (d *DatabaseHandler) StoreCombatants(combatants []*data.Combatant) error {
+	d.lock.Lock()
+	defer d.lock.Unlock()
 	for index := range combatants {
 		res := d.conn.Save(combatants[index])
 		if res.Error != nil {
@@ -182,6 +191,8 @@ func (d *DatabaseHandler) FetchCombatantsForEncounter(encounterUID string) ([]da
 
 // StorePlayers - store players to database
 func (d *DatabaseHandler) StorePlayers(players []*data.Player) error {
+	d.lock.Lock()
+	defer d.lock.Unlock()
 	for index := range players {
 		res := d.conn.Save(players[index])
 		if res.Error != nil {
@@ -194,24 +205,26 @@ func (d *DatabaseHandler) StorePlayers(players []*data.Player) error {
 // CleanUpRoutine - perform clean up operations at regular interval
 func (d *DatabaseHandler) CleanUpRoutine() {
 	cleanUp := func() {
+		d.lock.Lock()
+		defer d.lock.Unlock()
 		count := int64(0)
-		d.log.Start("Begin clean up.")
 		// delete encounters older than EncounterDeleteDays days
-		cleanUpDate := time.Now().Add(time.Duration(-app.EncounterDeleteDays*24) * time.Hour)
-		res := d.conn.Delete(&data.Encounter{}).Where(
+		cleanUpDate := time.Now().Add((-app.EncounterDeleteDays * 24) * time.Hour)
+		d.log.Start(fmt.Sprintf("Begin clean up. (Clean up encounters older than %s.)", cleanUpDate))
+		res := d.conn.Where(
 			"start_time < ?",
 			cleanUpDate,
-		)
+		).Delete(&data.Encounter{})
 		if res.Error != nil {
 			d.log.Error(res.Error)
 			return
 		}
 		count += res.RowsAffected
 		// delete all combatants older than EncounterDeleteDays days
-		res = d.conn.Delete(&data.Combatant{}).Where(
+		res = d.conn.Where(
 			"time < ?",
 			cleanUpDate,
-		)
+		).Delete(&data.Combatant{})
 		if res.Error != nil {
 			d.log.Error(res.Error)
 			return
