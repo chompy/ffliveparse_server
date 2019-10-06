@@ -40,6 +40,9 @@ const LogLineByteSize = 512
 // LogLineReadLimit - limit of log lines per read
 const LogLineReadLimit = 50
 
+// globalLogLock - globally locks log file writing
+var globalLogLock sync.Mutex
+
 // LogLineManager - handles log line data for session
 type LogLineManager struct {
 	logLines     []*data.LogLine
@@ -100,11 +103,15 @@ func (l *LogLineManager) Update(logLine data.LogLine) {
 		return
 	}
 	logLine.EncounterUID = l.encounterUID
+	l.dumpFileLock.Lock()
+	defer l.dumpFileLock.Unlock()
 	l.logLines = append(l.logLines, &logLine)
 }
 
 // Dump - dump log lines to temp file
 func (l *LogLineManager) Dump() ([]data.LogLine, error) {
+	globalLogLock.Lock()
+	globalLogLock.Unlock()
 	l.dumpFileLock.Lock()
 	defer l.dumpFileLock.Unlock()
 	// open dump file
@@ -189,6 +196,8 @@ func (l *LogLineManager) Save() error {
 	if l.encounterUID == "" {
 		return fmt.Errorf("can't save log lines without encounter uid set")
 	}
+	globalLogLock.Lock()
+	globalLogLock.Unlock()
 	l.dumpFileLock.Lock()
 	defer l.dumpFileLock.Unlock()
 	defer l.dumpFile.Seek(0, 2)
@@ -226,12 +235,17 @@ func (l *LogLineManager) Save() error {
 // LogLineCleanUpRoutine - perform log line clean up operations at regular interval
 func LogLineCleanUpRoutine() {
 	cleanUp := func() {
+		globalLogLock.Lock()
+		defer globalLogLock.Unlock()
 		logger := app.Logging{ModuleName: "LOGLINE-CLEANUP"}
 		cleanCount := 0
 		noBirthTimeCount := 0
 		cleanUpDate := time.Now().Add(time.Duration(-app.EncounterLogDeleteDays*24) * time.Hour)
 		logger.Start(fmt.Sprintf("Start log file clean up. (Clean up log older than %s.)", cleanUpDate))
 		err := filepath.Walk(app.FileStorePath, func(path string, info os.FileInfo, err error) error {
+			if err != nil {
+				return err
+			}
 			if info.IsDir() || filepath.Ext(path) != ".dat" {
 				return nil
 			}
@@ -245,11 +259,13 @@ func LogLineCleanUpRoutine() {
 			}
 			return nil
 		})
-		if err == nil {
-			logger.Finish(fmt.Sprintf("Finish file clean up. (%d files removed.)", cleanCount))
-			if noBirthTimeCount > 0 {
-				logger.Log(fmt.Sprintf("%d files had no creation time.", noBirthTimeCount))
-			}
+		if err != nil {
+			logger.Error(err)
+			return
+		}
+		logger.Finish(fmt.Sprintf("Finish file clean up. (%d files removed.)", cleanCount))
+		if noBirthTimeCount > 0 {
+			logger.Log(fmt.Sprintf("%d files had no creation time.", noBirthTimeCount))
 		}
 	}
 	cleanUp()
