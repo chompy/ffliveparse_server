@@ -41,7 +41,7 @@ const EncounterSuccessWipe = 2
 const combatantTimeout = 7500
 
 // teamDeadTimeout - time before an encounter should end upon a team wipe
-const teamDeadTimeout = 10000
+const teamDeadTimeout = 20000
 
 // noActionTimeout - time before an encounter should end when no actions/data have been recieved
 const noActionTimeout = 300000
