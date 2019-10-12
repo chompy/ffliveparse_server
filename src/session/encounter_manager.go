@@ -293,7 +293,7 @@ func (e *EncounterManager) ReadLogLine(l *ParsedLogLine) {
 			}
 			// update team wipe time if action was just performed
 			if e.teamWipeTime.After(e.encounter.StartTime) {
-				e.teamWipeTime = l.Time.Add(time.Millisecond * teamDeadTimeout)
+				e.teamWipeTime = time.Now().Add(time.Millisecond * teamDeadTimeout)
 			}
 			e.lastActionTime = time.Now()
 			break
