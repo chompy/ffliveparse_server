@@ -1,3 +1,9 @@
+1.42
+- Add locks to database writing to prevent multiple write issues.
+- Fixed countdown encounter end trigger.
+- Adding healing, damage taken, and deaths to each player in overview view.
+- Overview view now counts "was defeated" log messages and grays out combatants who are currently dead.
+
 1.41
 - Fixed issue with encounter history being immediately deleted.
 - Added ability to have user's opt out of their encounters+logs being saved.

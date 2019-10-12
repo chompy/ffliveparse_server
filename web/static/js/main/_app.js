@@ -278,7 +278,7 @@ class Application
             t.errorOverlayElement.classList.remove("hide");
             t.errorOverlayMessageElement.innerHTML = "Connection lost.";
             console.log(">> Connection closed,", event);
-            t.pingRefreshTimeout = setTimeout(function() { t._pingRefresh(); }, 5000);
+            t.pingRefreshTimeout = setTimeout(function() { t._pingRefresh(); }, 15000);
         };
         socket.onerror = function(event) {
             t.errorOverlayElement.classList.remove("hide");
@@ -420,12 +420,12 @@ class Application
         request.addEventListener("error", function(e) {
             t.pingRefreshTimeout = setTimeout(function() {
                 t._pingRefresh();
-            }, 5000);
+            }, 15000);
         });
         request.addEventListener("abort", function(e) {
             t.pingRefreshTimeout = setTimeout(function() {
                 t._pingRefresh();
-            }, 5000);
+            }, 15000);
         });
     }
 

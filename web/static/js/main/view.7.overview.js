@@ -49,6 +49,7 @@ class ViewOverview extends ViewBase
         this.bossTracker = [];
         this.playerListElement.innerHTML = "";
         this.lastLogUpdate = null;
+        this.totalDeaths = 0;
         this.onResize();
     }
 
@@ -137,6 +138,27 @@ class ViewOverview extends ViewBase
         dpsElement.classList.add("dps");
         dpsElement.innerText = "-";
         playerElement.appendChild(dpsElement);
+
+        // hps
+        var hpsElement = document.createElement("div");
+        hpsElement.classList.add("hps");
+        hpsElement.classList.add("extras");
+        hpsElement.innerText = "-";
+        playerElement.appendChild(hpsElement);
+
+        // damage taken
+        var dTakenElement = document.createElement("div");
+        dTakenElement.classList.add("damage-taken");
+        dTakenElement.classList.add("extras");
+        dTakenElement.innerText = "-";
+        playerElement.appendChild(dTakenElement);
+
+        // deaths
+        var deathsElement = document.createElement("div");
+        deathsElement.classList.add("deaths");
+        deathsElement.classList.add("extras");
+        deathsElement.innerText = "0";
+        playerElement.appendChild(deathsElement);
 
         // cooldowns
         var cooldownElement = document.createElement("div");
@@ -267,31 +289,46 @@ class ViewOverview extends ViewBase
         }
         // update players
         var raidDps = 0;
-        var deaths = 0;
         var combatants = this.combatantCollector.getSortedCombatants("damage");
         var offsetPos = 0;
         for (var i in combatants) {
             var combatant = combatants[i];
             var snapshot = combatant.getLastSnapshot();
-            // get deaths
-            deaths += snapshot.Deaths;
             // get damage / dps
             var damage = this.combatantCollector.getCombatantTotalDamage(combatant);
             var dps = damage / (this.encounter.getLength() / 1000);
             raidDps += dps;
             if (snapshot.ID in this.playerElements) {
+                // get healing / hps
+                var healing = this.combatantCollector.getCombatantTotalHealing(combatant);
+                var hps = healing / (this.encounter.getLength() / 1000);
+                var hpsK = hps / 1000;
+                // get damage taken
+                var damageTaken = combatant.data.DamageTaken;
+                var damageTakenK = damageTaken / 1000;
                 var playerElement = this.playerElements[snapshot.ID];
                 playerElement.style.top = (offsetPos) + "px";
-
                 offsetPos += playerElement.offsetHeight
-
                 // set dps
                 var dpsElement = playerElement.getElementsByClassName("dps")[0];
-                dpsElement.setAttribute("data-damage", damage);
+                //dpsElement.setAttribute("data-damage", damage);
                 if (dpsElement.innerText != dps.toFixed(2)) {
                     dpsElement.innerText = dps.toFixed(2);
                     dpsElement.title = dps.toFixed(2) + " damage per second (" + damage + " total damage)";
                 }
+                // set hps
+                var hpsElement = playerElement.getElementsByClassName("hps")[0];
+                //dpsElement.setAttribute("data-healing", healing);
+                if (hpsElement.innerText != hpsK.toFixed(1) + "K") {
+                    hpsElement.innerText = hpsK.toFixed(1) + "K";
+                    hpsElement.title = hps.toFixed(2) + " healing per second (" + healing + " total healing)";
+                }
+                // set damage taken
+                var damageTakenElement = playerElement.getElementsByClassName("damage-taken")[0];
+                if (damageTakenElement.innerText != damageTakenK.toFixed(1) + "K") {
+                    damageTakenElement.innerText = damageTakenK.toFixed(1) + "K";
+                    damageTakenElement.title = damageTaken + " damage taken.";
+                }           
             }
         }
         // update raid dps
@@ -322,12 +359,7 @@ class ViewOverview extends ViewBase
             if (this.ttcElement.innerText != timeStr) {
                 this.ttcElement.innerText = timeStr;
             }
-        }
-        // update deaths
-        if (this.deathsElement.innerText != deaths) {
-            this.deathsElement.innerText = deaths;
-        }
-        
+        }        
         // set player list height
         if (this.playerListElement.children.length > 0) {
             this.playerListElement.style.height = (combatants.length * this.playerListElement.children[0].offsetHeight) + "px";
@@ -397,6 +429,11 @@ class ViewOverview extends ViewBase
     {
         this.reset();
         this.encounter = encounter;
+        this.deathsElement.innerText = "0";
+    }
+
+    onEncounterInactive(encounter)
+    {
     }
 
     onCombatant(combatant)
@@ -425,28 +462,60 @@ class ViewOverview extends ViewBase
         this.lastLogUpdate = logLineData.Time;
         // parse log line
         var pLogLine = parseLogLine(logLineData.LogLine);  
-        // track boss hp
-        if (pLogLine.type == MESSAGE_TYPE_SINGLE_TARGET) {
-            var tMaxHp = parseInt(pLogLine.targetMaxHp);
-            var tCurHp = parseInt(pLogLine.targetCurrentHp - pLogLine.damage);
-            if (tMaxHp <= 0) {
-                return;
+        switch (pLogLine.type) {
+            case MESSAGE_TYPE_SINGLE_TARGET: {
+                // track boss hp
+                var tMaxHp = parseInt(pLogLine.targetMaxHp);
+                var tCurHp = parseInt(pLogLine.targetCurrentHp - pLogLine.damage);
+                if (tMaxHp > 0) {
+                    if (this.bossTracker.length == 0 || this.bossTracker[1] <= tMaxHp || this.bossTracker[2] <= 0) {
+                        this.bossTracker = [
+                            pLogLine.targetName,
+                            tMaxHp,
+                            tCurHp
+                        ];
+                        var percent = (tCurHp / tMaxHp) * 100;
+                        if (percent < 0) {
+                            percent = 0;
+                        }
+                        if (isNaN(percent)) {
+                            percent = 0
+                        }
+                        this.bossHpElement.innerText = percent.toFixed(2) + "%";
+                    }
+                }
+                // flag player alive
+                if (pLogLine.flags.indexOf(LOG_LINE_FLAG_DAMAGE) != -1) {
+                    var combatant = this.combatantCollector.find(pLogLine.sourceName);
+                    if (combatant && combatant.data.ID in this.playerElements) {
+                        if (this.playerElements[combatant.data.ID].classList.contains("dead")) {
+                            this.playerElements[combatant.data.ID].classList.remove("dead");
+                        }
+                    }
+                }
+                break;
             }
-            if (this.bossTracker.length == 0 || this.bossTracker[1] <= tMaxHp || this.bossTracker[2] <= 0) {
-                this.bossTracker = [
-                    pLogLine.targetName,
-                    tMaxHp,
-                    tCurHp
-                ];
-                var percent = (tCurHp / tMaxHp) * 100;
-                if (percent < 0) {
-                    percent = 0;
+            case MESSAGE_TYPE_DEATH: {
+                // track deaths
+                var combatant = this.combatantCollector.find(pLogLine.sourceName);
+                if (!combatant) {
+                    break;
                 }
-                if (isNaN(percent)) {
-                    percent = 0
+                if (!(combatant.data.ID in this.playerElements)) {
+                    break;
                 }
-                this.bossHpElement.innerText = percent.toFixed(2) + "%";
-            } 
+                this.playerElements[combatant.data.ID].classList.add("dead");
+                this.totalDeaths++;
+                this.deathsElement.innerText = this.totalDeaths;
+                var playerDeathsElement = this.playerElements[combatant.data.ID].getElementsByClassName("deaths")[0];
+                var playerDeaths = parseInt(playerDeathsElement.innerText);
+                if (!playerDeaths) {
+                    playerDeaths = 0;
+                }
+                playerDeathsElement.innerText = playerDeaths + 1;
+                break;
+            }
+
         }
     }
 

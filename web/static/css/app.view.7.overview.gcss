@@ -26,12 +26,14 @@
       &.dps
         background-color: #723c3a
       &.healer
-        background-color: #2fa35f
-        color: #000
+        background-color: #1a4e30
       &.tank
         background-color: #4f59c4
       &.special
         background-color: #2d2d2d
+      &.dead
+        filter: grayscale(100%)
+        opacity: .7
       img.job
         width: 48px
         vertical-align: -12px
@@ -42,6 +44,33 @@
         font-size: 32px
         font-weight: bold
         width: 150px
+        position: relative
+        top: -9px
+        padding-left: 20px
+        background: url(/static/img/icon_dps.png) no-repeat left center
+        background-size: 12px
+      .extras
+        position: absolute
+        top: 39px
+        font-size: 10px
+        padding-left: 14px
+        line-height: 18px
+        background-repeat: no-repeat
+        background-position: left 2px
+        background-size: 12px
+      .hps
+        left: 83px
+        padding-left: 20px
+        background-image: url(/static/img/icon_hps.png)
+      .damage-taken
+        left: 135px
+        background-image: url(/static/img/icon_damage_taken.png)
+      .deaths
+        left: 190px
+        background-image: url(/static/img/icon_deaths.png)
+        background: url(/static/img/icon_deaths.png) no-repeat left 2px
+        background-size: 12px
+
       .cooldowns
         display: inline-block
         .cooldown
@@ -84,6 +113,14 @@
         .dps
           font-size: 20px
           width: 96px
+        .extras
+          top: 31px
+        .hps
+          left: 66px
+        .damage-taken
+          left: 116px
+        .deaths
+          left: 170px
         .cooldowns
           .cooldown
             vertical-align: 3px
@@ -114,5 +151,22 @@
         .dps
           font-size: 19px
           width: auto
+          top: -8px
+        .extras
+          top: 23px
+          padding-left: 15px
+        .hps
+          left: 37px
+        .damage-taken
+          left: 82px
+        .deaths
+          left: 139px
         .cooldowns
+          display: none
+
+@media(max-width: 170px)
+  #view-overview
+    .players
+      .player
+        .deaths
           display: none

@@ -20,7 +20,7 @@ package app
 import "fmt"
 
 // VersionNumber - version number
-const VersionNumber int32 = 141
+const VersionNumber int32 = 142
 
 // ActPluginMinVersionNumber - act plugin min version
 const ActPluginMinVersionNumber int32 = 5
@@ -42,6 +42,9 @@ const GlobalStatBanPath = "./data/conf/global_stat_bans.txt"
 
 // TickRate - how often act data should be sent to web user in ms
 const TickRate = 1000
+
+// EncounterResendRate - how often encounter data should be resent in ms
+const EncounterResendRate = 5000
 
 // LastUpdateInactiveTime - Time in ms between last data update before data is considered inactive
 const LastUpdateInactiveTime = 1800000 // 30 minutes

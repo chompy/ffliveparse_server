@@ -198,6 +198,9 @@ func (e *EncounterManager) checkTeamStatus() {
 		}
 	}
 	if deadTeam == 0 {
+		if e.teamWipeTime.After(time.Time{}) {
+			e.log.Log("Both teams are alive.")
+		}
 		e.teamWipeTime = time.Time{}
 		return
 	}
@@ -265,7 +268,10 @@ func (e *EncounterManager) ReadLogLine(l *ParsedLogLine) {
 			// attacker is a alive
 			ctAttacker.IsAlive = true
 			// target was attacked
-			ctTarget.WasAttacked = true
+			if !ctTarget.WasAttacked {
+				e.log.Log(fmt.Sprintf("Combatant '%s' is a valid target.", ctTarget.Name))
+				ctTarget.WasAttacked = true
+			}
 			// set teams if needed
 			if ctAttacker.Team == 0 && ctTarget.Team == 0 {
 				ctAttacker.Team = 1
@@ -316,7 +322,6 @@ func (e *EncounterManager) ReadLogLine(l *ParsedLogLine) {
 				if e.IsWaitForTeamWipe() {
 					e.teamWipeTime = time.Now().Add(-time.Second)
 					e.checkTeamStatus()
-					break
 				}
 				// otherwise flag unknown end
 				e.End(EncounterSuccessEnd)
@@ -342,47 +347,6 @@ func (e *EncounterManager) ReadLogLine(l *ParsedLogLine) {
 						}
 					}
 				}
-			/*case LogMsgIDObtainItem:
-				{
-					// if message about tomestones is recieved then that should mean the encounter is over
-					re, err := regexp.Compile("00:083e:You obtain .* Allagan tomestones of|00:083e:You cannot receive any more Allagan tomestones of .* this week")
-					if err != nil {
-						break
-					}
-					// end encounter if match
-					if re.MatchString(l.Raw) && ec.Encounter.Active {
-						ec.CompletionFlag = true
-						ec.log.Log(fmt.Sprintf("Encounter '%s' clear flag (tomestones) detected.", ec.Encounter.UID))
-					}
-					break
-				}
-			case LogMsgIDCompletionTime:
-				{
-					// if message about completion time then that should mean the encounter is over
-					re, err := regexp.Compile("00:0840:.* completion time: ")
-					if err != nil {
-						break
-					}
-					// end encounter if match
-					if re.MatchString(l.Raw) && ec.Encounter.Active {
-						ec.CompletionFlag = true
-						ec.log.Log(fmt.Sprintf("Encounter '%s' clear flag (completion time) detected.", ec.Encounter.UID))
-					}
-					break
-				}
-			case LogMsgIDCastLot:
-				{
-					re, err := regexp.Compile("00:0839:Cast your lot|00:0839:One or more party members have yet to complete this duty|00:0839:You received a player commendation")
-					if err != nil {
-						break
-					}
-					// end encounter if match
-					if re.MatchString(l.Raw) && ec.Encounter.Active {
-						ec.CompletionFlag = true
-						ec.log.Log(fmt.Sprintf("Encounter '%s' clear flag (cast lots) detected.", ec.Encounter.UID))
-					}
-					break
-				}*/
 			case LogMsgIDEcho:
 				{
 					re, err := regexp.Compile("00:0038:end")
@@ -398,21 +362,14 @@ func (e *EncounterManager) ReadLogLine(l *ParsedLogLine) {
 				}
 			case LogMsgIDCountdownStart:
 				{
-					re, err := regexp.Compile("00:00b9:Battle commencing in .* seconds!")
-					if err != nil {
-						break
+					e.log.Log("Clear flag (countdown) detected.")
+					// if countdown while waiting for team wipe to be determined
+					// then force team wipe check now
+					if e.IsWaitForTeamWipe() {
+						e.teamWipeTime = time.Now().Add(-time.Second)
+						e.checkTeamStatus()
 					}
-					if re.MatchString(l.Raw) && e.encounter.Active {
-						e.log.Log("Clear flag (countdown) detected.")
-						// if countdown while waiting for team wipe to be determined
-						// then force team wipe check now
-						if e.IsWaitForTeamWipe() {
-							e.teamWipeTime = time.Now().Add(-time.Second)
-							e.checkTeamStatus()
-							break
-						}
-						e.End(EncounterSuccessEnd)
-					}
+					e.End(EncounterSuccessEnd)
 					break
 				}
 			}
@@ -438,7 +395,7 @@ func (e *EncounterManager) GetEncounter() data.Encounter {
 
 // IsWaitForTeamWipe - determine if waiting for team wipe time out to end encounter
 func (e *EncounterManager) IsWaitForTeamWipe() bool {
-	return !e.teamWipeTime.Before(e.encounter.StartTime) && e.teamWipeTime.After(time.Now())
+	return e.teamWipeTime.After(e.encounter.StartTime) && e.teamWipeTime.After(time.Now())
 }
 
 // Save - save encounter

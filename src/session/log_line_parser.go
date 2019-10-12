@@ -368,19 +368,8 @@ func ParseLogLine(logLine data.LogLine) (ParsedLogLine, error) {
 		}
 	case LogTypeHPPercent:
 		{
-			re, err := regexp.Compile(" 0D:([A-Za-z\\-' ]*) HP at ([0-9]*)%")
-			if err != nil {
-				return data, err
-			}
-			match := re.FindStringSubmatch(logLineString)
-			if len(match) > 2 {
-				data.TargetName = match[1]
-				damage, err := hexToInt(match[2])
-				if err != nil {
-					return data, err
-				}
-				data.Damage = int(damage)
-			}
+			// ignore these messages
+			data.Raw = ""
 			break
 		}
 	case LogTypeGameLog:

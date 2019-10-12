@@ -237,6 +237,7 @@ func (m *Manager) handdleSession(session *UserSession) {
 	encounterActive := false
 	encounterZone := ""
 	lastCombatantUpdate := time.Time{}
+	lastEncounterSend := time.Time{}
 	for range time.Tick(time.Millisecond * app.TickRate) {
 		var err error
 		// tick encounter
@@ -244,9 +245,12 @@ func (m *Manager) handdleSession(session *UserSession) {
 		// send encounter
 		encounter := session.EncounterManager.GetEncounter()
 		encounter.UserID = session.User.ID
-		if encounter.Active != encounterActive || (encounter.Zone != "" && encounterZone == "") {
+		if lastEncounterSend.Add(time.Millisecond*app.EncounterResendRate).Before(time.Now()) ||
+			encounter.Active != encounterActive || (encounter.Zone != "" && encounterZone == "") {
+
 			encounterZone = encounter.Zone
 			encounterActive = encounter.Active
+			lastEncounterSend = time.Now()
 			encounterBytes := encounter.ToBytes()
 			encounterBytes, err = data.CompressBytes(encounterBytes)
 			if err != nil {
