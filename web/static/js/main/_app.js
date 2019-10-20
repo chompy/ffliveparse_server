@@ -287,9 +287,11 @@ class Application
         };    
         // log incoming data
         window.addEventListener("act:encounter", function(e) {
+            if (!e.detail.Zone) {
+                return;
+            }
             if (!t.encounter || e.detail.UID != t.encounter.data.UID) {
-                console.log(t.encounter);
-                console.log(">> Encounter active, ", e.detail);
+                console.log(">> New encounter, ", e.detail);
                 t.combatantCollector.reset();
                 t.actionCollector.reset();
                 t.encounter = new Encounter();
@@ -299,7 +301,7 @@ class Application
                     t.views[i].onEncounter(t.encounter);
                 }
             }
-            if (t.encounter && !e.detail.Active) {
+            if (t.encounter && t.encounter.data.Active && !e.detail.Active) {
                 console.log(">> Encounter inactive, ", e.detail);
                 t.encounter.update(e.detail);
                 for (var i in t.views) {

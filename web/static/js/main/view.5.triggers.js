@@ -149,9 +149,9 @@ class Trigger
         if (!this.regex) {
             return false;
         }
-        /*if (this.getZone() && currentZone && this.getZone() != currentZone) {
+        if (this.getZone() && currentZone && this.getZone() != currentZone) {
             return false;
-        }*/
+        }
         var match = XRegExp.exec(logLine.LogLine, this.regex);
         if (!match) {
             return false;
@@ -394,7 +394,7 @@ class ViewTriggers extends ViewBase
             // two passes, second one attempt to decompress string
             for (var i = 0; i < 2; i++) {
                 if (i == 1) {
-                    data = LZString.decompressFromBase64(data)
+                    data = LZString.decompressFromBase64(data);
                 }
                 try {
                     var oData = data.trim();
@@ -823,7 +823,7 @@ class ViewTriggers extends ViewBase
             return;
         }
         for (var i in this.triggers) {
-            this.triggers[i].onLogLine(logLineData);
+            this.triggers[i].onLogLine(logLineData, this.zoneName);
         }
     }
 
