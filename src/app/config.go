@@ -32,13 +32,10 @@ const ActPluginMaxVersionNumber int32 = 7
 const Name string = "FFLiveParse"
 
 // DatabasePath - path to database file
-const DatabasePath = "./data/store/db.sqlite"
+const DatabasePath = "./data/db.sqlite"
 
 // FileStorePath - path to file system storage
-const FileStorePath = "./data/store"
-
-// GlobalStatBanPath - path to global stat ban file
-const GlobalStatBanPath = "./data/conf/global_stat_bans.txt"
+const FileStorePath = "./data"
 
 // TickRate - how often act data should be sent to web user in ms
 const TickRate = 1000
