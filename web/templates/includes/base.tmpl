@@ -7,6 +7,9 @@
         <link rel="stylesheet" href="/app.min.css?v={{.VersionString}}" />
     </head>
     <body>
+        {{ if not (eq .FFToolsURL "") }}
+        <iframe id="network" seamless="" src="{{ .FFToolsURL }}/i/network"></iframe>
+        {{ end }}
         <div id="error-overlay" class="hide">
             <div id="error-overlay-message" class="textCenter textBold">An error has occured.</div>
         </div>

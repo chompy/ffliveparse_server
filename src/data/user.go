@@ -29,13 +29,14 @@ const webIDSalt = "aedb2d139b653ee8aeeed9010ed053e94cb01$#!756"
 
 // User - data about an user
 type User struct {
-	ID         int64 `gorm:"primary_key;AUTO_INCREMENT"`
-	Created    time.Time
-	Accessed   time.Time
-	UploadKey  string `gorm:"unique;not null;type:varchar(32)"` // key used to push data from ACT
-	WebKey     string `gorm:"unique;not null;type:varchar(32)"` // key used to access creds via homepage (stored in cookie)
-	FFToolsUID string `gorm:"unique_index;type:varchar(32)"`
-	webIDHash  string `gorm:"-"`
+	ID              int64 `gorm:"primary_key;AUTO_INCREMENT"`
+	Created         time.Time
+	Accessed        time.Time
+	UploadKey       string `gorm:"unique;not null;type:varchar(32)"` // key used to push data from ACT
+	WebKey          string `gorm:"unique;not null;type:varchar(32)"` // key used to access creds via homepage (stored in cookie)
+	FFToolsUID      string `gorm:"unique_index;type:varchar(32)"`
+	FFToolsUsername string `gorm:"-"`
+	webIDHash       string `gorm:"-"`
 }
 
 // NewUser - create new user data
@@ -52,6 +53,9 @@ func NewUser() User {
 
 // GetWebIDString - get web id string used to access data
 func (u *User) GetWebIDString() (string, error) {
+	if u.FFToolsUsername != "" {
+		return u.FFToolsUsername, nil
+	}
 	if u.webIDHash != "" {
 		return u.webIDHash, nil
 	}

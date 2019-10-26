@@ -79,6 +79,7 @@ type templateData struct {
 	PlayerStatSortOptions   []string
 	PlayerStatSort          string
 	PlayerStatJob           string
+	FFToolsURL              string
 }
 
 // websocketConnection - Websocket connection data associated with user data
@@ -492,15 +493,43 @@ func HTTPStartServer(
 			htmlTemplates["app.tmpl"].ExecuteTemplate(w, "base.tmpl", td)
 			return
 		}
-		// get cookie, use it to fetch user data
-		cookie, err := r.Cookie(webKeyCookieName)
-		if err == nil {
-			userData, err := sessionManager.UserManager.LoadFromWebKey(cookie.Value)
+		// fetch fftools user
+		hasUserData := false
+		fftUser, err := sessionManager.UserManager.FFToolsUserManager.Fetch(r)
+		if err == nil && fftUser.UID != "" {
+			userData, err := sessionManager.UserManager.LoadFromFFToolsUID(fftUser.UID)
+			userData.FFToolsUsername = fftUser.Username
 			if err == nil {
+				hasUserData = true
 				addUserToTemplateData(&td, userData)
-			} else {
+			}
+		}
+		// get cookie, use it to fetch user data
+		if !hasUserData {
+			cookie, err := r.Cookie(webKeyCookieName)
+			if err == nil {
+				userData, err := sessionManager.UserManager.LoadFromWebKey(cookie.Value)
+				if err == nil {
+					hasUserData = true
+					// bind fftools uid to fflp user
+					if app.FFToolsURL != "" && fftUser.UID != "" && userData.FFToolsUID != fftUser.UID {
+						userData.FFToolsUID = fftUser.UID
+						sessionManager.UserManager.Save(&userData)
+					}
+					addUserToTemplateData(&td, userData)
+				}
+			}
+		}
+		// create new fflp user and bind to fftools user
+		if !hasUserData && app.FFToolsURL != "" && fftUser.UID != "" {
+			userData := sessionManager.UserManager.New()
+			userData.FFToolsUID = fftUser.UID
+			userData.FFToolsUsername = fftUser.Username
+			err := sessionManager.UserManager.Save(&userData)
+			if err != nil {
 				appLog.Error(err)
 			}
+			addUserToTemplateData(&td, userData)
 		}
 		// no web id provided, serve up home page with connection info
 		htmlTemplates["home.tmpl"].ExecuteTemplate(w, "base.tmpl", td)
@@ -673,12 +702,16 @@ func snapshotListener(websocketConnections *[]websocketConnection, events *emitt
 }
 
 func getBaseTemplateData() templateData {
-	return templateData{
+	td := templateData{
 		VersionString:    app.GetVersionString(),
 		ActVersionString: app.GetActVersionString(),
 		AppName:          app.Name,
 		HasUser:          false,
 	}
+	if app.FFToolsURL != "" {
+		td.FFToolsURL = app.FFToolsURL
+	}
+	return td
 }
 
 func addUserToTemplateData(td *templateData, u data.User) {

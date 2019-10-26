@@ -25,13 +25,15 @@ import (
 
 // UserManager - manages users data
 type UserManager struct {
-	database *DatabaseHandler
+	FFToolsUserManager FFToolsUserManager
+	database           *DatabaseHandler
 }
 
 // NewUserManager - create new user manager
 func NewUserManager(db *DatabaseHandler) UserManager {
 	return UserManager{
-		database: db,
+		database:           db,
+		FFToolsUserManager: NewFFToolsUserManager(),
 	}
 }
 
@@ -76,9 +78,25 @@ func (m *UserManager) LoadFromWebKey(webKey string) (data.User, error) {
 func (m *UserManager) LoadFromWebIDString(webIDString string) (data.User, error) {
 	userID, err := data.GetIDFromWebIDString(webIDString)
 	if err != nil {
-		return data.User{}, err
+		fftUID, err := m.FFToolsUserManager.GetUIDFromUsername(webIDString)
+		if err != nil {
+			return data.User{}, err
+		}
+		user, err := m.LoadFromFFToolsUID(fftUID)
+		user.FFToolsUsername = webIDString
+		return user, err
 	}
 	return m.LoadFromID(userID)
+}
+
+// LoadFromFFToolsUID - load user from fftools uid string
+func (m *UserManager) LoadFromFFToolsUID(uid string) (data.User, error) {
+	u, err := m.database.FetchUserFromFFToolsUID(uid)
+	if err != nil {
+		return u, err
+	}
+	u.Accessed = time.Now()
+	return u, nil
 }
 
 // Save - save user data

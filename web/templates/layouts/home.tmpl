@@ -34,7 +34,6 @@
         </p>
     </div>
 
-
     <div class="home-section">
         <div class="home-section-name">My Info</div>
         {{ if (gt .User.ID 0) }}
@@ -51,7 +50,15 @@
 
         {{ else }}
         <p class="text-center textBody">
+            {{ if (eq .FFToolsURL "") }}
             <a href="/new">Click here to generate your upload key.</a>
+            {{ else }}
+            You need an <a href="{{ .FFToolsURL }}">FFTools</a> account to use FFLiveParse.
+            <br/><br/>
+            <a href="{{ .FFToolsURL }}/signup">Sign Up</a>
+            • 
+            <a href="{{ .FFToolsURL }}/login">Log In</a>
+            {{ end }}
         </p>
         {{ end }}
     </div>

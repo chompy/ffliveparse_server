@@ -67,6 +67,9 @@ const EncounterCleanUpRate = 1800000 // 30 minutes
 // CleanUpRoutineRate - Rate at which clean up routines are ran
 const CleanUpRoutineRate = 1800000 // 30 minutes
 
+// FFToolsURL - url to access fftools api
+const FFToolsURL = "https://fftools.net/"
+
 // GetVersionString - get version as string in format X.XX
 func GetVersionString() string {
 	return fmt.Sprintf("%.2f", float32(VersionNumber)/100.0)

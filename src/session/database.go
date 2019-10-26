@@ -96,6 +96,13 @@ func (d *DatabaseHandler) FetchUserFromWebKey(webKey string) (data.User, error) 
 	return u, res.Error
 }
 
+// FetchUserFromFFToolsUID - fetch user with fftools uid from database
+func (d *DatabaseHandler) FetchUserFromFFToolsUID(uid string) (data.User, error) {
+	u := data.User{}
+	res := d.conn.Where("ff_tools_uid = ?", uid).First(&u)
+	return u, res.Error
+}
+
 // StoreEncounter - store encounter to database
 func (d *DatabaseHandler) StoreEncounter(encounter *data.Encounter) error {
 	d.lock.Lock()
