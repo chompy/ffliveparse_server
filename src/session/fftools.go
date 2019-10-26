@@ -44,6 +44,7 @@ type FFToolsUser struct {
 type FFToolsUserManager struct {
 	users      map[string]FFToolsUser
 	ffToolsURL string
+	logger     app.Logging
 }
 
 // NewFFToolsUserManager - create new fftools user manager
@@ -51,6 +52,7 @@ func NewFFToolsUserManager() FFToolsUserManager {
 	return FFToolsUserManager{
 		users:      make(map[string]FFToolsUser, 0),
 		ffToolsURL: app.GetFFToolsURL(),
+		logger:     app.Logging{ModuleName: "FFTOOLS"},
 	}
 }
 
@@ -59,6 +61,7 @@ func (f *FFToolsUserManager) fetchFromAPI(uid string, token string) (FFToolsUser
 	if f.ffToolsURL == "" {
 		return FFToolsUser{}, fmt.Errorf("fftools url not set")
 	}
+	f.logger.Log(fmt.Sprintf("Fetch FFTools user '%s' from API.", uid))
 	postData := url.Values{}
 	postData.Set("uid", uid)
 	postData.Set("token", token)
@@ -109,7 +112,13 @@ func (f *FFToolsUserManager) Fetch(r *http.Request) (FFToolsUser, error) {
 		return user, nil
 	}
 	// fetch from api
-	return f.fetchFromAPI(uid.Value, token.Value)
+	user, err = f.fetchFromAPI(uid.Value, token.Value)
+	if err != nil {
+		return user, err
+	}
+	// store in cache
+	f.users[user.UID] = user
+	return user, nil
 }
 
 // GetUIDFromUsername - get userfrom from uid
@@ -124,6 +133,7 @@ func (f *FFToolsUserManager) GetUIDFromUsername(username string) (string, error)
 		}
 	}
 	// fetch from api
+	f.logger.Log(fmt.Sprintf("Fetch FFTools UID for username '%s' from API.", username))
 	outReq, err := http.NewRequest(
 		http.MethodGet,
 		f.ffToolsURL+fmt.Sprintf("api/uid-from-username?username=%s", username),
@@ -144,10 +154,11 @@ func (f *FFToolsUserManager) GetUIDFromUsername(username string) (string, error)
 	}
 	user := FFToolsUser{}
 	err = json.Unmarshal(bodyBuf.Bytes(), &user)
+	if user.UID == "" {
+		return "", fmt.Errorf("uid not found")
+	}
 	// cache
 	user.Username = username
-	if user.UID != "" {
-		f.users[user.UID] = user
-	}
+	f.users[user.UID] = user
 	return user.UID, err
 }
