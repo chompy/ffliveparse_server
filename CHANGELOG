@@ -1,3 +1,7 @@
+DEV
+- Hide network header while in stream view.
+- Fixed issue with FFTools user caching.
+
 1.43
 - Added FFTools intergration. Live parse pages can now be accessed by FFTools account usernames.
 - Fixed issue with triggers that are restricted to a specific zone in triggers view.
