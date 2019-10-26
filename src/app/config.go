@@ -17,10 +17,13 @@ along with FFLiveParse.  If not, see <https://www.gnu.org/licenses/>.
 
 package app
 
-import "fmt"
+import (
+	"fmt"
+	"os"
+)
 
 // VersionNumber - version number
-const VersionNumber int32 = 142
+const VersionNumber int32 = 143
 
 // ActPluginMinVersionNumber - act plugin min version
 const ActPluginMinVersionNumber int32 = 5
@@ -67,8 +70,11 @@ const EncounterCleanUpRate = 1800000 // 30 minutes
 // CleanUpRoutineRate - Rate at which clean up routines are ran
 const CleanUpRoutineRate = 1800000 // 30 minutes
 
-// FFToolsURL - url to access fftools api
-const FFToolsURL = "https://fftools.net/"
+// GetFFToolsURL - url to access fftools api
+func GetFFToolsURL() string {
+	out, _ := os.LookupEnv("FFTOOLS_URL")
+	return out
+}
 
 // GetVersionString - get version as string in format X.XX
 func GetVersionString() string {

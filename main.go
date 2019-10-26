@@ -15,7 +15,7 @@ import (
 const ActListenUDPPort uint16 = 31593
 
 // HTTPListenTCPPort - Port http server will listen on
-const HTTPListenTCPPort uint16 = 8081
+const HTTPListenTCPPort uint16 = 8082
 
 func main() {
 	appLog := app.Logging{ModuleName: "MAIN"}

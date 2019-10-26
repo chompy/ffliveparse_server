@@ -1,3 +1,8 @@
+1.43
+- Added FFTools intergration. Live parse pages can now be accessed by FFTools account usernames.
+- Fixed issue with triggers that are restricted to a specific zone in triggers view.
+- Tweaks to encounter end detection.
+
 1.42
 - Add locks to database writing to prevent multiple write issues.
 - Fixed countdown encounter end trigger.

@@ -512,7 +512,7 @@ func HTTPStartServer(
 				if err == nil {
 					hasUserData = true
 					// bind fftools uid to fflp user
-					if app.FFToolsURL != "" && fftUser.UID != "" && userData.FFToolsUID != fftUser.UID {
+					if app.GetFFToolsURL() != "" && fftUser.UID != "" && userData.FFToolsUID != fftUser.UID {
 						userData.FFToolsUID = fftUser.UID
 						sessionManager.UserManager.Save(&userData)
 					}
@@ -521,7 +521,7 @@ func HTTPStartServer(
 			}
 		}
 		// create new fflp user and bind to fftools user
-		if !hasUserData && app.FFToolsURL != "" && fftUser.UID != "" {
+		if !hasUserData && app.GetFFToolsURL() != "" && fftUser.UID != "" {
 			userData := sessionManager.UserManager.New()
 			userData.FFToolsUID = fftUser.UID
 			userData.FFToolsUsername = fftUser.Username
@@ -708,8 +708,8 @@ func getBaseTemplateData() templateData {
 		AppName:          app.Name,
 		HasUser:          false,
 	}
-	if app.FFToolsURL != "" {
-		td.FFToolsURL = app.FFToolsURL
+	if app.GetFFToolsURL() != "" {
+		td.FFToolsURL = app.GetFFToolsURL()
 	}
 	return td
 }
