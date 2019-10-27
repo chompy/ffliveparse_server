@@ -28,6 +28,8 @@
     font-weight: bold
     &.active
       color: #00ff38
+    &.end-wait
+      animation: encounterEndWait 1s linear infinite
   #encounter-status
     font-weight: bold
     text-transform: uppercase
@@ -50,3 +52,7 @@
       float: none
     #encounter-name
       display: none
+
+@keyframes encounterEndWait
+  50%
+    opacity: 0

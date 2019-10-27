@@ -16,7 +16,7 @@ along with FFLiveParse.  If not, see <https://www.gnu.org/licenses/>.
 */
 
 /** Downtime offsets for specific fights. */
-TTC_DOWNTIME_OFFSETS = {
+var TTC_DOWNTIME_OFFSETS = {
 };
 
 class ViewOverview extends ViewBase
@@ -44,6 +44,7 @@ class ViewOverview extends ViewBase
     reset()
     {
         this.encounter = null;
+        this.endWait = false;
         this.playerElements = {};
         this.cooldownQueue = [];
         this.bossTracker = [];
@@ -425,15 +426,16 @@ class ViewOverview extends ViewBase
         }
     }
 
-    onEncounter(encounter)
+    onEncounterActive(encounter)
     {
         this.reset();
-        this.encounter = encounter;
         this.deathsElement.innerText = "0";
     }
 
-    onEncounterInactive(encounter)
+    onEncounter(encounter)
     {
+        this.endWait = encounter.data.EndWait;
+        this.encounter = encounter;
     }
 
     onCombatant(combatant)

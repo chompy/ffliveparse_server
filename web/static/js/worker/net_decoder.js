@@ -84,6 +84,7 @@ function decodeEncounterBytes(data)
     output["Zone"]          = readString(data, pos); pos += readUint16(data, pos) + SIZE_INT16;
     output["Damage"]        = readUint32(data, pos); pos += SIZE_INT32;
     output["Active"]        = readByte(data, pos) != 0; pos += SIZE_BYTE;
+    output["EndWait"]       = readByte(data, pos) != 0; pos += SIZE_BYTE;
     output["SuccessLevel"]  = readByte(data, pos); pos += SIZE_BYTE;
     
     output["StartTime"]     = new Date(output["StartTime"]);

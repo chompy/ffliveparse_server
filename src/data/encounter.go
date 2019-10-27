@@ -28,15 +28,16 @@ const DataTypeEncounter byte = 2
 // Encounter - Data about an encounter
 type Encounter struct {
 	ByteEncodable
-	UserID       int64     `json:"user_id"`
+	UserID       int64     `json:"user_id" gorm:"index"`
 	UID          string    `json:"uid" gorm:"primary key;unique_index;not null;type:varchar(32)"`
 	ActID        uint32    `json:"act_id"`
 	CompareHash  string    `json:"compare_hash" gorm:"not null;type:varchar(32)"`
-	StartTime    time.Time `json:"start_time"`
-	EndTime      time.Time `json:"end_time"`
+	StartTime    time.Time `json:"start_time" gorm:"index"`
+	EndTime      time.Time `json:"end_time" gorm:"index"`
 	Zone         string    `json:"zone" gorm:"type:varchar(256)"`
 	Damage       int32     `json:"damage"`
 	Active       bool      `json:"active"`
+	EndWait      bool      `json:"end_wait"`
 	SuccessLevel uint8     `json:"success_level"`
 }
 
@@ -50,6 +51,7 @@ func (e *Encounter) ToBytes() []byte {
 	writeString(&data, e.Zone)
 	writeInt32(&data, e.Damage)
 	writeBool(&data, e.Active)
+	writeBool(&data, e.EndWait)
 	writeByte(&data, e.SuccessLevel)
 	return data
 }

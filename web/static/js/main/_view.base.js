@@ -119,10 +119,19 @@ class ViewBase
     }
 
     /**
-     * Called when a new encounter is started.
+     * Called when encounter data is recieved.
      * @param {object} encounter 
      */
     onEncounter(encounter)
+    {
+        return;
+    }
+
+    /**
+     * Called when a new encounter is started.
+     * @param {object} encounter 
+     */
+    onEncounterActive(encounter)
     {
         return;
     }

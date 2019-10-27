@@ -481,7 +481,7 @@ class ViewCombatantTable extends ViewBase
         this.updateCooldowns();        
     }
 
-    onEncounter(encounter)
+    onEncounterActive(encounter)
     {
         this.tableBody.innerHTML = "";
         this.combatantElements = {};

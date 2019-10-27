@@ -235,6 +235,7 @@ func (m *Manager) handdleSession(session *UserSession) {
 	logger.Log("Start session.")
 	lastActivity := time.Now()
 	encounterActive := false
+	encounterEndWait := false
 	encounterZone := ""
 	lastCombatantUpdate := time.Time{}
 	lastEncounterSend := time.Time{}
@@ -246,10 +247,10 @@ func (m *Manager) handdleSession(session *UserSession) {
 		encounter := session.EncounterManager.GetEncounter()
 		encounter.UserID = session.User.ID
 		if lastEncounterSend.Add(time.Millisecond*app.EncounterResendRate).Before(time.Now()) ||
-			encounter.Active != encounterActive || (encounter.Zone != "" && encounterZone == "") {
-
+			encounter.Active != encounterActive || (encounter.Zone != "" && encounterZone == "") || encounter.EndWait != encounterEndWait {
 			encounterZone = encounter.Zone
 			encounterActive = encounter.Active
+			encounterEndWait = encounter.EndWait
 			lastEncounterSend = time.Now()
 			encounterBytes := encounter.ToBytes()
 			encounterBytes, err = data.CompressBytes(encounterBytes)

@@ -827,7 +827,7 @@ class ViewTriggers extends ViewBase
         }
     }
 
-    onEncounter(encounter)
+    onEncounterActive(encounter)
     {
         this.reset();
         this.zoneName = encounter.data.Zone;

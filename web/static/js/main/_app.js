@@ -298,7 +298,7 @@ class Application
                 t.encounter.update(e.detail);
                 // forward encounter to all views
                 for (var i in t.views) {
-                    t.views[i].onEncounter(t.encounter);
+                    t.views[i].onEncounterActive(t.encounter);
                 }
             }
             if (t.encounter && t.encounter.data.Active && !e.detail.Active) {
@@ -307,6 +307,11 @@ class Application
                 for (var i in t.views) {
                     t.views[i].onEncounterInactive(t.encounter);
                 } 
+            }
+            for (var i in t.views) {
+                var encounter = new Encounter();
+                encounter.update(e.detail);
+                t.views[i].onEncounter(encounter);
             }
         });
         

@@ -196,19 +196,6 @@ func (d *DatabaseHandler) FetchCombatantsForEncounter(encounterUID string) ([]da
 	return c, res.Error
 }
 
-// StorePlayers - store players to database
-func (d *DatabaseHandler) StorePlayers(players []*data.Player) error {
-	d.lock.Lock()
-	defer d.lock.Unlock()
-	for index := range players {
-		res := d.conn.Save(players[index])
-		if res.Error != nil {
-			return res.Error
-		}
-	}
-	return nil
-}
-
 // CleanUpRoutine - perform clean up operations at regular interval
 func (d *DatabaseHandler) CleanUpRoutine() {
 	cleanUp := func() {

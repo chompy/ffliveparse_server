@@ -29,7 +29,6 @@ class EncounterDisplay
     constructor()
     {
         this.startTime = null;
-        this.offset = 0;
         this.encounterId = "";
         this.combatants = [];
         this.tickTimeout = null;
@@ -55,6 +54,7 @@ class EncounterDisplay
     reset()
     {
         this.combatants = [];
+        this.endWait = false;
         this.encounterLengthElement.innerText = "00:00";
         this.encounterNameElement.innerText = "-";
         this.encounterStatusElement.classList.add("hide");
@@ -73,8 +73,8 @@ class EncounterDisplay
             clearTimeout(this.tickTimeout);
         }
         // update element
-        if (this.startTime) {
-            var duration = new Date().getTime() - this.startTime.getTime() + this.offset;
+        if (this.startTime && !this.endWait) {
+            var duration = new Date().getTime() - this.startTime.getTime();
             this.setTimer(duration);
         }
         // run every second
@@ -103,6 +103,8 @@ class EncounterDisplay
      */
     _updateEncounter(event)
     {
+        var encounter = new Encounter();
+        encounter.update(event.detail);
         this.encounterId = event.detail.UID;
         // new encounter active
         if (!this.startTime && event.detail.Active) {
@@ -116,22 +118,13 @@ class EncounterDisplay
             this.encounterTimeElement.classList.remove("hide");
             this.encounterTimeElement.innerText = event.detail.StartTime.toLocaleString();
         }
-
-        // calculate encounter dps
-        /*var encounterDps = event.detail.Damage / ((event.detail.EndTime.getTime() - event.detail.StartTime.getTime()) / 1000);
-        if (!this._isValidParseNumber(encounterDps)) {
-            encounterDps = 0;
-        }*/
-        //this.encounterDpsElement.innerText = encounterDps.toFixed(2);
         // inactive
         if (!event.detail.Active) {
             this.startTime = null;
             this.encounterLengthElement.classList.remove("active");
-            var lastDuration = event.detail.EndTime.getTime() - event.detail.StartTime.getTime();
-            this.setTimer(lastDuration);
-
+            this.setTimer(encounter.getLength());
             this.encounterStatusElement.classList.remove("hide");
-
+            this.encounterLengthElement.classList.remove("end-wait");
             switch (event.detail.SuccessLevel) {
                 case 2:
                 case 3:
@@ -148,19 +141,24 @@ class EncounterDisplay
                 {
                     this.encounterStatusElement.innerText = "Ended";
                 }
-            }
-            
+            }            
             return;
         }
-        
         this.startTime = event.detail.StartTime;
-        
         // make active encounter
         this.encounterLengthElement.classList.add("active");  
         // hide status
         this.encounterStatusElement.innerText = "";
         this.encounterStatusElement.classList.add("hide");
-    }
+        // end wait
+        if (!this.endWait && event.detail.EndWait) {
+            this.setTimer(encounter.getLength());
+            this.encounterLengthElement.classList.add("end-wait");
+        } else if (this.endWait && !event.detail.EndWait) {
+            this.encounterLengthElement.classList.remove("end-wait");
+        }
+        this.endWait = event.detail.EndWait;
 
+    }
 
 }

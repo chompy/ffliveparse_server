@@ -101,7 +101,7 @@ class ViewCombatantGraph extends ViewGridBase
         this.combatants = this.combatantCollector.getSortedCombatants("role");
     }
 
-    onEncounter(encounter)
+    onEncounterActive(encounter)
     {
         this.reset();
         this.encounter = encounter;
@@ -146,7 +146,7 @@ class ViewCombatantGraph extends ViewGridBase
         if (!this.encounter) {
             return 0;
         }
-        var startTimestamp = this.encounter.data.StartTime.getTime();
+        var startTimestamp = this.encounter.getStartTime().getTime();
         var encounterLength = this.encounter.getLength();
         switch (name)
         {

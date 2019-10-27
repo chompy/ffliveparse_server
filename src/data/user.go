@@ -34,7 +34,7 @@ type User struct {
 	Accessed        time.Time
 	UploadKey       string `gorm:"unique;not null;type:varchar(32)"` // key used to push data from ACT
 	WebKey          string `gorm:"unique;not null;type:varchar(32)"` // key used to access creds via homepage (stored in cookie)
-	FFToolsUID      string `gorm:"unique_index;type:varchar(32)"`
+	FFToolsUID      string `gorm:"index;type:varchar(32)"`
 	FFToolsUsername string `gorm:"-"`
 	webIDHash       string `gorm:"-"`
 }

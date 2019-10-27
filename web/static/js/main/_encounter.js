@@ -32,16 +32,31 @@ class Encounter
     }
 
     /**
+     * Get encounter start time.
+     * @return {Date}
+     */
+    getStartTime()
+    {
+        if (typeof(this.data.StartTime) != "undefined") {
+            return this.data.StartTime;
+        }
+        return new Date();
+    }
+
+    /**
      * Get encounter end time, or current time if
      * encounter is still active.
      * @return {Date}
      */
     getEndTime()
     {
-        if (this.data.Active) {
+        if (this.data.Active && !this.data.EndWait) {
             return new Date();
         }
-        return this.data.EndTime;
+        if (typeof(this.data.EndTime) != "undefined") {
+            return this.data.EndTime;
+        }
+        return new Date();
     }
 
     /**
@@ -50,7 +65,11 @@ class Encounter
      */
     getLength()
     {
-        return this.getEndTime().getTime() - this.data.StartTime.getTime()
+        var length = this.getEndTime().getTime() - this.getStartTime().getTime();
+        if (length < 1000) {
+            length = 1000;
+        }
+        return length;
     }
 
 }

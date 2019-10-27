@@ -390,6 +390,7 @@ func (e *EncounterManager) Tick() {
 
 // GetEncounter - get the current encounter
 func (e *EncounterManager) GetEncounter() data.Encounter {
+	e.encounter.EndWait = e.IsWaitForTeamWipe()
 	return e.encounter
 }
 
@@ -415,16 +416,6 @@ func (e *EncounterManager) Save() error {
 	}
 	// store encounter to database
 	err := e.database.StoreEncounter(&e.encounter)
-	if err != nil {
-		return err
-	}
-	// store players
-	players := e.CombatantManager.GetPlayers()
-	storePlayers := make([]*data.Player, 0)
-	for index := range players {
-		storePlayers = append(storePlayers, &players[index])
-	}
-	err = e.database.StorePlayers(storePlayers)
 	if err != nil {
 		return err
 	}

@@ -206,7 +206,7 @@ class ViewLogs extends ViewBase
         }
     }
 
-    onEncounter(encounter)
+    onEncounterActive(encounter)
     {
         this.reset();
         this.encounter = encounter;

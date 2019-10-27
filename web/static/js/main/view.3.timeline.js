@@ -62,7 +62,7 @@ var TIMELINE_ELEMENT_SIZES = {
     }
 }
 var TIMELINE_ROLE_COLORS = {
-    "healer"        : ["#2fa35f", "#000"],
+    "healer"        : ["#1a4e30", "#fff"],
     "tank"          : ["#4f59c4", "#fff"],
     "dps"           : ["#723c3a", "#fff"],
     "enemy"         : ["#404040", "#fff"],
@@ -190,7 +190,7 @@ class ViewTimeline extends ViewGridBase
         this.max = this.encounter.getLength();
     }
 
-    onEncounter(encounter)
+    onEncounterActive(encounter)
     {
         this.reset();
         this.encounter = encounter;

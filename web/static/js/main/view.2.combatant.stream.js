@@ -44,7 +44,10 @@ class ViewCombatantStream extends ViewCombatantTable
         super.onActive();
         document.getElementById("head").classList.add("hide");
         document.getElementById("footer").classList.add("hide");
-        document.getElementById("network").classList.add("hide");
+        var network = document.getElementById("network");
+        if (network) {
+            network.classList.add("hide");
+        }
         document.getElementsByTagName("html")[0].style.backgroundColor = "transparent";
         document.getElementsByTagName("body")[0].style.backgroundColor = "transparent";
         var mouseEvent;
@@ -52,7 +55,9 @@ class ViewCombatantStream extends ViewCombatantTable
             window.removeEventListener("mousemove", mouseEvent);
             document.getElementById("head").classList.remove("hide");
             document.getElementById("footer").classList.remove("hide");
-            document.getElementById("network").classList.remove("hide");
+            if (network) {
+                network.classList.remove("hide");
+            }
             document.getElementsByTagName("html")[0].style.backgroundColor = "";
             document.getElementsByTagName("body")[0].style.backgroundColor = "";
         });
