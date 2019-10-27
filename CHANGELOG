@@ -1,6 +1,8 @@
-DEV
+1.44
 - Hide network header while in stream view.
 - Fixed issue with FFTools user caching.
+- Timer now flashes whiles waiting for encounter to end.
+- Updated other views to use healer background color from overview view.
 
 1.43
 - Added FFTools intergration. Live parse pages can now be accessed by FFTools account usernames.
