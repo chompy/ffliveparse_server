@@ -350,16 +350,22 @@ func ParseLogLine(logLine data.LogLine) (ParsedLogLine, error) {
 		}
 	case LogTypeRemoveCombatant:
 		{
-			re, err := regexp.Compile(" 04:Removing combatant ([a-zA-Z0-9'\\- ]*)\\.  Max HP: ([0-9]*)\\.")
+			// remember...we replace ': ' with '####'
+			re, err := regexp.Compile(" 04:([A-F0-9]*):Removing combatant ([a-zA-Z0-9'\\- ]*)\\.  Max HP####([0-9]*)\\.")
 			if err != nil {
 				return data, err
 			}
 			match := re.FindStringSubmatch(logLineString)
-			if len(match) < 3 {
+			if len(match) < 4 {
 				break
 			}
-			data.TargetName = match[1]
-			maxHP, err := hexToInt(match[2])
+			targetID, err := hexToInt(match[1])
+			if err != nil {
+				return data, err
+			}
+			data.TargetID = targetID
+			data.TargetName = match[2]
+			maxHP, err := hexToInt(match[3])
 			if err != nil {
 				return data, err
 			}

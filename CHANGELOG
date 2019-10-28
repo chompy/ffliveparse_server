@@ -1,3 +1,7 @@
+1.45
+- Fixed log parsing for 'removing combatant' message.
+- Encounter detection now uses combatant id.
+
 1.44
 - Hide network header while in stream view.
 - Fixed issue with FFTools user caching.

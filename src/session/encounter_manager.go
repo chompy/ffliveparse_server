@@ -266,30 +266,33 @@ func (e *EncounterManager) ReadLogLine(l *ParsedLogLine) {
 				break
 			}
 			// attacker is a alive
-			ctAttacker.IsAlive = true
+			if !ctTarget.IsAlive {
+				e.log.Log(fmt.Sprintf("Combatant '%s' is alive.", l.TargetName))
+				ctAttacker.IsAlive = true
+			}
 			// target was attacked
 			if !ctTarget.WasAttacked {
-				e.log.Log(fmt.Sprintf("Combatant '%s' is a valid target.", ctTarget.Name))
+				e.log.Log(fmt.Sprintf("Combatant '%s' is a valid target.", l.TargetName))
 				ctTarget.WasAttacked = true
 			}
 			// set teams if needed
 			if ctAttacker.Team == 0 && ctTarget.Team == 0 {
 				ctAttacker.Team = 1
 				ctTarget.Team = 2
-				e.log.Log(fmt.Sprintf("Combatant '%s' is on team 1.", ctAttacker.Name))
-				e.log.Log(fmt.Sprintf("Combatant '%s' is on team 2.", ctTarget.Name))
+				e.log.Log(fmt.Sprintf("Combatant '%s' is on team 1.", l.AttackerName))
+				e.log.Log(fmt.Sprintf("Combatant '%s' is on team 2.", l.TargetName))
 			} else if ctAttacker.Team == 0 && ctTarget.Team != 0 {
 				ctAttacker.Team = 1
 				if ctTarget.Team == 1 {
 					ctAttacker.Team = 2
 				}
-				e.log.Log(fmt.Sprintf("Combatant '%s' is on team %d.", ctAttacker.Name, ctAttacker.Team))
+				e.log.Log(fmt.Sprintf("Combatant '%s' is on team %d.", l.AttackerName, ctAttacker.Team))
 			} else if ctAttacker.Team != 0 && ctTarget.Team == 0 {
 				ctTarget.Team = 1
 				if ctAttacker.Team == 1 {
 					ctTarget.Team = 2
 				}
-				e.log.Log(fmt.Sprintf("Combatant '%s' is on team %d.", ctTarget.Name, ctTarget.Team))
+				e.log.Log(fmt.Sprintf("Combatant '%s' is on team %d.", l.TargetName, ctTarget.Team))
 			}
 			// update team wipe time if action was just performed
 			if e.teamWipeTime.After(e.encounter.StartTime) {
@@ -298,7 +301,7 @@ func (e *EncounterManager) ReadLogLine(l *ParsedLogLine) {
 			e.lastActionTime = time.Now()
 			break
 		}
-	case LogTypeDefeat, LogTypeRemoveCombatant:
+	case LogTypeRemoveCombatant, LogTypeDefeat:
 		{
 			// must be active
 			if !e.encounter.Active {
@@ -308,8 +311,14 @@ func (e *EncounterManager) ReadLogLine(l *ParsedLogLine) {
 			if ctTarget == nil {
 				break
 			}
-			ctTarget.IsAlive = false
-			e.log.Log(fmt.Sprintf("Combatant '%s' was defeated.", ctTarget.Name))
+			// ignore player remove combatant message
+			if e.playerTeam > 0 && ctTarget.Team == e.playerTeam && l.Type == LogTypeRemoveCombatant {
+				break
+			}
+			if ctTarget.IsAlive {
+				ctTarget.IsAlive = false
+				e.log.Log(fmt.Sprintf("Combatant '%s' was defeated.", l.TargetName))
+			}
 			e.checkTeamStatus()
 			break
 		}
