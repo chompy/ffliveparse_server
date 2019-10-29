@@ -1,3 +1,7 @@
+DEV
+- Remove excess database queries from past encounter fetch.
+- Tweak to encounter detection...removing combatant messages no longer ignored for players.
+
 1.45
 - Fixed log parsing for 'removing combatant' message.
 - Encounter detection now uses combatant id.

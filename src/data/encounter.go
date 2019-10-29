@@ -28,12 +28,12 @@ const DataTypeEncounter byte = 2
 // Encounter - Data about an encounter
 type Encounter struct {
 	ByteEncodable
-	UserID       int64     `json:"user_id" gorm:"index"`
+	UserID       int64     `json:"user_id" gorm:"index:idx_encounter_search"`
 	UID          string    `json:"uid" gorm:"primary key;unique_index;not null;type:varchar(32)"`
 	ActID        uint32    `json:"act_id"`
 	CompareHash  string    `json:"compare_hash" gorm:"not null;type:varchar(32)"`
-	StartTime    time.Time `json:"start_time" gorm:"index"`
-	EndTime      time.Time `json:"end_time" gorm:"index"`
+	StartTime    time.Time `json:"start_time" gorm:"index:idx_encounter_search"`
+	EndTime      time.Time `json:"end_time" gorm:"index:idx_encounter_search"`
 	Zone         string    `json:"zone" gorm:"type:varchar(256)"`
 	Damage       int32     `json:"damage"`
 	Active       bool      `json:"active"`

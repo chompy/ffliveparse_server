@@ -206,7 +206,7 @@ func (d *DatabaseHandler) CleanUpRoutine() {
 		cleanUpDate := time.Now().Add((-app.EncounterDeleteDays * 24) * time.Hour)
 		d.log.Start(fmt.Sprintf("Begin clean up. (Clean up encounters older than %s.)", cleanUpDate))
 		res := d.conn.Where(
-			"start_time < ?",
+			"start_time < ? or zone = ''",
 			cleanUpDate,
 		).Delete(&data.Encounter{})
 		if res.Error != nil {

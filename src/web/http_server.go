@@ -417,7 +417,7 @@ func HTTPStartServer(
 			td.Encounters = make([]session.EncounterManager, len(encounters))
 			for index := range encounters {
 				emptySes := sessionManager.GetEmptyUserSession(userData)
-				err = emptySes.EncounterManager.Load(encounters[index].UID)
+				emptySes.EncounterManager.Set(encounters[index])
 				if err != nil {
 					appLog.Error(err)
 					displayError(

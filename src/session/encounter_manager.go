@@ -119,6 +119,11 @@ func (e *EncounterManager) Update(encounter data.Encounter) {
 	e.encounter.ActID = encounter.ActID
 }
 
+// Set - set encounter
+func (e *EncounterManager) Set(encounter data.Encounter) {
+	e.encounter = encounter
+}
+
 // End - flag encounter as inactive
 func (e *EncounterManager) End(successLevel uint8) {
 	// wasn't active
@@ -309,10 +314,6 @@ func (e *EncounterManager) ReadLogLine(l *ParsedLogLine) {
 			}
 			ctTarget := e.getCombatantTracker(l.TargetName)
 			if ctTarget == nil {
-				break
-			}
-			// ignore player remove combatant message
-			if e.playerTeam > 0 && ctTarget.Team == e.playerTeam && l.Type == LogTypeRemoveCombatant {
 				break
 			}
 			if ctTarget.IsAlive {
