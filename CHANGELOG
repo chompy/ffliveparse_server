@@ -1,6 +1,9 @@
-DEV
+1.46
 - Remove excess database queries from past encounter fetch.
 - Tweak to encounter detection...removing combatant messages no longer ignored for players.
+- Fix player table id column, shouldn't be auto incrementing.
+- Allow past encounter combatants to still be fetched even without a record in player table.
+- Add additional check to encounter detection...if pop up message is parsed in log then extend encounter. (This helps prevent end encounters during long phase change cutscenes.)
 
 1.45
 - Fixed log parsing for 'removing combatant' message.

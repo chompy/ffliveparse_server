@@ -152,8 +152,18 @@ func (d *DatabaseHandler) CountUserEncounters(userID int64, start *time.Time, en
 func (d *DatabaseHandler) StoreCombatants(combatants []*data.Combatant) error {
 	d.lock.Lock()
 	defer d.lock.Unlock()
+	players := make(map[int32]data.Player, 0)
+	// store combatants
 	for index := range combatants {
 		res := d.conn.Save(combatants[index])
+		if res.Error != nil {
+			return res.Error
+		}
+		players[combatants[index].Player.ID] = combatants[index].Player
+	}
+	// store players
+	for key := range players {
+		res := d.conn.Save(players[key])
 		if res.Error != nil {
 			return res.Error
 		}
@@ -184,7 +194,15 @@ func (d *DatabaseHandler) FetchCombatantsForEncounter(encounterUID string) ([]da
 		playerIDs = append(playerIDs, c[index].PlayerID)
 	}
 	if len(playerIDs) > 0 {
-		res = d.conn.Where(playerIDs).Find(&players)
+		res = d.conn.Where("player_id IN (?)", playerIDs).Find(&players)
+		if res.Error != nil {
+			return c, res.Error
+		}
+	}
+	for cIndex := range c {
+		c[cIndex].Player.ID = c[cIndex].PlayerID
+		c[cIndex].Player.Name = fmt.Sprintf("#%d", c[cIndex].PlayerID)
+		c[cIndex].Player.ActName = c[cIndex].Player.Name
 	}
 	for index := range players {
 		for cIndex := range c {
@@ -193,7 +211,7 @@ func (d *DatabaseHandler) FetchCombatantsForEncounter(encounterUID string) ([]da
 			}
 		}
 	}
-	return c, res.Error
+	return c, nil
 }
 
 // CleanUpRoutine - perform clean up operations at regular interval

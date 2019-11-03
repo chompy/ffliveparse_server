@@ -37,11 +37,8 @@ const EncounterSuccessClear = 1
 // EncounterSuccessWipe - flag, encounter was failed
 const EncounterSuccessWipe = 2
 
-// combatantTimeout - Time before last combat action before a combatant should be considered defeated/removed
-const combatantTimeout = 7500
-
 // teamDeadTimeout - time before an encounter should end upon a team wipe
-const teamDeadTimeout = 20000
+const teamDeadTimeout = 30000
 
 // noActionTimeout - time before an encounter should end when no actions/data have been recieved
 const noActionTimeout = 300000
@@ -380,6 +377,15 @@ func (e *EncounterManager) ReadLogLine(l *ParsedLogLine) {
 						e.checkTeamStatus()
 					}
 					e.End(EncounterSuccessEnd)
+					break
+				}
+
+			case LogMsgPopUpBubble:
+				{
+					// if 'boss' is talking then its safe to say the encoutner is still going on
+					if e.IsWaitForTeamWipe() {
+						e.teamWipeTime = time.Now().Add(time.Millisecond * teamDeadTimeout)
+					}
 					break
 				}
 			}

@@ -15,7 +15,7 @@
     .card-desc
       font-size: 18px
   .players
-    overflow-x: hidden
+    overflow: hidden
     position: relative
     .player
       padding: 10px 20px
@@ -66,7 +66,7 @@
         left: 135px
         background-image: url(/static/img/icon_damage_taken.png)
       .deaths
-        left: 190px
+        left: 200px
         background-image: url(/static/img/icon_deaths.png)
         background: url(/static/img/icon_deaths.png) no-repeat left 2px
         background-size: 12px
@@ -143,30 +143,19 @@
 
     .players
       .player
-        padding: 10px 5px
+        padding: 8px 10px
         img.job
-          max-width: 28px
-          vertical-align: -7px
-          margin-right: 5px
+          margin-right: 3px
         .dps
-          font-size: 19px
-          width: auto
-          top: -8px
+          width: 80px
         .extras
-          top: 23px
-          padding-left: 15px
+          top: 27px
         .hps
-          left: 37px
+          left: 51px
         .damage-taken
-          left: 82px
+          display: none
         .deaths
-          left: 139px
+          left: 106px
         .cooldowns
           display: none
 
-@media(max-width: 170px)
-  #view-overview
-    .players
-      .player
-        .deaths
-          display: none

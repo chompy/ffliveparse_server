@@ -31,7 +31,7 @@ type Combatant struct {
 	ID             int64     `gorm:"primary key;unique;AUTO_INCREMENT"`
 	UserID         int64     `json:"user_id"`
 	PlayerID       int32     `json:"player_id"`
-	Player         Player    `json:"player" gorm:"foreignkey:ID"`
+	Player         Player    `json:"player" gorm:"-"`
 	EncounterUID   string    `json:"encounter_uid" gorm:"type:varchar(32)"`
 	ActEncounterID uint32    `json:"act_encounter_id"`
 	Time           time.Time `json:"time"`

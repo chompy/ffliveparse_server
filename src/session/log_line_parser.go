@@ -149,6 +149,9 @@ const LogMsgIDCountdownStart = 0x00b9
 // LogMsgChatID - Log message IDs less then this value are considered chat messages and can be ignored
 const LogMsgChatID = 0x00FF
 
+// LogMsgPopUpBubble - Log mesage ID for popup text bubble during encounter.
+const LogMsgPopUpBubble = 0x0044
+
 // logShiftValues
 var logShiftValues = [...]int{0x3E, 0x113, 0x213, 0x313}
 
