@@ -19,7 +19,7 @@ package data
 
 // Player - Data about a player
 type Player struct {
-	ID      int32  `json:"player_id" gorm:"column:player_id;unique_index;not null"`
+	ID      int32  `json:"player_id" gorm:"column:player_id;primary_key;not null"`
 	Name    string `json:"name" gorm:"type:varchar(128)"`
 	ActName string `json:"act_name" gorm:"type:varchar(128)"`
 	World   string `json:"world" gorm:"type:varchar(64)"`
