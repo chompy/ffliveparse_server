@@ -268,8 +268,8 @@ func (e *EncounterManager) ReadLogLine(l *ParsedLogLine) {
 				break
 			}
 			// attacker is a alive
-			if !ctTarget.IsAlive {
-				e.log.Log(fmt.Sprintf("Combatant '%s' is alive.", l.TargetName))
+			if !ctAttacker.IsAlive {
+				e.log.Log(fmt.Sprintf("Combatant '%s' is alive.", l.AttackerName))
 				ctAttacker.IsAlive = true
 			}
 			// target was attacked
