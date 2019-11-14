@@ -367,8 +367,11 @@ func (e *EncounterManager) ReadLogLine(l *ParsedLogLine) {
 					}
 					break
 				}
-			case LogMsgIDCountdownStart:
+			case LogMsgIDCountdown[0], LogMsgIDCountdown[1], LogMsgIDCountdown[2]:
 				{
+					if !e.encounter.Active {
+						break
+					}
 					e.log.Log("Clear flag (countdown) detected.")
 					// if countdown while waiting for team wipe to be determined
 					// then force team wipe check now
@@ -382,8 +385,9 @@ func (e *EncounterManager) ReadLogLine(l *ParsedLogLine) {
 
 			case LogMsgPopUpBubble:
 				{
-					// if 'boss' is talking then its safe to say the encoutner is still going on
+					// if 'boss' is talking then extend team wipe timeout
 					if e.IsWaitForTeamWipe() {
+						e.log.Log("Extend team wipe timeout.")
 						e.teamWipeTime = time.Now().Add(time.Millisecond * teamDeadTimeout)
 					}
 					break

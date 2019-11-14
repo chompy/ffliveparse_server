@@ -1,3 +1,7 @@
+1.47
+- Fixed issue with encounter end on countdown.
+- Fixed issue causing errors to be thrown when parsing a certain log line.
+
 1.46
 - Remove excess database queries from past encounter fetch.
 - Tweak to encounter detection...removing combatant messages no longer ignored for players.

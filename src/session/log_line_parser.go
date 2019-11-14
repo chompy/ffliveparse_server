@@ -140,17 +140,14 @@ const LogMsgIDCastLot = 0x0839
 // LogMsgIDEcho - Log message ID for echo messages
 const LogMsgIDEcho = 0x0038
 
-// LogMsgIDCountdown - Log message ID for countdown messages
-const LogMsgIDCountdown = 0x0039
-
-// LogMsgIDCountdownStart - Log message ID for start countdown messages
-const LogMsgIDCountdownStart = 0x00b9
-
 // LogMsgChatID - Log message IDs less then this value are considered chat messages and can be ignored
 const LogMsgChatID = 0x00FF
 
 // LogMsgPopUpBubble - Log mesage ID for popup text bubble during encounter.
 const LogMsgPopUpBubble = 0x0044
+
+// LogMsgIDCountdown - Log message IDs for countdown
+var LogMsgIDCountdown = [...]int{0x0039, 0x00b9, 0x0139}
 
 // logShiftValues
 var logShiftValues = [...]int{0x3E, 0x113, 0x213, 0x313}
@@ -204,17 +201,17 @@ func ParseLogLine(logLine data.LogLine) (ParsedLogLine, error) {
 	if len(logLineString) <= 15 {
 		return ParsedLogLine{}, fmt.Errorf("tried to parse log line with too few characters")
 	}
+	// get field type
+	logLineType, err := hexToInt(logLineString[15:17])
+	if err != nil {
+		log.Print(logLineString)
+		return ParsedLogLine{}, err
+	}
 	// semi colon with space afterwards is ability name instead of delimiter
 	// probably........... examples... Kaeshi: Higanbana, Hissatsu: Guren
 	logLineString = strings.Replace(logLineString, ": ", "####", -1)
 	// split fields
 	fields := strings.Split(logLineString[15:], ":")
-	// get field type
-	logLineType, err := hexToInt(fields[0])
-	if err != nil {
-		log.Print(logLineString)
-		return ParsedLogLine{}, err
-	}
 	// create data object
 	data := ParsedLogLine{
 		Type: int(logLineType),
