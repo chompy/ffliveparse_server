@@ -198,7 +198,7 @@ func hexToInt(hexString string) (int, error) {
 // ParseLogLine - Parse log line in to data structure
 func ParseLogLine(logLine data.LogLine) (ParsedLogLine, error) {
 	logLineString := logLine.LogLine
-	if len(logLineString) <= 15 {
+	if len(logLineString) <= 17 {
 		return ParsedLogLine{}, fmt.Errorf("tried to parse log line with too few characters")
 	}
 	// get field type
