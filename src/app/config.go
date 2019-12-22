@@ -20,6 +20,7 @@ package app
 import (
 	"fmt"
 	"os"
+	"strings"
 )
 
 // VersionNumber - version number
@@ -73,7 +74,16 @@ const CleanUpRoutineRate = 1800000 // 30 minutes
 // GetFFToolsURL - url to access fftools api
 func GetFFToolsURL() string {
 	out, _ := os.LookupEnv("FFTOOLS_URL")
-	return out
+	return strings.TrimRight(out, "/") + "/"
+}
+
+// GetFFTriggersURL - url for links to fftriggers
+func GetFFTriggersURL() string {
+	out, _ := os.LookupEnv("FFTRIGGERS_URL")
+	if out == "" {
+		out = "https://triggers.fftools.net"
+	}
+	return strings.TrimRight(out, "/") + "/"
 }
 
 // GetVersionString - get version as string in format X.XX

@@ -80,6 +80,7 @@ type templateData struct {
 	PlayerStatSort          string
 	PlayerStatJob           string
 	FFToolsURL              string
+	FFTriggersURL           string
 }
 
 // websocketConnection - Websocket connection data associated with user data
@@ -710,6 +711,9 @@ func getBaseTemplateData() templateData {
 	}
 	if app.GetFFToolsURL() != "" {
 		td.FFToolsURL = app.GetFFToolsURL()
+	}
+	if app.GetFFTriggersURL() != "" {
+		td.FFTriggersURL = app.GetFFTriggersURL()
 	}
 	return td
 }

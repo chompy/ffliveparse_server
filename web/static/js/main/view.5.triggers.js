@@ -22,167 +22,6 @@ var TRIGGER_KEY_TRIGGER = "t";
 var TRIGGER_KEY_ZONE = "z";
 var TRIGGER_KEY_ACTION = "a";
 
-/**
- * A single processable trigger.
- */
-class Trigger
-{
-
-    /**
-     * Constructor.
-     * @param {string|object} data
-     * @param {Vm} vm
-     */
-    constructor(data, vm)
-    {
-        // convert data json/yaml string to object
-        if (typeof(data) == "string") {
-            data = YAML.parse(data);
-        }
-        // only accept one trigger per trigger object
-        if (Array.isArray(data)) {
-            data = data[0];
-        }
-        this.data = data;
-        this.vm = vm;
-        // slugify id
-        this.id  = this.data["i"] = this.get(TRIGGER_KEY_ID)
-            .toLowerCase()
-            .replace(/ /g,'-')
-            .replace(/[^\w-]+/g,'')
-        ;
-        this.parentId = this.data["p"] = this.get(TRIGGER_KEY_PARENT_ID)
-            .toLowerCase()
-            .replace(/ /g,'-')
-            .replace(/[^\w-]+/g,'')
-        ;        
-        // compile trigger regex
-        this.regex = null;
-        if (this.getTrigger()) {
-            this.regex = new XRegExp(this.getTrigger(), "gm");
-        }
-        this.enabled = true;
-    }
-
-    /**
-     * Get data value.
-     * @param {string} key
-     * @return {string}
-     */
-    get(key)
-    {
-        if (key in this.data) {
-            return this.data[key];
-        }
-        return "";
-    }
-
-    /**
-     * @return {boolean}
-     */
-    isValid()
-    {
-        // must have id
-        return this.get(TRIGGER_KEY_ID);
-    }
-
-    /**
-     * @return {string}
-     */
-    getId()
-    {
-        return this.id;
-    }
-
-    /**
-     * @return {string}
-     */
-    getName()
-    {
-        var name = this.get(TRIGGER_KEY_NAME);
-        if (!name) {
-            name = this.getId();
-        }
-        return name;
-    }
-
-    /**
-     * @return {string}
-     */
-    getParentId()
-    {
-        return this.parentId;
-    }
-
-    /**
-     * @return {string}
-     */
-    getZone()
-    {
-        return this.get(TRIGGER_KEY_ZONE);
-    }
-
-    /**
-     * @return {string}
-     */
-    getTrigger()
-    {
-        return this.get(TRIGGER_KEY_TRIGGER);
-    }
-
-    /**
-     * @return {string}
-     */
-    getAction()
-    {
-        return this.get(TRIGGER_KEY_ACTION);
-    }
-
-    /**
-     * Check trigger against a log line.
-     * @param {LogLine} logLine
-     * @param {string} currentZone
-     * @return {boolean} True if log line matched
-     */
-    onLogLine(logLine, currentZone)
-    {
-        if (!this.regex) {
-            return false;
-        }
-        if (this.getZone() && currentZone && this.getZone() != currentZone) {
-            return false;
-        }
-        var match = XRegExp.exec(logLine.LogLine, this.regex);
-        if (!match) {
-            return false;
-        }
-        console.log(">> Trigger, '" + this.getId() + "' matched log line event.");
-        this.vm.realm.global.match = match;
-        this.vm.realm.global.logLine = logLine;
-        this.performAction();
-        this.vm.realm.global.match = null;
-        this.vm.realm.global.logLine = null;
-        return true;
-    }
-
-    /**
-     * Perform action.
-     */
-    performAction()
-    {
-        if (!this.enabled) {
-            return;
-        }
-        if (this.getAction()) {
-            this.vm.realm.global.triggerId = this.getId();
-            this.vm.realm.global.triggerZone = this.getZone();
-            this.vm.realm.global.triggerRegex = this.getTrigger();
-            this.vm.eval(this.getAction());
-        }
-    }
-
-}
-
 class ViewTriggers extends ViewBase
 {
 
@@ -199,7 +38,6 @@ class ViewTriggers extends ViewBase
     init()
     {
         super.init();
-        this.zoneName = "";
         // create triggers in user config if not present
         if (!("triggers" in this.userConfig)) {
             this.userConfig["triggers"] = {};
@@ -231,6 +69,7 @@ class ViewTriggers extends ViewBase
         this.logLineQueue = [];
         this.triggerTimeouts = [];
         this.triggerVariables = {};
+        this.triggerList = null;
         // (re)load triggers
         this.loadTriggers();
     }
@@ -313,7 +152,7 @@ class ViewTriggers extends ViewBase
             function(e) {
                 setTimeout(function() {
                     try {
-                        t.addTriggers(importTextarea.value);
+                        t.importTriggers(importTextarea.value);
                     } catch (exception) {
                         console.log(">> Trigger, import error,", exception);
                         t.importStatusDiv.innerText = "ERROR: " + exception;
@@ -387,30 +226,18 @@ class ViewTriggers extends ViewBase
      * Add new trigger(s).
      * @param {*} data 
      */
-    addTriggers(data)
+    importTriggers(data)
     {
         // parse trigger(s)
         if (typeof(data) == "string") {
-            // two passes, second one attempt to decompress string
-            for (var i = 0; i < 2; i++) {
-                if (i == 1) {
-                    data = LZString.decompressFromBase64(data);
-                }
+            try {
+                data = this.convertFFTriggerData(data);
+            } catch (e) {
                 try {
-                    var oData = data.trim();
-                    data = YAML.parse(data);
-                    if (typeof(data) == "string" && data.trim() == oData) {
-                        throw "Could not parse YAML.";
-                    }
-                    break;
+                    data = this.convertActXML(data);
                 } catch (e) {
-                    try {
-                        data = this.convertActXML(data);
-                        break;
-                    } catch (e) {
-                        if (i == 1) {
-                            throw "Could not parse trigger data.";
-                        }
+                    if (i == 1) {
+                        throw "Could not parse trigger data.";
                     }
                 }
             }
@@ -420,21 +247,24 @@ class ViewTriggers extends ViewBase
             data = [data];
         }
         // itterate triggers
-        var importNewCount = 0;
-        var importUpdateCount = 0;
-        for (var i in data) {
-            var trigger = new Trigger(data[i], new Vm());
-            if (!trigger.isValid()) {
-                console.log(">> Trigger, import error, tried to import trigger without an ID (i).")
-                continue; 
+        let importNewCount = 0;
+        let importUpdateCount = 0;
+        for (let i in data) {
+            let trigger = null;
+            try {
+                trigger = new Trigger(this.convertTrigger(data[i]));
+            } catch (e) {
+                console.log(">> Trigger, import error,", e);
+                continue;                 
             }
-            if (trigger.getId() in this.userConfig["triggers"]) {
+
+            if (trigger.getUid() in this.userConfig["triggers"]) {
                 importUpdateCount++;
             } else {
                 importNewCount++
             }
-            this.userConfig["triggers"][trigger.getId()] = trigger.data;
-            console.log(">> Trigger, imported '" + trigger.getId() + ".'");
+            this.userConfig["triggers"][trigger.getUid()] = data[i];
+            console.log(">> Trigger, imported '" + trigger.getUid() + ".'");
         }
         this.importStatusDiv.innerText = "";
         if (importNewCount > 0) {
@@ -461,7 +291,7 @@ class ViewTriggers extends ViewBase
         var deleteIndexes = [];
         for (var i in this.triggers) {
             var trigger = this.triggers[i];
-            if (triggerIds.indexOf(trigger.getId()) != -1) {
+            if (triggerIds.indexOf(trigger.getUid()) != -1) {
                 if (deleteIndexes.indexOf(i) == -1) {
                     deleteIndexes.push(i);
                 }
@@ -502,7 +332,7 @@ class ViewTriggers extends ViewBase
         var exportIndexes = [];
         for (var i in this.triggers) {
             var trigger = this.triggers[i];
-            if (triggerIds.indexOf(trigger.getId()) != -1) {
+            if (triggerIds.indexOf(trigger.getUid()) != -1) {
                 if (exportIndexes.indexOf(i) == -1) {
                     exportIndexes.push(i);
                 }
@@ -548,7 +378,7 @@ class ViewTriggers extends ViewBase
         var parentIds = [child.getParentId()];
         for (var i in this.triggers) {
             var trigger = this.triggers[i];
-            if (parentIds.indexOf(trigger.getId()) != -1) {
+            if (parentIds.indexOf(trigger.getUid()) != -1) {
                 if (trigger.getParentId()) {
                     parentIds.push(trigger.getParentId());
                 }
@@ -557,171 +387,83 @@ class ViewTriggers extends ViewBase
         return parentIds.indexOf(parent.getId()) != -1;
     }
 
+    /**
+     * Convert stored trigger to dict used by FFTrigger.
+     * @param {Dict} data 
+     * @return {Dict}
+     */
+    convertTrigger(data)
+    {
+        return {
+            "name" : data[TRIGGER_KEY_NAME],
+            "uid" : data[TRIGGER_KEY_ID],
+            "log_regex" : data[TRIGGER_KEY_TRIGGER],
+            "zone_regex" : data[TRIGGER_KEY_ZONE],
+            "lua_script" : data[TRIGGER_KEY_ACTION],
+            "tts_message" : "",
+            "parent_id" : data[TRIGGER_KEY_PARENT_ID]
+        };
+    }
+
+    /**
+     * Load all triggers from local storage.
+     */
     loadTriggers()
     {        
-        // create trigger condition+action vm
-        var t = this;
-        var vm = new Vm();
-        vm.realm.global.me = this.userConfig["character_name"];
-        vm.realm.global.data = {};
-        var triggerFuncTimeout = function(func, delay) {
-            var delay = parseInt(delay ? delay : 0);
-            if (isNaN(delay) || !delay) {
-                func();
-                return;
+        // create trigger list object
+        this.triggerList = new TriggerList(
+            function(msg) {
+                console.log(">> Trigger, log, ", msg);
             }
-            t.triggerTimeouts.push(
-                setTimeout(func, delay)
-            );
-        };
-        var triggerEnable = function(tid, enable) {
-            var count = 0;
-            for (var i in t.triggers) {
-                var trigger = t.triggers[i];
-                if (trigger.getId() == tid) {
-                    count++;
-                    trigger.enabled = enable;
-                    for (var j in t.triggers) {
-                        if (t.triggerIsChildOf(t.triggers[j], trigger)) {
-                            count++;
-                            t.triggers[j].enabled = enable;
-                        }
-                    }
-                }
-            }
-            if (count > 0) {
-                if (enable) {
-                    console.log(">> Trigger, ENABLE, " + tid + ", " + count + " trigger(s).");
-                    return;
-                }
-                console.log(">> Trigger, DISABLE, " + tid + ", " + count + " trigger(s).");
-            }
+        );
+        this.triggerList.setEncounterZone("*");
+        if (this.userConfig["character_name"]) {
+            this.triggerList.setMe({
+                "name" : this.userConfig["character_name"],
+                "job" : "WAR"
+            });
         }
-        // SAY
-        vm.realm.global.say = function(text, delay) {
-            var text = text;
-            triggerFuncTimeout(
-                function() {
-                    console.log(">> Trigger, SAY, " + text);
-                    if (!t.userConfig["enable_tts"]) {
-                        return;
-                    }
-                    var msg = new SpeechSynthesisUtterance(text);
-                    window.speechSynthesis.speak(msg);      
-                },
-                delay
-            );      
-        };
-        // DO
-        vm.realm.global.do = function(tid, delay) {
-            var tid = tid;
-            triggerFuncTimeout(
-                function() {
-                    for (var i in t.triggers) {
-                        var trigger = t.triggers[i];
-                        if (trigger.getId() == tid) {
-                            console.log(">> Trigger, DO, " + tid);
-                            return trigger.performAction();
-                        }
-                    }
-                },
-                delay
-            );
-        };
-        // WAIT
-        vm.realm.global.wait = function(callback, delay) {
-            triggerFuncTimeout(
-                callback,
-                delay
-            )
-        };
-        // ENABLE
-        vm.realm.global.enable = function(tid, delay) {
-            var tid = tid;
-            triggerFuncTimeout(
-                function() {
-                    triggerEnable(tid, true);
-                },
-                delay
-            );
-        };
-        // DISABLE
-        vm.realm.global.disable = function(tid, delay) {
-            var tid = tid;
-            triggerFuncTimeout(
-                function() {
-                    triggerEnable(tid, false);
-                },
-                delay
-            );
-            
-        };
+
         // GET COMBATANT
-        vm.realm.global.getCombatant = function(name) {
+        /*vm.realm.global.getCombatant = function(name) {
             return this.combatantCollector.find(name);
-        };
-        // NAME SHORTIFY
-        vm.realm.global.nameShortify = function(name) {
-            name = name.trim().split(" ");
-            return name[0];
-        };
-        // PARSE LOG LINE
-        vm.realm.global.parseLogLine = function(logLine) {
-            if (typeof(logLine) == "object") {
-                logLine = logLine.LogLine;
-            }
-            return parseLogLine(logLine);
-        };
-        // SET
-        vm.realm.global.set = function(key, value) {
-            console.log(">> Trigger, SET, " + key + " = " + value);
-            t.triggerVariables[key] = value;
-        };
-        // GET
-        vm.realm.global.get = function(key) {
-            return key in t.triggerVariables ? t.triggerVariables[key] : null;
-        }
-        // LOG
-        vm.realm.global.log = function(value) {
-            console.log(">> Trigger, log, ", value);
-        }
+        };*/
+
         // load triggers with VM
         this.triggers = [];
         for (var tid in this.userConfig["triggers"]) {
-            var trigger = new Trigger(this.userConfig["triggers"][tid], vm);
-            if (!trigger.isValid()) {
-                continue;
-            }
-            this.triggers.push(trigger);
+            this.triggerList.addTrigger(
+                this.convertTrigger(this.userConfig["triggers"][tid])
+            );
         }
-        console.log(">> Trigger, loaded " + this.triggers.length + " triggers.");
+        console.log(">> Trigger, loaded " + this.triggerList.triggers.length + " triggers.");
         this.addTriggerElements();
     }
 
     addTriggerElements()
     {
         this.triggerListDiv.innerHTML = "";
-        if (this.triggers.length == 0) {
+        if (this.triggerList.triggers.length == 0) {
             this.triggerListDiv.appendChild(this.triggerListEmptyDiv);
             return;
         }
-        this.triggers.sort(function(a, b) {
+        this.triggerList.triggers.sort(function(a, b) {
             return a.getName().localeCompare(b.getName());
         });
         var t = this;
         var itterateLevels = function(parentTrigger, level) {
-            for (var i in t.triggers) {
-                var trigger = t.triggers[i];
-                if (trigger.getParentId() == parentTrigger.getId()) {
+            for (var i in t.triggerList.triggers) {
+                var trigger = t.triggerList.triggers[i];
+                if (trigger.trigger.parent_id == parentTrigger.getUid()) {
                     t.addTriggerElement(trigger, level);
                     itterateLevels(trigger, level + 1);
                 }
             }
         };
-        for (var i in this.triggers) {
-            var trigger = t.triggers[i];
-            if (!trigger.getParentId()) {
-                this.addTriggerElement(this.triggers[i], 0);
+        for (var i in this.triggerList.triggers) {
+            var trigger = t.triggerList.triggers[i];
+            if (!trigger.trigger.parent_id) {
+                this.addTriggerElement(trigger, 0);
                 itterateLevels(trigger, 1);
             }
         }
@@ -734,12 +476,12 @@ class ViewTriggers extends ViewBase
     {
         var triggerElement = document.createElement("div");
         triggerElement.classList.add("trigger-list-element", "trigger-element-level-" + level)
-        triggerElement.setAttribute("data-trigger-id", trigger.getId());
+        triggerElement.setAttribute("data-trigger-id", trigger.getUid());
         this.triggerListDiv.appendChild(triggerElement);
 
         var triggerSelectElement = document.createElement("input");
         triggerSelectElement.type = "checkbox";
-        var elementId = "trigger-element-" + trigger.getId().replace(/ /g, "-");
+        var elementId = "trigger-element-" + trigger.getUid().replace(/ /g, "-");
         triggerSelectElement.id = elementId;
         triggerElement.appendChild(triggerSelectElement);
 
@@ -790,8 +532,8 @@ class ViewTriggers extends ViewBase
         if (category) {
             var categoryId = "act-" + category;
             triggersToAdd.push({
-                "i"         : categoryId,
-                "n"         : category + " (ACT)"
+                TRIGGER_KEY_ID   : categoryId,
+                TRIGGER_KEY_NAME : category + " (ACT)"
             });
         }
         // fix match vars in message
@@ -803,16 +545,59 @@ class ViewTriggers extends ViewBase
         triggerId = "act-" + triggerId.split("").reduce(function(a,b){a=((a<<5)-a)+b.charCodeAt(0);return a&a},0);
         // create trigger data object
         triggersToAdd.push({
-            "i"         : triggerId,
-            "n"         : regex.substring(0, 64) + 
+            TRIGGER_KEY_ID   : triggerId,
+            TRIGGER_KEY_NAME : regex.substring(0, 64) + 
                                 (regex.length > 64 ? "... :: " : " :: ") +
                                 message.substring(0, 64) +
                                 (message.length > 64 ? "..." : "")
                         ,
-            "p"         : categoryId,
-            "t"         : regex,
-            "z"         : restrictToZoneCategory ? category : "",
-            "a"         : "say(\""+ actionMessage +"\");"
+            TRIGGER_KEY_PARENT_ID : categoryId,
+            TRIGGER_KEY_TRIGGER   : regex,
+            TRIGGER_KEY_ZONE      : restrictToZoneCategory ? category : "",
+            TRIGGER_KEY_ACTION    : "say(\""+ actionMessage +"\")"
+        });
+        return triggersToAdd;
+    }
+
+    /**
+     * Convert FFTrigger data.
+     * @param {string} data 
+     */
+    convertFFTriggerData(data)
+    {
+        data = atob(data.trim());
+        data = new TextDecoder("utf-8").decode(
+            pako.inflate(data)
+        );
+        let sep = "╠";
+
+        if (data.length == 0 || data[0] !=sep) {
+            throw "Invalid FFTrigger data.";
+        }
+        data = data.split(sep);
+        if (data.length != 7) {
+            throw "Invalid FFTrigger data.";
+        }
+        let triggerId = data[1];
+        let triggerName = data[2];
+        let triggerRegex = data[3];
+        let triggerZone = data[4];
+        let triggerTts = data[5].trim();
+        let triggerScript = data[6];        
+        if (triggerTts) {
+            triggerScript = "say(\"" + triggerTts + "\");\n" + triggerScript;
+        }
+        let triggersToAdd = [{
+            [TRIGGER_KEY_ID]   : "fftriggers",
+            [TRIGGER_KEY_NAME] : "FFTriggers"
+        }];
+        triggersToAdd.push({
+            [TRIGGER_KEY_ID]   : triggerId,
+            [TRIGGER_KEY_NAME] : triggerName,
+            [TRIGGER_KEY_PARENT_ID] : "fftriggers",
+            [TRIGGER_KEY_TRIGGER]   : triggerRegex,
+            [TRIGGER_KEY_ZONE]      : triggerZone,
+            [TRIGGER_KEY_ACTION]    : triggerScript
         });
         return triggersToAdd;
     }
@@ -822,15 +607,13 @@ class ViewTriggers extends ViewBase
         if (!this.ready) {
             return;
         }
-        for (var i in this.triggers) {
-            this.triggers[i].onLogLine(logLineData, this.zoneName);
-        }
+        this.triggerList.onLogLine(logLineData.LogLine);
     }
 
     onEncounterActive(encounter)
     {
         this.reset();
-        this.zoneName = encounter.data.Zone;
+        this.triggerList.setEncounterZone(encounter.data.Zone);
     }
 
     onEncounterInactive(encounter)
