@@ -56,7 +56,7 @@ class ViewTriggers extends ViewBase
         this.buildBaseElements();
         this.triggerTimeouts = [];
         this.reset();
-        this.importStatusDiv.textContent = this.triggers.length + " trigger(s) loaded."
+        this.importStatusDiv.textContent = this.triggerList.triggers.length + " trigger(s) loaded."
     }
 
     reset()
@@ -252,7 +252,7 @@ class ViewTriggers extends ViewBase
         for (let i in data) {
             let trigger = null;
             try {
-                trigger = new Trigger(this.convertTrigger(data[i]));
+                trigger = new Trigger(this.convertTrigger(data[i]), new TriggerLuaFunctions({}));
             } catch (e) {
                 console.log(">> Trigger, import error,", e);
                 continue;                 
@@ -288,15 +288,15 @@ class ViewTriggers extends ViewBase
         if (typeof(triggerIds) != "object") {
             triggerIds = [triggerIds];
         }
-        var deleteIndexes = [];
-        for (var i in this.triggers) {
-            var trigger = this.triggers[i];
+        let deleteIndexes = [];
+        for (let i in this.triggerList.triggers) {
+            let trigger = this.triggerList.triggers[i];
             if (triggerIds.indexOf(trigger.getUid()) != -1) {
                 if (deleteIndexes.indexOf(i) == -1) {
                     deleteIndexes.push(i);
                 }
-                for (var j in this.triggers) {
-                    if (this.triggerIsChildOf(this.triggers[j], trigger)) {
+                for (let j in this.triggerList.triggers) {
+                    if (this.triggerIsChildOf(this.triggerList.triggers[j], trigger)) {
                         if (deleteIndexes.indexOf(j) == -1) {
                             deleteIndexes.push(j);
                         }
@@ -305,11 +305,11 @@ class ViewTriggers extends ViewBase
             }
         }
         if (confirm("This will delete " + deleteIndexes.length + " trigger(s), are you sure?")) {
-            var rebuildTriggers = {};
-            for (var tid in this.userConfig["triggers"]) {
-                var isDelete = false;
-                for (var i in deleteIndexes) {
-                    if (this.triggers[deleteIndexes[i]].getId() == tid) {
+            let rebuildTriggers = {};
+            for (let tid in this.userConfig["triggers"]) {
+                let isDelete = false;
+                for (let i in deleteIndexes) {
+                    if (this.triggerList.triggers[deleteIndexes[i]].getUid() == tid) {
                         isDelete = true;
                         break;
                     }
@@ -326,24 +326,24 @@ class ViewTriggers extends ViewBase
 
     exportTriggers(triggerIds)
     {
-        if (typeof(triggerIds) != "object") {
+        /*if (typeof(triggerIds) != "object") {
             triggerIds = [triggerIds];
         }
         var exportIndexes = [];
-        for (var i in this.triggers) {
+        for (var i in this.triggerList) {
             var trigger = this.triggers[i];
             if (triggerIds.indexOf(trigger.getUid()) != -1) {
                 if (exportIndexes.indexOf(i) == -1) {
                     exportIndexes.push(i);
                 }
-                var parentTriggerId = trigger.getParentId();
+                var parentTriggerId = trigger.parent_id;
                 while (parentTriggerId) {
                     for (var j in this.triggers) {
                         if (this.triggers[j].getId() == parentTriggerId) {
                             if (exportIndexes.indexOf(j) == -1) {
                                 exportIndexes.push(j);
                             }
-                            parentTriggerId = this.triggers[j].getParentId();
+                            parentTriggerId = this.triggerList.triggers[j].parent_id;
                         }
                     }
                 }      
@@ -358,7 +358,7 @@ class ViewTriggers extends ViewBase
         prompt(
             exportTriggerData.length + " trigger(s) exported...",
             LZString.compressToBase64(JSON.stringify(exportTriggerData))
-        );
+        );*/
     }
 
     /**
@@ -369,22 +369,23 @@ class ViewTriggers extends ViewBase
      */
     triggerIsChildOf(child, parent)
     {
-        if (!child.getParentId()) {
+        console.log(child);
+        if (!child.data.parent_id) {
             return false;
         }
-        if (child.getParentId() == parent.getId()) {
+        if (child.data.parent_id == parent.getUid()) {
             return true;
         }
-        var parentIds = [child.getParentId()];
-        for (var i in this.triggers) {
-            var trigger = this.triggers[i];
+        var parentIds = [child.data.parent_id];
+        for (var i in this.triggerList.triggers) {
+            var trigger = this.triggerList.triggers[i];
             if (parentIds.indexOf(trigger.getUid()) != -1) {
-                if (trigger.getParentId()) {
-                    parentIds.push(trigger.getParentId());
+                if (trigger.data.parent_id) {
+                    parentIds.push(trigger.data.parent_id);
                 }
             }
         }
-        return parentIds.indexOf(parent.getId()) != -1;
+        return parentIds.indexOf(parent.getUid()) != -1;
     }
 
     /**
@@ -416,21 +417,18 @@ class ViewTriggers extends ViewBase
                 console.log(">> Trigger, log, ", msg);
             }
         );
-        this.triggerList.setEncounterZone("*");
         if (this.userConfig["character_name"]) {
             this.triggerList.setMe({
                 "name" : this.userConfig["character_name"],
-                "job" : "WAR"
+                "job"  : "war",
+                "damage" : 0,
+                "healing" : 0,
+                "damage_taken" : 0,
+                "deaths" : 0,
+                "hits" : 0,
             });
         }
-
-        // GET COMBATANT
-        /*vm.realm.global.getCombatant = function(name) {
-            return this.combatantCollector.find(name);
-        };*/
-
-        // load triggers with VM
-        this.triggers = [];
+        // load triggers
         for (var tid in this.userConfig["triggers"]) {
             this.triggerList.addTrigger(
                 this.convertTrigger(this.userConfig["triggers"][tid])
@@ -454,7 +452,7 @@ class ViewTriggers extends ViewBase
         var itterateLevels = function(parentTrigger, level) {
             for (var i in t.triggerList.triggers) {
                 var trigger = t.triggerList.triggers[i];
-                if (trigger.trigger.parent_id == parentTrigger.getUid()) {
+                if (trigger.data.parent_id == parentTrigger.getUid()) {
                     t.addTriggerElement(trigger, level);
                     itterateLevels(trigger, level + 1);
                 }
@@ -462,7 +460,7 @@ class ViewTriggers extends ViewBase
         };
         for (var i in this.triggerList.triggers) {
             var trigger = t.triggerList.triggers[i];
-            if (!trigger.trigger.parent_id) {
+            if (!trigger.data.parent_id) {
                 this.addTriggerElement(trigger, 0);
                 itterateLevels(trigger, 1);
             }
@@ -526,14 +524,18 @@ class ViewTriggers extends ViewBase
         var message = xmlDoc.firstChild.getAttribute("SD");
         var category = xmlDoc.firstChild.getAttribute("C");
         var restrictToZoneCategory = xmlDoc.firstChild.getAttribute("CR") == "T";
-        var triggersToAdd = [];
+        var triggersToAdd = [{
+            [TRIGGER_KEY_ID]   : "act",
+            [TRIGGER_KEY_NAME] : "ACT Triggers"
+        }];
         // create parent trigger for category
         var categoryId = "";
         if (category) {
             var categoryId = "act-" + category;
             triggersToAdd.push({
-                TRIGGER_KEY_ID   : categoryId,
-                TRIGGER_KEY_NAME : category + " (ACT)"
+                [TRIGGER_KEY_ID]   : categoryId,
+                [TRIGGER_KEY_NAME] : category,
+                [TRIGGER_KEY_PARENT_ID] : "act",
             });
         }
         // fix match vars in message
@@ -545,16 +547,16 @@ class ViewTriggers extends ViewBase
         triggerId = "act-" + triggerId.split("").reduce(function(a,b){a=((a<<5)-a)+b.charCodeAt(0);return a&a},0);
         // create trigger data object
         triggersToAdd.push({
-            TRIGGER_KEY_ID   : triggerId,
-            TRIGGER_KEY_NAME : regex.substring(0, 64) + 
+            [TRIGGER_KEY_ID]   : triggerId,
+            [TRIGGER_KEY_NAME] : regex.substring(0, 64) + 
                                 (regex.length > 64 ? "... :: " : " :: ") +
                                 message.substring(0, 64) +
                                 (message.length > 64 ? "..." : "")
                         ,
-            TRIGGER_KEY_PARENT_ID : categoryId,
-            TRIGGER_KEY_TRIGGER   : regex,
-            TRIGGER_KEY_ZONE      : restrictToZoneCategory ? category : "",
-            TRIGGER_KEY_ACTION    : "say(\""+ actionMessage +"\")"
+            [TRIGGER_KEY_PARENT_ID] : categoryId,
+            [TRIGGER_KEY_TRIGGER]   : regex,
+            [TRIGGER_KEY_ZONE]      : restrictToZoneCategory ? category : "",
+            [TRIGGER_KEY_ACTION]    : "say(\""+ actionMessage +"\")"
         });
         return triggersToAdd;
     }
@@ -610,10 +612,27 @@ class ViewTriggers extends ViewBase
         this.triggerList.onLogLine(logLineData.LogLine);
     }
 
+    onCombatant(combatant)
+    {
+        if (!combatant.getLastSnapshot().Job) {
+            return;
+        }
+        this.triggerList.setCombatant({
+            "name" : combatant.getDisplayName(),
+            "job"  : combatant.getLastSnapshot().Job,
+            "damage" : combatant.getLastSnapshot().Damage,
+            "healing" : combatant.getLastSnapshot().DamageHealed,
+            "damage_taken" : combatant.getLastSnapshot().DamageTaken,
+            "deaths" : combatant.getLastSnapshot().Deaths,
+            "hits" : combatant.getLastSnapshot().Hits,
+        });
+    }
+
     onEncounterActive(encounter)
     {
         this.reset();
         this.triggerList.setEncounterZone(encounter.data.Zone);
+        this.triggerList.setStartTime(encounter.data.StartTime);
     }
 
     onEncounterInactive(encounter)
