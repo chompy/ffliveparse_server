@@ -24,7 +24,7 @@ import (
 )
 
 // VersionNumber - version number
-const VersionNumber int32 = 147
+const VersionNumber int32 = 148
 
 // ActPluginMinVersionNumber - act plugin min version
 const ActPluginMinVersionNumber int32 = 5
