@@ -1,3 +1,6 @@
+1.49
+- Fixed issue with DPS in table and stream views.
+
 1.48
 - Removed support for Javascript based triggers.
 - Added support for FFTriggers Lua based triggers.

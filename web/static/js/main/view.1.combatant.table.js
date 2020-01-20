@@ -485,9 +485,13 @@ class ViewCombatantTable extends ViewBase
     {
         this.tableBody.innerHTML = "";
         this.combatantElements = {};
-        this.encounter = encounter;
         this.cooldownTracker = {};
         this.cooldownQueue = [];
+    }
+
+    onEncounter(encounter)
+    {
+        this.encounter = encounter;
     }
 
     onCombatant(combatant)
